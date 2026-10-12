@@ -1,16 +1,41 @@
-# mobile_app
+# AquaSense Mobile App
 
-A new Flutter project.
+Flutter application for AquaSense aquarium monitoring and appetite-aware
+feeding.
 
-## Getting Started
+## Environments
 
-This project is a starting point for a Flutter application.
+Configuration is supplied with compile-time Dart defines. Do not place API
+credentials or other secrets in source control.
 
-A few resources to get you started if this is your first Flutter project:
+Development uses the Android emulator host address by default:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```powershell
+flutter run --dart-define=AQUASENSE_ENV=development
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+To use another backend address:
+
+```powershell
+flutter run `
+  --dart-define=AQUASENSE_ENV=development `
+  --dart-define=AQUASENSE_API_BASE_URL=http://192.168.1.10:8080
+```
+
+Production builds must explicitly provide `AQUASENSE_API_BASE_URL`:
+
+```powershell
+flutter build apk `
+  --dart-define=AQUASENSE_ENV=production `
+  --dart-define=AQUASENSE_API_BASE_URL=https://api.example.com
+```
+
+## Verification
+
+```powershell
+flutter analyze
+flutter test
+```
+
+Development progress and decisions are recorded in
+`../docs/MOBILE_APP_DEVELOPMENT.md`.
