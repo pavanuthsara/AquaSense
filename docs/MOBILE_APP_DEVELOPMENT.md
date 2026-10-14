@@ -16,14 +16,15 @@ Only one task should normally be marked `In progress`.
 
 No task is currently in progress.
 
-**Recommended next task:** MOB-002 — Three onboarding screens.
+**Recommended next task:** MOB-003 — Authentication interface and secure
+session handling.
 
 ## Task Backlog
 
 | ID | Task | Depends on | Status |
 |---|---|---|---|
 | MOB-001 | Flutter application foundation | — | Done |
-| MOB-002 | Three onboarding screens | MOB-001 | Not started |
+| MOB-002 | Three onboarding screens | MOB-001 | Done |
 | MOB-003 | Authentication interface and secure session handling | MOB-001 | Not started |
 | MOB-004 | Google authentication backend | MOB-003 | Not started |
 | MOB-005 | Aquarium facility creation | MOB-004 | Not started |
@@ -203,4 +204,36 @@ usability evaluation, and document demonstrated capabilities and limitations.
   Onboarding content and persistence belong to MOB-002; authentication behavior
   and secure sessions belong to MOB-003.
 - Recommended next task: MOB-002 — Three onboarding screens.
+
+### 2026-10-13 — MOB-002: Three onboarding screens
+
+- Status: Done
+- Summary: Added three responsive onboarding pages covering tank organization,
+  appetite-aware feeding, and alerts/human control. Added Skip, Next, Get
+  started, animated page indicators, saved completion, returning-user startup
+  routing, and an onboarding replay action.
+- Files added: Onboarding repository contract, shared-preferences adapter,
+  startup gate, and completed onboarding presentation under
+  `mobile_app/lib/features/onboarding/`.
+- Files changed: Application bootstrap/routing, home placeholder,
+  `mobile_app/pubspec.yaml`, lockfile, Android NDK/application configuration,
+  generated plugin registration, mobile run guide, and startup/widget tests.
+- Backend/API changes: None.
+- Tests performed: Dart formatting, `flutter analyze --no-pub`,
+  `flutter test --no-pub`, and `flutter build apk --debug --no-pub`.
+- Test results: Static analysis reported no issues; all six onboarding,
+  persistence-flow, replay, routing, and startup tests passed; Android debug APK
+  built successfully with the required NDK configuration.
+- Decisions made: Use `SharedPreferencesAsync` behind an onboarding repository,
+  default safely to onboarding if the completion state cannot be read, and keep
+  persistence replaceable in tests. Use Flutter-native illustrations so this
+  stage introduces no image-asset maintenance.
+- Known limitations: Authentication remains a placeholder for MOB-003. Until a
+  Settings screen exists, onboarding replay is exposed through the dashboard
+  header. Windows Developer Mode may need to be enabled when Flutter creates
+  plugin links during dependency resolution. The local Android toolchain also
+  reports unaccepted SDK licenses, which must be accepted before the first
+  connected-device run.
+- Recommended next task: MOB-003 — Authentication interface and secure session
+  handling.
 

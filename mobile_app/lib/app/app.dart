@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../features/onboarding/domain/onboarding_repository.dart';
+import '../features/onboarding/presentation/startup_gate.dart';
 import 'config/app_environment.dart';
 import 'routing/app_router.dart';
-import 'routing/app_routes.dart';
 import 'theme/aquasense_theme.dart';
 
 class AquaSenseApp extends StatelessWidget {
-  const AquaSenseApp({required this.environment, super.key});
+  const AquaSenseApp({
+    required this.environment,
+    required this.onboardingRepository,
+    super.key,
+  });
 
   final AppEnvironment environment;
+  final OnboardingRepository onboardingRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -18,8 +24,10 @@ class AquaSenseApp extends StatelessWidget {
         title: 'AquaSense',
         debugShowCheckedModeBanner: !environment.isProduction,
         theme: AquaSenseTheme.light,
-        initialRoute: AppRoutes.onboarding,
-        onGenerateRoute: AppRouter.onGenerateRoute,
+        home: StartupGate(onboardingRepository: onboardingRepository),
+        onGenerateRoute: AppRouter(
+          onboardingRepository: onboardingRepository,
+        ).onGenerateRoute,
       ),
     );
   }
