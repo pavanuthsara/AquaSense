@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../core/widgets/app_error_view.dart';
 import '../features/auth/data/development_authentication_repository.dart';
-import '../features/auth/data/pending_google_authentication_repository.dart';
+import '../features/auth/data/google_backend_authentication_repository.dart';
 import '../features/auth/data/secure_auth_session_storage.dart';
 import '../features/auth/domain/authentication_repository.dart';
 import '../features/onboarding/data/shared_preferences_onboarding_repository.dart';
@@ -23,12 +23,17 @@ Future<void> bootstrap({
   final resolvedEnvironment = environment ?? AppEnvironment.fromDartDefines();
   final resolvedOnboardingRepository =
       onboardingRepository ?? SharedPreferencesOnboardingRepository();
+  final sessionStorage = SecureAuthSessionStorage();
   final resolvedAuthenticationRepository =
       authenticationRepository ??
-      (resolvedEnvironment.isProduction
-          ? const PendingGoogleAuthenticationRepository()
+      (resolvedEnvironment.usesRealAuthentication
+          ? GoogleBackendAuthenticationRepository(
+              apiBaseUrl: resolvedEnvironment.apiBaseUrl,
+              googleServerClientId: resolvedEnvironment.googleServerClientId,
+              sessionStorage: sessionStorage,
+            )
           : DevelopmentAuthenticationRepository(
-              sessionStorage: SecureAuthSessionStorage(),
+              sessionStorage: sessionStorage,
             ));
 
   FlutterError.onError = (details) {

@@ -57,7 +57,7 @@ class SignInScreen extends StatelessWidget {
                       height: 1.5,
                     ),
                   ),
-                  if (!environment.isProduction) ...[
+                  if (!environment.usesRealAuthentication) ...[
                     const SizedBox(height: 24),
                     const _DevelopmentModeNotice(),
                   ],

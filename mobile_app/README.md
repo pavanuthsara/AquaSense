@@ -5,14 +5,14 @@ feeding.
 
 ## Current Authentication Behavior
 
-MOB-003 provides the complete authentication interface, state management, and
-encrypted access/refresh-token storage. Development builds intentionally use a
-local test owner when **Continue with Google** is selected. No Google account
-data is requested yet.
+MOB-004 connects the authentication interface to Google and the AquaSense API.
+When a Google Web OAuth client ID is supplied, **Continue with Google** opens
+the Android account chooser, sends the returned ID token to the backend, and
+stores only the resulting AquaSense access and refresh tokens in encrypted
+device storage.
 
-Real Google identity verification and AquaSense backend token exchange belong
-to MOB-004. The development notice on the sign-in screen makes this distinction
-visible while testing on a phone.
+If no Google client ID is supplied, development builds intentionally use the
+local test owner from MOB-003. The sign-in screen clearly labels that mode.
 
 ## Environments
 
@@ -33,12 +33,34 @@ flutter run `
   --dart-define=AQUASENSE_API_BASE_URL=http://192.168.1.10:8080
 ```
 
-Production builds must explicitly provide `AQUASENSE_API_BASE_URL`:
+Real authentication requires both the backend address and the Google Web OAuth
+client ID:
 
 ```powershell
-flutter build apk `
-  --dart-define=AQUASENSE_ENV=production `
-  --dart-define=AQUASENSE_API_BASE_URL=https://api.example.com
+flutter run `
+  --dart-define=AQUASENSE_API_BASE_URL=http://192.168.1.10:8080 `
+  --dart-define=AQUASENSE_GOOGLE_SERVER_CLIENT_ID=<Web OAuth client ID>
+```
+
+Production builds must additionally set
+`--dart-define=AQUASENSE_ENV=production`; they reject missing API and Google
+configuration at startup.
+
+## One-time Google setup for Android
+
+1. In Google Cloud, configure the OAuth consent screen.
+2. Create an **Android OAuth client** for package `com.aquasense.mobile` and
+   the SHA-1 fingerprint of the signing certificate.
+3. Create a **Web application OAuth client**. Use that same Web client ID for
+   the mobile `AQUASENSE_GOOGLE_SERVER_CLIENT_ID` define and backend
+   `AQUASENSE_GOOGLE_CLIENT_ID` environment variable.
+
+For the debug certificate fingerprint on Windows:
+
+```powershell
+keytool -list -v -alias androiddebugkey `
+  -keystore "$env:USERPROFILE\.android\debug.keystore" `
+  -storepass android -keypass android
 ```
 
 ## Verification
@@ -93,9 +115,11 @@ If more than one Android device is listed, pass the required device ID:
 flutter run -d <device-id> --dart-define=AQUASENSE_ENV=development
 ```
 
-The current onboarding and placeholder screens do not require the backend to
-be running. While the app is running, press `r` in the terminal for hot reload
-or `R` for a full restart.
+For real Google sign-in, start the backend first and replace `192.168.1.10`
+with the laptop's Wi-Fi IPv4 address shown by `ipconfig`. The phone and laptop
+must be on the same network. Allow Java through Windows Firewall if the phone
+cannot reach port 8080. While the app is running, press `r` in the terminal for
+hot reload or `R` for a full restart.
 
 ### Run from Android Studio
 

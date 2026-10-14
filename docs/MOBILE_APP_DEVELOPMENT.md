@@ -14,9 +14,8 @@ Only one task should normally be marked `In progress`.
 
 ## Current Task
 
-No task is currently in progress.
-
-**Recommended next task:** MOB-004 — Google authentication backend.
+No task is currently in progress. The recommended next task is
+**MOB-005 — Aquarium facility creation**.
 
 ## Task Backlog
 
@@ -25,7 +24,7 @@ No task is currently in progress.
 | MOB-001 | Flutter application foundation | — | Done |
 | MOB-002 | Three onboarding screens | MOB-001 | Done |
 | MOB-003 | Authentication interface and secure session handling | MOB-001 | Done |
-| MOB-004 | Google authentication backend | MOB-003 | Not started |
+| MOB-004 | Google authentication backend | MOB-003 | Done |
 | MOB-005 | Aquarium facility creation | MOB-004 | Not started |
 | MOB-006 | Multiple-facility switching | MOB-005 | Not started |
 | MOB-007 | Worker invitations and roles | MOB-005 | Not started |
@@ -269,4 +268,44 @@ usability evaluation, and document demonstrated capabilities and limitations.
   that backend integration is pending. Google identity validation, token
   exchange/refresh, and `/me` belong to MOB-004.
 - Recommended next task: MOB-004 — Google authentication backend.
+
+### 2026-10-14 — MOB-004: Google authentication backend
+
+- Status: Done
+- Summary: Added Google ID-token verification, local user creation/update,
+  short-lived AquaSense access JWTs, hashed and rotating refresh tokens,
+  refresh-token revocation, stateless API security, and the Google-to-backend
+  exchange in the Flutter app. Replaced the temporary Android package with
+  `com.aquasense.mobile` so OAuth registration has a stable application ID.
+- Files added: Backend authentication configuration, entities, repositories,
+  services, Google verifier, controllers/error handling, Flyway migration,
+  backend test configuration and authentication tests; Flutter Google token
+  provider, authentication API client, production repository, and repository
+  tests; `backend/README.md`.
+- Files changed: Backend dependencies and runtime configuration; Flutter
+  bootstrap/environment, sign-in disclosure, dependencies and generated plugin
+  registration; Android manifests, package/application ID and activity;
+  `mobile_app/README.md`.
+- Backend/API changes: Added `POST /api/v1/auth/google/exchange`,
+  `POST /api/v1/auth/refresh`, `GET /api/v1/auth/me`, and
+  `POST /api/v1/auth/logout`. All other endpoints now require a valid AquaSense
+  bearer token. Added `app_users` and `refresh_tokens` tables through Flyway.
+- Tests performed: Java 21 Maven test suite, Dart formatting, Flutter static
+  analysis, Flutter test suite, and Android debug APK build with the real-auth
+  compile-time configuration path enabled.
+- Test results: All 11 backend tests passed; all 17 Flutter tests passed;
+  static analysis reported no issues; Android debug APK built successfully.
+- Decisions made: Validate Google signature/expiry through Google's JWK set and
+  additionally require the configured audience, accepted issuer, verified
+  email, and subject; issue 15-minute HMAC-SHA256 access tokens and 30-day
+  opaque refresh tokens; store only SHA-256 refresh-token hashes; rotate each
+  refresh token once; keep secrets in environment/build configuration; retain
+  the disclosed mock sign-in when no Google client ID is supplied.
+- Known limitations: A live Google account chooser and PostgreSQL deployment
+  were not exercised because project-specific Google OAuth credentials and a
+  configured local database were not provided. The code path, API behavior,
+  security rules, migrations, mobile integration, and Android build are
+  automated-test verified. Revoked refresh-token rows are retained for audit
+  and will need a scheduled cleanup policy in a later hardening task.
+- Recommended next task: MOB-005 — Aquarium facility creation.
 

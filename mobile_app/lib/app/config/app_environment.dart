@@ -3,16 +3,23 @@ import 'package:flutter/widgets.dart';
 enum AppEnvironmentName { development, test, production }
 
 class AppEnvironment {
-  const AppEnvironment({required this.name, required this.apiBaseUrl});
+  const AppEnvironment({
+    required this.name,
+    required this.apiBaseUrl,
+    this.googleServerClientId = '',
+  });
 
   const AppEnvironment.test()
     : name = AppEnvironmentName.test,
-      apiBaseUrl = 'http://localhost';
+      apiBaseUrl = 'http://localhost',
+      googleServerClientId = '';
 
   final AppEnvironmentName name;
   final String apiBaseUrl;
+  final String googleServerClientId;
 
   bool get isProduction => name == AppEnvironmentName.production;
+  bool get usesRealAuthentication => googleServerClientId.isNotEmpty;
 
   factory AppEnvironment.fromDartDefines() {
     const environmentValue = String.fromEnvironment(
@@ -21,6 +28,9 @@ class AppEnvironment {
     );
     const configuredApiBaseUrl = String.fromEnvironment(
       'AQUASENSE_API_BASE_URL',
+    );
+    const googleServerClientId = String.fromEnvironment(
+      'AQUASENSE_GOOGLE_SERVER_CLIENT_ID',
     );
 
     final name = switch (environmentValue.toLowerCase()) {
@@ -39,7 +49,17 @@ class AppEnvironment {
             ),
           };
 
-    return AppEnvironment(name: name, apiBaseUrl: apiBaseUrl);
+    if (name == AppEnvironmentName.production && googleServerClientId.isEmpty) {
+      throw StateError(
+        'AQUASENSE_GOOGLE_SERVER_CLIENT_ID is required in production.',
+      );
+    }
+
+    return AppEnvironment(
+      name: name,
+      apiBaseUrl: apiBaseUrl,
+      googleServerClientId: googleServerClientId,
+    );
   }
 }
 
