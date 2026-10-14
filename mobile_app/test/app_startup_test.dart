@@ -5,11 +5,18 @@ import 'package:mobile_app/app/config/app_environment.dart';
 import 'package:mobile_app/app/routing/app_routes.dart';
 import 'package:mobile_app/features/onboarding/domain/onboarding_repository.dart';
 
+import 'fakes/fake_authentication_repository.dart';
+
 void main() {
-  Widget buildApp(FakeOnboardingRepository repository) {
+  Widget buildApp(
+    FakeOnboardingRepository repository, {
+    FakeAuthenticationRepository? authenticationRepository,
+  }) {
     return AquaSenseApp(
       environment: const AppEnvironment.test(),
       onboardingRepository: repository,
+      authenticationRepository:
+          authenticationRepository ?? FakeAuthenticationRepository(),
     );
   }
 
@@ -55,7 +62,7 @@ void main() {
 
     expect(repository.completed, isTrue);
     expect(repository.completionWrites, 1);
-    expect(find.text('Sign in to your aquarium'), findsOneWidget);
+    expect(find.text('Welcome to AquaSense'), findsOneWidget);
   });
 
   testWidgets('skip completes onboarding and opens sign-in', (tester) async {
@@ -67,7 +74,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.completed, isTrue);
-    expect(find.text('Sign in to your aquarium'), findsOneWidget);
+    expect(find.text('Welcome to AquaSense'), findsOneWidget);
   });
 
   testWidgets('returning user bypasses onboarding', (tester) async {
@@ -76,7 +83,7 @@ void main() {
     await tester.pumpWidget(buildApp(repository));
     await tester.pumpAndSettle();
 
-    expect(find.text('Sign in to your aquarium'), findsOneWidget);
+    expect(find.text('Welcome to AquaSense'), findsOneWidget);
     expect(find.text('All tanks, one clear view'), findsNothing);
   });
 

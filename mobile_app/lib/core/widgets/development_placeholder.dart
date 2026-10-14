@@ -7,6 +7,7 @@ class DevelopmentPlaceholder extends StatelessWidget {
     required this.title,
     required this.description,
     this.action,
+    this.uppercaseEyebrow = true,
     super.key,
   });
 
@@ -15,6 +16,7 @@ class DevelopmentPlaceholder extends StatelessWidget {
   final String title;
   final String description;
   final Widget? action;
+  final bool uppercaseEyebrow;
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +50,7 @@ class DevelopmentPlaceholder extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
                 Text(
-                  eyebrow.toUpperCase(),
+                  uppercaseEyebrow ? eyebrow.toUpperCase() : eyebrow,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: theme.colorScheme.primary,
                     letterSpacing: 1.2,

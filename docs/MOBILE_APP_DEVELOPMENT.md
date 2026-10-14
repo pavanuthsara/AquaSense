@@ -16,8 +16,7 @@ Only one task should normally be marked `In progress`.
 
 No task is currently in progress.
 
-**Recommended next task:** MOB-003 — Authentication interface and secure
-session handling.
+**Recommended next task:** MOB-004 — Google authentication backend.
 
 ## Task Backlog
 
@@ -25,7 +24,7 @@ session handling.
 |---|---|---|---|
 | MOB-001 | Flutter application foundation | — | Done |
 | MOB-002 | Three onboarding screens | MOB-001 | Done |
-| MOB-003 | Authentication interface and secure session handling | MOB-001 | Not started |
+| MOB-003 | Authentication interface and secure session handling | MOB-001 | Done |
 | MOB-004 | Google authentication backend | MOB-003 | Not started |
 | MOB-005 | Aquarium facility creation | MOB-004 | Not started |
 | MOB-006 | Multiple-facility switching | MOB-005 | Not started |
@@ -236,4 +235,38 @@ usability evaluation, and document demonstrated capabilities and limitations.
   connected-device run.
 - Recommended next task: MOB-003 — Authentication interface and secure session
   handling.
+
+### 2026-10-14 — MOB-003: Authentication interface and secure session handling
+
+- Status: Done
+- Summary: Replaced the authentication placeholder with a complete Google
+  sign-in interface and application-wide authentication controller. Added
+  checking, signed-out, signing-in, signed-in, signing-out, cancellation, and
+  retryable error behavior; restored sessions at startup; and added user-aware
+  home and sign-out behavior.
+- Files added: Authentication domain models and repository contracts, encrypted
+  session-storage adapter, development and pending-production providers,
+  authentication controller/scope/gate, completed sign-in screen, reusable test
+  fake, authentication widget tests, and secure-storage tests.
+- Files changed: Application bootstrap/scope/routing, startup gate, home screen,
+  shared placeholder widget, mobile run guide, Android configuration,
+  `mobile_app/pubspec.yaml`, lockfile, generated plugin registration, and
+  existing startup tests.
+- Backend/API changes: None. The backend exchange remains MOB-004.
+- Tests performed: Dart formatting, `flutter analyze --no-pub`,
+  `flutter test --no-pub`, and two Android debug build checks while aligning
+  native plugin requirements.
+- Test results: Static analysis reported no issues; all 13 onboarding,
+  authentication-state, session-restoration, sign-out, routing, and encrypted
+  storage tests passed; the Android debug APK built successfully against SDK 36.
+- Decisions made: Keep UI and state management independent of the eventual
+  Google/backend implementation through `AuthenticationRepository`; use
+  `flutter_secure_storage` for access and refresh tokens; use an explicitly
+  disclosed local owner in development; disable Android app backup; and support
+  Android 6.0/API 23 or newer for the secure-storage requirement.
+- Known limitations: **Continue with Google** uses the local development account
+  and does not open the real Google account chooser. Production sign-in reports
+  that backend integration is pending. Google identity validation, token
+  exchange/refresh, and `/me` belong to MOB-004.
+- Recommended next task: MOB-004 — Google authentication backend.
 

@@ -4,6 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/widgets/app_error_view.dart';
+import '../features/auth/data/development_authentication_repository.dart';
+import '../features/auth/data/pending_google_authentication_repository.dart';
+import '../features/auth/data/secure_auth_session_storage.dart';
+import '../features/auth/domain/authentication_repository.dart';
 import '../features/onboarding/data/shared_preferences_onboarding_repository.dart';
 import '../features/onboarding/domain/onboarding_repository.dart';
 import 'app.dart';
@@ -12,12 +16,20 @@ import 'config/app_environment.dart';
 Future<void> bootstrap({
   AppEnvironment? environment,
   OnboardingRepository? onboardingRepository,
+  AuthenticationRepository? authenticationRepository,
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final resolvedEnvironment = environment ?? AppEnvironment.fromDartDefines();
   final resolvedOnboardingRepository =
       onboardingRepository ?? SharedPreferencesOnboardingRepository();
+  final resolvedAuthenticationRepository =
+      authenticationRepository ??
+      (resolvedEnvironment.isProduction
+          ? const PendingGoogleAuthenticationRepository()
+          : DevelopmentAuthenticationRepository(
+              sessionStorage: SecureAuthSessionStorage(),
+            ));
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
@@ -42,6 +54,7 @@ Future<void> bootstrap({
       AquaSenseApp(
         environment: resolvedEnvironment,
         onboardingRepository: resolvedOnboardingRepository,
+        authenticationRepository: resolvedAuthenticationRepository,
       ),
     ),
     (error, stack) {

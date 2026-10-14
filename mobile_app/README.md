@@ -3,6 +3,17 @@
 Flutter application for AquaSense aquarium monitoring and appetite-aware
 feeding.
 
+## Current Authentication Behavior
+
+MOB-003 provides the complete authentication interface, state management, and
+encrypted access/refresh-token storage. Development builds intentionally use a
+local test owner when **Continue with Google** is selected. No Google account
+data is requested yet.
+
+Real Google identity verification and AquaSense backend token exchange belong
+to MOB-004. The development notice on the sign-in screen makes this distinction
+visible while testing on a phone.
+
 ## Environments
 
 Configuration is supplied with compile-time Dart defines. Do not place API

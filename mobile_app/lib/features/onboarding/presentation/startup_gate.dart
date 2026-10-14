@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../auth/presentation/sign_in_placeholder_screen.dart';
+import '../../auth/presentation/authentication_gate.dart';
 import '../domain/onboarding_repository.dart';
 import 'onboarding_screen.dart';
 
@@ -33,7 +33,7 @@ class _StartupGateState extends State<StartupGate> {
         }
 
         if (snapshot.data == true) {
-          return const SignInPlaceholderScreen();
+          return const AuthenticationGate();
         }
 
         return OnboardingScreen(
