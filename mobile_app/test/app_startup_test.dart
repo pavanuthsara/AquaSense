@@ -7,6 +7,7 @@ import 'package:mobile_app/features/onboarding/domain/onboarding_repository.dart
 
 import 'fakes/fake_authentication_repository.dart';
 import 'fakes/fake_facility_repository.dart';
+import 'fakes/fake_facility_selection_store.dart';
 
 void main() {
   Widget buildApp(
@@ -21,6 +22,7 @@ void main() {
       facilityRepository: FakeFacilityRepository(
         facilities: [FakeFacilityRepository.facility()],
       ),
+      facilitySelectionStore: FakeFacilitySelectionStore(),
     );
   }
 
@@ -96,7 +98,14 @@ void main() {
   ) async {
     final repository = FakeOnboardingRepository(completed: true);
 
-    await tester.pumpWidget(buildApp(repository));
+    await tester.pumpWidget(
+      buildApp(
+        repository,
+        authenticationRepository: FakeAuthenticationRepository(
+          restoredSession: FakeAuthenticationRepository.session(),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
     final navigator = tester.state<NavigatorState>(find.byType(Navigator));

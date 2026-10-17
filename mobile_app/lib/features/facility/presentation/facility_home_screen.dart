@@ -4,14 +4,53 @@ import '../../../app/routing/app_routes.dart';
 import '../../auth/presentation/authentication_controller.dart';
 import '../../auth/presentation/authentication_scope.dart';
 import '../domain/facility.dart';
+import 'selected_facility_scope.dart';
 
 class FacilityHomeScreen extends StatelessWidget {
-  const FacilityHomeScreen({required this.facility, super.key});
+  const FacilityHomeScreen({
+    required this.facilities,
+    required this.isSwitching,
+    required this.onFacilitySelected,
+    required this.onAddFacility,
+    super.key,
+  });
 
-  final Facility facility;
+  static const _addFacilityChoice = '__add_facility__';
+
+  final List<Facility> facilities;
+  final bool isSwitching;
+  final Future<bool> Function(Facility) onFacilitySelected;
+  final VoidCallback onAddFacility;
+
+  Future<void> _openFacilitySwitcher(
+    BuildContext context,
+    Facility selectedFacility,
+  ) async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _FacilitySwitcherSheet(
+        facilities: facilities,
+        selectedFacilityId: selectedFacility.id,
+        addFacilityChoice: _addFacilityChoice,
+      ),
+    );
+    if (!context.mounted || choice == null) {
+      return;
+    }
+    if (choice == _addFacilityChoice) {
+      onAddFacility();
+      return;
+    }
+
+    final facility = facilities.firstWhere((item) => item.id == choice);
+    await onFacilitySelected(facility);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final facility = SelectedFacilityScope.of(context);
     final authentication = AuthenticationScope.of(context);
     final user = authentication.user;
     final isSigningOut =
@@ -20,7 +59,23 @@ class FacilityHomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(facility.name),
+        title: TextButton.icon(
+          key: const Key('facility-switcher-button'),
+          onPressed: isSwitching
+              ? null
+              : () => _openFacilitySwitcher(context, facility),
+          style: TextButton.styleFrom(
+            foregroundColor: theme.colorScheme.onSurface,
+          ),
+          iconAlignment: IconAlignment.end,
+          icon: isSwitching
+              ? const SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.keyboard_arrow_down_rounded),
+          label: Text(facility.name, overflow: TextOverflow.ellipsis),
+        ),
         actions: [
           IconButton(
             tooltip: 'View onboarding again',
@@ -116,6 +171,81 @@ class FacilityHomeScreen extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FacilitySwitcherSheet extends StatelessWidget {
+  const _FacilitySwitcherSheet({
+    required this.facilities,
+    required this.selectedFacilityId,
+    required this.addFacilityChoice,
+  });
+
+  final List<Facility> facilities;
+  final String selectedFacilityId;
+  final String addFacilityChoice;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 560),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 12),
+              child: Text(
+                'Switch aquarium',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: facilities.length,
+                itemBuilder: (context, index) {
+                  final facility = facilities[index];
+                  final isSelected = facility.id == selectedFacilityId;
+                  return ListTile(
+                    key: Key('facility-choice-${facility.id}'),
+                    leading: CircleAvatar(
+                      child: Text(facility.name.characters.first.toUpperCase()),
+                    ),
+                    title: Text(facility.name),
+                    subtitle: Text(
+                      '${facility.timeZone.replaceAll('_', ' ')} · '
+                      '${facility.role == FacilityRole.owner ? 'Owner' : 'Worker'}',
+                    ),
+                    trailing: isSelected
+                        ? Icon(
+                            Icons.check_circle_rounded,
+                            color: theme.colorScheme.primary,
+                          )
+                        : null,
+                    onTap: () => Navigator.of(context).pop(facility.id),
+                  );
+                },
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: OutlinedButton.icon(
+                key: const Key('add-aquarium-button'),
+                onPressed: () => Navigator.of(context).pop(addFacilityChoice),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add aquarium'),
               ),
             ),
           ],

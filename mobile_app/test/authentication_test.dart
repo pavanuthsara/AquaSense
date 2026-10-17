@@ -6,6 +6,7 @@ import 'package:mobile_app/features/onboarding/domain/onboarding_repository.dart
 
 import 'fakes/fake_authentication_repository.dart';
 import 'fakes/fake_facility_repository.dart';
+import 'fakes/fake_facility_selection_store.dart';
 
 void main() {
   Widget buildApp(
@@ -17,6 +18,7 @@ void main() {
       onboardingRepository: _CompletedOnboardingRepository(),
       authenticationRepository: authenticationRepository,
       facilityRepository: facilityRepository ?? FakeFacilityRepository(),
+      facilitySelectionStore: FakeFacilitySelectionStore(),
     );
   }
 

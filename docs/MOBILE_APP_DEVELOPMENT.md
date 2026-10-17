@@ -14,8 +14,7 @@ Only one task should normally be marked `In progress`.
 
 ## Current Task
 
-No task is currently in progress. The recommended next task is
-**MOB-006 — Multiple-facility switching**.
+**MOB-006 — Multiple-facility switching** is in progress.
 
 ## Task Backlog
 
@@ -26,7 +25,7 @@ No task is currently in progress. The recommended next task is
 | MOB-003 | Authentication interface and secure session handling | MOB-001 | Done |
 | MOB-004 | Google authentication backend | MOB-003 | Done |
 | MOB-005 | Aquarium facility creation | MOB-004 | Done |
-| MOB-006 | Multiple-facility switching | MOB-005 | Not started |
+| MOB-006 | Multiple-facility switching | MOB-005 | In progress |
 | MOB-007 | Worker invitations and roles | MOB-005 | Not started |
 | MOB-008 | Tank-group management | MOB-005, MOB-007 | Not started |
 | MOB-009 | Tank and tag management | MOB-008 | Not started |

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../domain/facility.dart';
+import '../../auth/presentation/authentication_scope.dart';
 import '../domain/facility_repository.dart';
+import '../domain/facility_selection_store.dart';
 import 'facility_home_screen.dart';
 import 'facility_repository_scope.dart';
+import 'facility_selection_controller.dart';
+import 'facility_selection_store_scope.dart';
 import 'facility_setup_screen.dart';
+import 'selected_facility_scope.dart';
 
 class FacilityGate extends StatefulWidget {
   const FacilityGate({super.key});
@@ -15,59 +19,113 @@ class FacilityGate extends StatefulWidget {
 
 class _FacilityGateState extends State<FacilityGate> {
   FacilityRepository? _repository;
-  Future<List<Facility>>? _facilities;
-  Facility? _selectedFacility;
+  FacilitySelectionStore? _selectionStore;
+  String? _userId;
+  FacilitySelectionController? _controller;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final repository = FacilityRepositoryScope.of(context);
-    if (_repository != repository) {
-      _repository = repository;
-      _facilities = repository.listFacilities();
-      _selectedFacility = null;
+    final selectionStore = FacilitySelectionStoreScope.of(context);
+    final userId = AuthenticationScope.of(context).user?.id;
+    if (userId == null ||
+        (_repository == repository &&
+            _selectionStore == selectionStore &&
+            _userId == userId)) {
+      return;
     }
+
+    _controller?.dispose();
+    _repository = repository;
+    _selectionStore = selectionStore;
+    _userId = userId;
+    _controller = FacilitySelectionController(
+      repository: repository,
+      selectionStore: selectionStore,
+      userId: userId,
+    )..initialize();
   }
 
-  void _retry() {
-    setState(() {
-      _facilities = _repository!.listFacilities();
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openAddFacility() async {
+    final controller = _controller!;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (routeContext) => FacilitySetupScreen(
+          repository: _repository!,
+          isFirstFacility: false,
+          onCreated: (facility) async {
+            await controller.addAndSelect(facility);
+            if (routeContext.mounted) {
+              Navigator.of(routeContext).pop();
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  void _queueNotice(FacilitySelectionController controller, String notice) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || controller.notice != notice) {
+        return;
+      }
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(notice)));
+      controller.clearNotice();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final selectedFacility = _selectedFacility;
-    if (selectedFacility != null) {
-      return FacilityHomeScreen(facility: selectedFacility);
+    final controller = _controller;
+    if (controller == null) {
+      return const _FacilityLoadingScreen();
     }
 
-    return FutureBuilder<List<Facility>>(
-      future: _facilities,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final notice = controller.notice;
+        if (notice != null) {
+          _queueNotice(controller, notice);
+        }
+        if (controller.isLoading) {
           return const _FacilityLoadingScreen();
         }
-        if (snapshot.hasError) {
-          final error = snapshot.error;
+        if (controller.loadError != null) {
           return _FacilityLoadErrorScreen(
-            message: error is FacilityException
-                ? error.message
-                : 'Your aquariums could not be loaded.',
-            onRetry: _retry,
+            message: controller.loadError!,
+            onRetry: controller.retry,
           );
         }
 
-        final facilities = snapshot.data ?? const <Facility>[];
-        if (facilities.isEmpty) {
+        final selectedFacility = controller.selectedFacility;
+        if (selectedFacility == null) {
           return FacilitySetupScreen(
             repository: _repository!,
-            onCreated: (facility) {
-              setState(() => _selectedFacility = facility);
-            },
+            onCreated: controller.addAndSelect,
           );
         }
-        return FacilityHomeScreen(facility: facilities.first);
+
+        return SelectedFacilityScope(
+          key: ValueKey('facility-scope-${selectedFacility.id}'),
+          facility: selectedFacility,
+          child: FacilityHomeScreen(
+            key: ValueKey('facility-home-${selectedFacility.id}'),
+            facilities: controller.facilities,
+            isSwitching: controller.isSwitching,
+            onFacilitySelected: controller.select,
+            onAddFacility: _openAddFacility,
+          ),
+        );
       },
     );
   }

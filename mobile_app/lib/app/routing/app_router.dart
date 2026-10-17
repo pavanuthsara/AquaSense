@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/screens/not_found_screen.dart';
 import '../../features/auth/presentation/authentication_gate.dart';
-import '../../features/facility/presentation/facility_gate.dart';
 import '../../features/onboarding/domain/onboarding_repository.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import 'app_routes.dart';
@@ -23,7 +22,7 @@ class AppRouter {
         isReplay: onboardingArguments.isReplay,
       ),
       AppRoutes.signIn => (_) => const AuthenticationGate(),
-      AppRoutes.home => (_) => const FacilityGate(),
+      AppRoutes.home => (_) => const AuthenticationGate(),
       _ => (_) => NotFoundScreen(routeName: settings.name),
     };
 

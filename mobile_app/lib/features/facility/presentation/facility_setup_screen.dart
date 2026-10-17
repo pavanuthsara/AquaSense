@@ -12,11 +12,13 @@ class FacilitySetupScreen extends StatefulWidget {
   const FacilitySetupScreen({
     required this.repository,
     required this.onCreated,
+    this.isFirstFacility = true,
     super.key,
   });
 
   final FacilityRepository repository;
-  final ValueChanged<Facility> onCreated;
+  final Future<void> Function(Facility) onCreated;
+  final bool isFirstFacility;
 
   @override
   State<FacilitySetupScreen> createState() => _FacilitySetupScreenState();
@@ -74,7 +76,7 @@ class _FacilitySetupScreenState extends State<FacilitySetupScreen> {
         idempotencyKey: _idempotencyKey!,
       );
       if (mounted) {
-        widget.onCreated(facility);
+        await widget.onCreated(facility);
       }
     } on FacilityException catch (error) {
       if (mounted) {
@@ -105,7 +107,9 @@ class _FacilitySetupScreenState extends State<FacilitySetupScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Set up AquaSense'),
+        title: Text(
+          widget.isFirstFacility ? 'Set up AquaSense' : 'Add aquarium',
+        ),
         actions: [
           IconButton(
             tooltip: 'View onboarding again',
@@ -115,11 +119,12 @@ class _FacilitySetupScreenState extends State<FacilitySetupScreen> {
             ),
             icon: const Icon(Icons.help_outline_rounded),
           ),
-          IconButton(
-            tooltip: 'Sign out',
-            onPressed: _isSaving ? null : authentication.signOut,
-            icon: const Icon(Icons.logout_rounded),
-          ),
+          if (widget.isFirstFacility)
+            IconButton(
+              tooltip: 'Sign out',
+              onPressed: _isSaving ? null : authentication.signOut,
+              icon: const Icon(Icons.logout_rounded),
+            ),
         ],
       ),
       body: SafeArea(
@@ -149,7 +154,9 @@ class _FacilitySetupScreenState extends State<FacilitySetupScreen> {
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Name your first aquarium',
+                      widget.isFirstFacility
+                          ? 'Name your first aquarium'
+                          : 'Create another aquarium',
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),

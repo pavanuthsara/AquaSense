@@ -13,7 +13,9 @@ class FakeFacilityRepository implements FacilityRepository {
   int createFailures;
   int listCalls = 0;
   int createCalls = 0;
+  int getCalls = 0;
   final List<String> creationKeys = [];
+  final Set<String> inaccessibleFacilityIds = {};
 
   static Facility facility({
     String id = 'facility-1',
@@ -59,7 +61,21 @@ class FakeFacilityRepository implements FacilityRepository {
 
   @override
   Future<Facility> getFacility(String facilityId) async {
-    return facilities.firstWhere((facility) => facility.id == facilityId);
+    getCalls += 1;
+    if (inaccessibleFacilityIds.remove(facilityId)) {
+      facilities.removeWhere((facility) => facility.id == facilityId);
+      throw const FacilityException(
+        'The aquarium is no longer available.',
+        code: 'facility_not_found',
+      );
+    }
+    return facilities.firstWhere(
+      (facility) => facility.id == facilityId,
+      orElse: () => throw const FacilityException(
+        'The aquarium is no longer available.',
+        code: 'facility_not_found',
+      ),
+    );
   }
 
   @override
