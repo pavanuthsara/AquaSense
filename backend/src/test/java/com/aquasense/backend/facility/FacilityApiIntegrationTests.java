@@ -135,6 +135,22 @@ class FacilityApiIntegrationTests {
     }
 
     @Test
+    void ownerCanListMultipleFacilitiesWithoutSeeingAnotherOwnersFacility() throws Exception {
+        String firstOwner = accessToken("multi-owner", "multi@example.com");
+        String secondOwner = accessToken("other-owner", "other@example.com");
+
+        create(firstOwner, "multi-1", "Blue Reef", "Asia/Colombo", 201);
+        create(firstOwner, "multi-2", "Guppy House", "UTC", 201);
+        create(secondOwner, "other-1", "Private Hatchery", "UTC", 201);
+
+        mockMvc.perform(get("/api/v1/facilities").header("Authorization", bearer(firstOwner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].name", is("Blue Reef")))
+                .andExpect(jsonPath("$[1].name", is("Guppy House")));
+    }
+
+    @Test
     void authenticatedUserCanLoadSupportedTimeZones() throws Exception {
         String accessToken = accessToken("owner-7", "owner7@example.com");
 
