@@ -6,6 +6,7 @@ import 'package:mobile_app/app/routing/app_routes.dart';
 import 'package:mobile_app/features/onboarding/domain/onboarding_repository.dart';
 
 import 'fakes/fake_authentication_repository.dart';
+import 'fakes/fake_facility_repository.dart';
 
 void main() {
   Widget buildApp(
@@ -17,6 +18,9 @@ void main() {
       onboardingRepository: repository,
       authenticationRepository:
           authenticationRepository ?? FakeAuthenticationRepository(),
+      facilityRepository: FakeFacilityRepository(
+        facilities: [FakeFacilityRepository.facility()],
+      ),
     );
   }
 
@@ -111,7 +115,7 @@ void main() {
     await tester.tap(find.text('Done'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Your aquarium overview'), findsOneWidget);
+    expect(find.text('Test Aquarium'), findsOneWidget);
     expect(repository.completed, isTrue);
   });
 

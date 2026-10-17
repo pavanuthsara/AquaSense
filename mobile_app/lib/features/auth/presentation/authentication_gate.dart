@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../home/presentation/home_placeholder_screen.dart';
+import '../../facility/presentation/facility_gate.dart';
 import 'authentication_controller.dart';
 import 'authentication_scope.dart';
 import 'sign_in_screen.dart';
@@ -21,7 +21,7 @@ class AuthenticationGate extends StatelessWidget {
           AuthenticationStatus.signedOut ||
           AuthenticationStatus.signingIn => const SignInScreen(),
           AuthenticationStatus.signedIn ||
-          AuthenticationStatus.signingOut => const HomePlaceholderScreen(),
+          AuthenticationStatus.signingOut => const FacilityGate(),
         };
       },
     );

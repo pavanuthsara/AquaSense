@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../features/auth/domain/authentication_repository.dart';
 import '../features/auth/presentation/authentication_controller.dart';
 import '../features/auth/presentation/authentication_scope.dart';
+import '../features/facility/domain/facility_repository.dart';
+import '../features/facility/presentation/facility_repository_scope.dart';
 import '../features/onboarding/domain/onboarding_repository.dart';
 import '../features/onboarding/presentation/startup_gate.dart';
 import 'config/app_environment.dart';
@@ -14,12 +16,14 @@ class AquaSenseApp extends StatefulWidget {
     required this.environment,
     required this.onboardingRepository,
     required this.authenticationRepository,
+    required this.facilityRepository,
     super.key,
   });
 
   final AppEnvironment environment;
   final OnboardingRepository onboardingRepository;
   final AuthenticationRepository authenticationRepository;
+  final FacilityRepository facilityRepository;
 
   @override
   State<AquaSenseApp> createState() => _AquaSenseAppState();
@@ -49,14 +53,19 @@ class _AquaSenseAppState extends State<AquaSenseApp> {
       environment: widget.environment,
       child: AuthenticationScope(
         controller: _authenticationController,
-        child: MaterialApp(
-          title: 'AquaSense',
-          debugShowCheckedModeBanner: !widget.environment.isProduction,
-          theme: AquaSenseTheme.light,
-          home: StartupGate(onboardingRepository: widget.onboardingRepository),
-          onGenerateRoute: AppRouter(
-            onboardingRepository: widget.onboardingRepository,
-          ).onGenerateRoute,
+        child: FacilityRepositoryScope(
+          repository: widget.facilityRepository,
+          child: MaterialApp(
+            title: 'AquaSense',
+            debugShowCheckedModeBanner: !widget.environment.isProduction,
+            theme: AquaSenseTheme.light,
+            home: StartupGate(
+              onboardingRepository: widget.onboardingRepository,
+            ),
+            onGenerateRoute: AppRouter(
+              onboardingRepository: widget.onboardingRepository,
+            ).onGenerateRoute,
+          ),
         ),
       ),
     );
