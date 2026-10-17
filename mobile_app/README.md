@@ -13,6 +13,12 @@ device storage.
 
 If no Google client ID is supplied, development builds intentionally use the
 local test owner from MOB-003. The sign-in screen clearly labels that mode.
+After sign-in, an owner with no aquariums is guided through naming the first
+aquarium and selecting its scheduling time zone. Returning owners enter the
+last aquarium they selected on that device. Tap the aquarium name in the app
+bar to switch workspaces or create another aquarium. Selections are stored per
+signed-in user, verified against the backend before switching, and safely fall
+back to another accessible aquarium when access has been removed.
 
 ## Environments
 

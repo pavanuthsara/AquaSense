@@ -1,0 +1,37 @@
+
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Original research videos and images
+data_collection/
+
+# YOLO training dataset
+dataset/
+
+# YOLO training results
+runs/
+
+# Model weights
+*.pt
+*.onnx
+*.tflite
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# System files
+.DS_Store
+Thumbs.db

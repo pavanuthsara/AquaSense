@@ -5,13 +5,20 @@ import 'package:mobile_app/app/config/app_environment.dart';
 import 'package:mobile_app/features/onboarding/domain/onboarding_repository.dart';
 
 import 'fakes/fake_authentication_repository.dart';
+import 'fakes/fake_facility_repository.dart';
+import 'fakes/fake_facility_selection_store.dart';
 
 void main() {
-  Widget buildApp(FakeAuthenticationRepository authenticationRepository) {
+  Widget buildApp(
+    FakeAuthenticationRepository authenticationRepository, {
+    FakeFacilityRepository? facilityRepository,
+  }) {
     return AquaSenseApp(
       environment: const AppEnvironment.test(),
       onboardingRepository: _CompletedOnboardingRepository(),
       authenticationRepository: authenticationRepository,
+      facilityRepository: facilityRepository ?? FakeFacilityRepository(),
+      facilitySelectionStore: FakeFacilitySelectionStore(),
     );
   }
 
@@ -45,8 +52,7 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
-    expect(find.text('Welcome, Test Owner'), findsOneWidget);
-    expect(find.text('owner@example.com'), findsOneWidget);
+    expect(find.text('Name your first aquarium'), findsOneWidget);
     expect(repository.signInCalls, 1);
   });
 
@@ -80,7 +86,7 @@ void main() {
     repository.behavior = FakeGoogleSignInBehavior.success;
     await tester.tap(find.text('Continue with Google'));
     await tester.pumpAndSettle();
-    expect(find.text('Welcome, Test Owner'), findsOneWidget);
+    expect(find.text('Name your first aquarium'), findsOneWidget);
     expect(repository.signInCalls, 2);
   });
 
@@ -90,11 +96,18 @@ void main() {
     final repository = FakeAuthenticationRepository(
       restoredSession: FakeAuthenticationRepository.session(),
     );
-    await tester.pumpWidget(buildApp(repository));
+    await tester.pumpWidget(
+      buildApp(
+        repository,
+        facilityRepository: FakeFacilityRepository(
+          facilities: [FakeFacilityRepository.facility()],
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.text('Welcome, Test Owner'), findsOneWidget);
-    await tester.tap(find.text('Sign out'));
+    expect(find.text('Test Aquarium'), findsOneWidget);
+    await tester.tap(find.byTooltip('Sign out'));
     await tester.pumpAndSettle();
 
     expect(find.text('Welcome to AquaSense'), findsOneWidget);

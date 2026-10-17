@@ -16,6 +16,8 @@ import com.aquasense.backend.auth.google.GoogleIdentityVerifier;
 import com.aquasense.backend.auth.repository.AppUserRepository;
 import com.aquasense.backend.auth.repository.RefreshTokenRepository;
 import com.aquasense.backend.auth.web.AuthenticationFailureException;
+import com.aquasense.backend.facility.repository.FacilityMembershipRepository;
+import com.aquasense.backend.facility.repository.FacilityRepository;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +46,12 @@ class AuthApiIntegrationTests {
     private RefreshTokenRepository refreshTokens;
 
     @Autowired
+    private FacilityMembershipRepository facilityMemberships;
+
+    @Autowired
+    private FacilityRepository facilities;
+
+    @Autowired
     private JwtEncoder jwtEncoder;
 
     @Autowired
@@ -54,6 +62,8 @@ class AuthApiIntegrationTests {
 
     @BeforeEach
     void cleanDatabase() {
+        facilityMemberships.deleteAll();
+        facilities.deleteAll();
         refreshTokens.deleteAll();
         users.deleteAll();
     }

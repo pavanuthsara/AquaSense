@@ -53,6 +53,18 @@ Every other API route is protected unless it is explicitly allowed by the
 security configuration. Raw refresh tokens are never stored in the database;
 only SHA-256 hashes are retained.
 
+## Facility endpoints
+
+- `POST /api/v1/facilities` creates an aquarium and owner membership. It
+  requires an `Idempotency-Key` header so safely repeated requests return the
+  original aquarium instead of creating duplicates.
+- `GET /api/v1/facilities` lists aquariums accessible to the signed-in user.
+- `GET /api/v1/facilities/{facilityId}` selects and returns an accessible
+  aquarium without revealing inaccessible aquarium IDs.
+- `GET /api/v1/facilities/timezones` returns the supported IANA time-zone IDs.
+
+Facility routes require an AquaSense bearer token.
+
 ## Verify
 
 ```powershell

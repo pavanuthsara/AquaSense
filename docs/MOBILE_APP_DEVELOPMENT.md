@@ -15,7 +15,7 @@ Only one task should normally be marked `In progress`.
 ## Current Task
 
 No task is currently in progress. The recommended next task is
-**MOB-005 — Aquarium facility creation**.
+**MOB-007 — Worker invitations and roles**.
 
 ## Task Backlog
 
@@ -25,8 +25,8 @@ No task is currently in progress. The recommended next task is
 | MOB-002 | Three onboarding screens | MOB-001 | Done |
 | MOB-003 | Authentication interface and secure session handling | MOB-001 | Done |
 | MOB-004 | Google authentication backend | MOB-003 | Done |
-| MOB-005 | Aquarium facility creation | MOB-004 | Not started |
-| MOB-006 | Multiple-facility switching | MOB-005 | Not started |
+| MOB-005 | Aquarium facility creation | MOB-004 | Done |
+| MOB-006 | Multiple-facility switching | MOB-005 | Done |
 | MOB-007 | Worker invitations and roles | MOB-005 | Not started |
 | MOB-008 | Tank-group management | MOB-005, MOB-007 | Not started |
 | MOB-009 | Tank and tag management | MOB-008 | Not started |
@@ -308,4 +308,76 @@ usability evaluation, and document demonstrated capabilities and limitations.
   automated-test verified. Revoked refresh-token rows are retained for audit
   and will need a scheduled cleanup policy in a later hardening task.
 - Recommended next task: MOB-005 — Aquarium facility creation.
+
+### 2026-10-15 — MOB-005: Aquarium facility creation
+
+- Status: Done
+- Summary: Added aquarium facility and owner-membership persistence, retry-safe
+  facility creation, facility listing and selection, server-provided IANA time
+  zones, and the authenticated Flutter flow for first-aquarium setup. Owners
+  with an existing aquarium now enter a facility-aware empty home screen.
+- Files added: Backend facility entities, role, repositories, service,
+  controller, Flyway migration, and facility API integration tests; Flutter
+  facility domain/repository contracts, development and HTTP adapters,
+  repository scope, facility gate, setup screen, empty home screen, reusable
+  facility test fake, repository tests, and widget tests.
+- Files changed: Backend user repository, shared API error handler and backend
+  guide; Flutter application/bootstrap dependency wiring, authentication gate,
+  routing, mobile guide, and existing startup/authentication tests. Removed the
+  superseded generic home placeholder.
+- Backend/API changes: Added `POST /api/v1/facilities`,
+  `GET /api/v1/facilities`, `GET /api/v1/facilities/{facilityId}`, and
+  `GET /api/v1/facilities/timezones`; added `facilities` and
+  `facility_memberships` tables. Creation requires an idempotency key, creates
+  an `OWNER` membership atomically, returns the original facility for an exact
+  retry, and rejects key reuse with different input.
+- Tests performed: Java 21 Maven integration/unit suite, Dart formatting,
+  Flutter static analysis, Flutter test suite, and Android debug APK build with
+  the real authentication/backend compile-time path enabled.
+- Test results: All 18 backend tests passed; all 26 Flutter tests passed;
+  static analysis reported no issues; Android debug APK built successfully.
+- Decisions made: Use IANA time-zone IDs supplied by the backend; serialize
+  facility creation per owner to make concurrent retry handling deterministic;
+  return not-found for inaccessible facility selection to avoid exposing other
+  tenants; preserve a creation key across unchanged mobile retries; and select
+  the first accessible facility until a dedicated switcher is implemented.
+- Known limitations: Multiple-facility selection is not persisted and the app
+  automatically opens the first accessible facility. Facility switching and
+  removed-access handling belong to MOB-006. Worker membership behavior belongs
+  to MOB-007, and tank/group actions remain later tasks.
+- Recommended next task: MOB-006 — Multiple-facility switching.
+
+### 2026-10-17 — MOB-006: Multiple-facility switching
+
+- Status: Done
+- Summary: Added an aquarium switcher, additional-aquarium creation flow,
+  per-user persistence of the last selected facility, backend access
+  verification before switching, and safe fallback when a saved or newly
+  selected facility is no longer accessible.
+- Files added: Flutter facility-selection storage contract and shared-
+  preferences implementation, selection controller, dependency and selected-
+  facility scopes, facility-switching widget tests, selection-store test, and
+  reusable selection-store test fake.
+- Files changed: Flutter bootstrap/application dependency wiring, authenticated
+  routing, facility gate, setup and home screens, mobile guide, existing mobile
+  tests and facility fake; backend facility integration tests.
+- Backend/API changes: No production endpoint or schema changes were required.
+  The existing authenticated facility list, creation, and facility-detail APIs
+  support multiple memberships. Added integration coverage proving that one
+  owner can list multiple facilities without seeing another owner's facility.
+- Tests performed: Java 21 Maven integration/unit suite, Dart formatting,
+  Flutter static analysis, Flutter test suite, and Android debug APK build with
+  the production authentication/backend compile-time path enabled.
+- Test results: All 19 backend tests passed; all 32 Flutter tests passed;
+  static analysis reported no issues; Android debug APK built successfully.
+- Decisions made: Store the selected facility ID under a user-specific local
+  key; verify facility access with the backend before changing workspaces; use
+  an inherited selected-facility scope for future facility-bound requests; and
+  key the complete facility workspace by facility ID so widget state and future
+  cached data cannot leak across aquarium switches.
+- Known limitations: The selection is device-local rather than synchronized
+  across devices. Tank, group, schedule, and dashboard data do not exist yet;
+  their repositories must use the selected-facility scope when implemented.
+  Worker membership and permission changes belong to MOB-007.
+- Recommended next task: MOB-007 — Worker invitations and roles.
 
