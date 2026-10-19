@@ -63,6 +63,19 @@ public class TankGroup {
         this.updatedAt = now;
     }
 
+    public void addTank(Instant now) {
+        this.tankCount += 1;
+        this.updatedAt = now;
+    }
+
+    public void removeTank(Instant now) {
+        if (tankCount <= 0) {
+            throw new IllegalStateException("Tank group count cannot become negative");
+        }
+        this.tankCount -= 1;
+        this.updatedAt = now;
+    }
+
     public UUID getId() { return id; }
     public Facility getFacility() { return facility; }
     public String getName() { return name; }

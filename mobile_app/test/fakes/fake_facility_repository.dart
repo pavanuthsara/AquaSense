@@ -2,6 +2,7 @@ import 'package:mobile_app/features/facility/domain/facility.dart';
 import 'package:mobile_app/features/facility/domain/facility_repository.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
 import 'package:mobile_app/features/facility/domain/tank_group.dart';
+import 'package:mobile_app/features/facility/domain/tank.dart';
 
 class FakeFacilityRepository implements FacilityRepository {
   FakeFacilityRepository({
@@ -9,17 +10,23 @@ class FakeFacilityRepository implements FacilityRepository {
     List<FacilityInvitation>? invitations,
     Map<String, List<FacilityMember>>? members,
     Map<String, List<TankGroup>>? tankGroups,
+    List<Tank>? tanks,
+    Map<String, TankDetail>? tankDetails,
     this.listError,
     this.createFailures = 0,
   }) : facilities = facilities ?? [],
        invitations = invitations ?? [],
        members = members ?? {},
-       tankGroups = tankGroups ?? {};
+       tankGroups = tankGroups ?? {},
+       tanks = tanks ?? [],
+       tankDetails = tankDetails ?? {};
 
   final List<Facility> facilities;
   final List<FacilityInvitation> invitations;
   final Map<String, List<FacilityMember>> members;
   final Map<String, List<TankGroup>> tankGroups;
+  final List<Tank> tanks;
+  final Map<String, TankDetail> tankDetails;
   Object? listError;
   int createFailures;
   int listCalls = 0;
@@ -292,4 +299,242 @@ class FakeFacilityRepository implements FacilityRepository {
       );
     }
   }
+
+  @override
+  Future<TankPage> listTanks({
+    required String facilityId,
+    required int page,
+    int size = 50,
+    String? search,
+    TankStatus? status,
+    String? groupId,
+    bool unassigned = false,
+    String? tag,
+  }) async {
+    final term = search?.trim().toLowerCase();
+    final normalizedTag = tag?.toLowerCase();
+    final filtered = tanks.where((tank) {
+      if (tank.facilityId != facilityId) return false;
+      if (status == null && tank.status == TankStatus.archived) return false;
+      if (status != null && tank.status != status) return false;
+      if (term != null &&
+          term.isNotEmpty &&
+          !tank.name.toLowerCase().contains(term) &&
+          !tank.code.toLowerCase().contains(term)) {
+        return false;
+      }
+      if (unassigned && tank.groupId != null) return false;
+      if (!unassigned && groupId != null && tank.groupId != groupId) {
+        return false;
+      }
+      if (normalizedTag != null && !tank.tags.contains(normalizedTag)) {
+        return false;
+      }
+      return true;
+    }).toList()..sort((a, b) => a.name.compareTo(b.name));
+    final pageSize = size.clamp(1, 100);
+    final start = page * pageSize;
+    final items = start >= filtered.length
+        ? const <Tank>[]
+        : filtered.sublist(start, (start + pageSize).clamp(0, filtered.length));
+    return TankPage(
+      items: List.unmodifiable(items),
+      page: page,
+      size: pageSize,
+      totalItems: filtered.length,
+      totalPages: filtered.isEmpty ? 0 : (filtered.length / pageSize).ceil(),
+    );
+  }
+
+  @override
+  Future<TankDetail> getTankDetail({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    final configured = tankDetails[tankId];
+    if (configured != null && configured.tank.facilityId == facilityId) {
+      return configured;
+    }
+    final tank = _tank(facilityId, tankId);
+    return TankDetail(
+      tank: tank,
+      observationState: tank.countObservedAt == null
+          ? TankObservationState.noData
+          : TankObservationState.current,
+      deviceStatus: TankDeviceStatus.notConfigured,
+      feedingTimes: const [],
+      recentActivity: [
+        TankActivity(
+          type: 'TANK_CREATED',
+          title: 'Tank created',
+          occurredAt: tank.createdAt,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<List<String>> listTankTags(String facilityId) async {
+    final tags =
+        tanks
+            .where(
+              (tank) =>
+                  tank.facilityId == facilityId &&
+                  tank.status != TankStatus.archived,
+            )
+            .expand((tank) => tank.tags)
+            .toSet()
+            .toList()
+          ..sort();
+    return tags;
+  }
+
+  @override
+  Future<Tank> createTank({
+    required String facilityId,
+    required TankDraft draft,
+  }) async {
+    _requireOwner(facilityId);
+    _rejectCode(facilityId, draft.code);
+    final group = _group(facilityId, draft.groupId);
+    final now = DateTime.now().toUtc();
+    final tank = Tank(
+      id: 'tank-${tanks.length + 1}',
+      facilityId: facilityId,
+      name: draft.name.trim(),
+      code: draft.code.trim(),
+      expectedGuppyCount: draft.expectedGuppyCount,
+      groupId: group?.id,
+      groupName: group?.name,
+      tags: _tags(draft.tags),
+      automationEnabled: draft.automationEnabled,
+      status: draft.automationEnabled ? TankStatus.active : TankStatus.paused,
+      notes: draft.notes.trim().isEmpty ? null : draft.notes.trim(),
+      createdAt: now,
+      updatedAt: now,
+    );
+    tanks.add(tank);
+    _changeCount(facilityId, group?.id, 1);
+    return tank;
+  }
+
+  @override
+  Future<Tank> updateTank({
+    required String facilityId,
+    required String tankId,
+    required TankDraft draft,
+  }) async {
+    _requireOwner(facilityId);
+    final index = tanks.indexWhere(
+      (tank) => tank.id == tankId && tank.facilityId == facilityId,
+    );
+    if (index == -1) {
+      throw const FacilityException(
+        'The tank was not found.',
+        code: 'tank_not_found',
+      );
+    }
+    _rejectCode(facilityId, draft.code, excludingId: tankId);
+    final existing = tanks[index];
+    final group = _group(facilityId, draft.groupId);
+    if (existing.groupId != group?.id) {
+      _changeCount(facilityId, existing.groupId, -1);
+      _changeCount(facilityId, group?.id, 1);
+    }
+    final updated = existing.copyWith(
+      name: draft.name.trim(),
+      code: draft.code.trim(),
+      expectedGuppyCount: draft.expectedGuppyCount,
+      groupId: group?.id,
+      clearGroup: group == null,
+      groupName: group?.name,
+      tags: _tags(draft.tags),
+      automationEnabled: draft.automationEnabled,
+      status: draft.automationEnabled ? TankStatus.active : TankStatus.paused,
+      notes: draft.notes.trim(),
+      updatedAt: DateTime.now().toUtc(),
+    );
+    tanks[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<Tank> archiveTank({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    _requireOwner(facilityId);
+    final index = tanks.indexWhere(
+      (tank) => tank.id == tankId && tank.facilityId == facilityId,
+    );
+    if (index == -1) {
+      throw const FacilityException(
+        'The tank was not found.',
+        code: 'tank_not_found',
+      );
+    }
+    if (tanks[index].status == TankStatus.archived) return tanks[index];
+    _changeCount(facilityId, tanks[index].groupId, -1);
+    final now = DateTime.now().toUtc();
+    tanks[index] = tanks[index].copyWith(
+      automationEnabled: false,
+      status: TankStatus.archived,
+      archivedAt: now,
+      updatedAt: now,
+    );
+    return tanks[index];
+  }
+
+  Tank _tank(String facilityId, String tankId) => tanks.firstWhere(
+    (tank) => tank.facilityId == facilityId && tank.id == tankId,
+    orElse: () => throw const FacilityException(
+      'The tank was not found.',
+      code: 'tank_not_found',
+    ),
+  );
+
+  TankGroup? _group(String facilityId, String? groupId) {
+    if (groupId == null) return null;
+    return (tankGroups[facilityId] ?? const <TankGroup>[]).firstWhere(
+      (group) => group.id == groupId && !group.archived,
+      orElse: () => throw const FacilityException(
+        'Select an active tank group from this aquarium.',
+        code: 'invalid_tank_group',
+      ),
+    );
+  }
+
+  void _changeCount(String facilityId, String? groupId, int amount) {
+    if (groupId == null) return;
+    final groups = tankGroups[facilityId] ?? [];
+    final index = groups.indexWhere((group) => group.id == groupId);
+    if (index != -1) {
+      groups[index] = groups[index].copyWith(
+        tankCount: groups[index].tankCount + amount,
+        updatedAt: DateTime.now().toUtc(),
+      );
+    }
+  }
+
+  void _rejectCode(String facilityId, String code, {String? excludingId}) {
+    if (tanks.any(
+      (tank) =>
+          tank.facilityId == facilityId &&
+          tank.id != excludingId &&
+          tank.code.toLowerCase() == code.trim().toLowerCase(),
+    )) {
+      throw const FacilityException(
+        'A tank in this aquarium already uses that code.',
+        code: 'tank_code_exists',
+      );
+    }
+  }
+
+  List<String> _tags(List<String> values) =>
+      values
+          .map((tag) => tag.trim().toLowerCase())
+          .where((tag) => tag.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
 }

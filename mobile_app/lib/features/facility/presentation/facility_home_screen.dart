@@ -14,6 +14,7 @@ class FacilityHomeScreen extends StatelessWidget {
     required this.onAddFacility,
     required this.onOpenTeam,
     required this.onOpenTankGroups,
+    required this.onOpenTanks,
     required this.onOpenInvitations,
     required this.pendingInvitationCount,
     super.key,
@@ -27,6 +28,7 @@ class FacilityHomeScreen extends StatelessWidget {
   final VoidCallback onAddFacility;
   final VoidCallback onOpenTeam;
   final VoidCallback onOpenTankGroups;
+  final VoidCallback onOpenTanks;
   final VoidCallback onOpenInvitations;
   final int pendingInvitationCount;
 
@@ -197,17 +199,22 @@ class FacilityHomeScreen extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     facility.role == FacilityRole.owner
-                        ? 'Create tank groups to organize the tanks in this '
-                              'aquarium. Individual tanks are added in the '
-                              'next development stage.'
-                        : 'Tank groups organize this aquarium by room, rack, '
-                              'or life stage. Individual tanks are added in '
-                              'the next development stage.',
+                        ? 'Create and organize tanks, expected guppy counts, '
+                              'tags, and automation settings.'
+                        : 'Browse the tanks, groups, guppy counts, and current '
+                              'automation settings for this aquarium.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       height: 1.45,
                     ),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                    key: const Key('tanks-button'),
+                    onPressed: onOpenTanks,
+                    icon: const Icon(Icons.water_rounded),
+                    label: const Text('View tanks'),
                   ),
                 ],
               ),

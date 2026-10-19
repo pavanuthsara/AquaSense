@@ -7,6 +7,7 @@ import 'package:mobile_app/features/facility/data/http_facility_repository.dart'
 import 'package:mobile_app/features/facility/domain/facility.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
 import 'package:mobile_app/features/facility/domain/tank_group.dart';
+import 'package:mobile_app/features/facility/domain/tank.dart';
 
 void main() {
   test('lists facilities with the saved bearer token', () async {
@@ -189,6 +190,72 @@ void main() {
       '/api/v1/facilities/facility-1/tank-groups/group-1/archive',
     );
   });
+
+  test(
+    'tank inventory and detail operations preserve filters and states',
+    () async {
+      final requests = <http.Request>[];
+      final repository = HttpFacilityRepository(
+        apiBaseUrl: 'https://api.example.com',
+        sessionStorage: _MemorySessionStorage(),
+        client: MockClient((request) async {
+          requests.add(request);
+          if (request.url.path.endsWith('/tank-tags')) {
+            return http.Response('["breeding","priority"]', 200);
+          }
+          if (request.method == 'GET' && request.url.path.endsWith('/tanks')) {
+            return http.Response(_tankPageJson, 200);
+          }
+          if (request.method == 'GET') {
+            return http.Response(_tankDetailJson, 200);
+          }
+          return http.Response(_tankJson, request.method == 'POST' ? 201 : 200);
+        }),
+      );
+
+      final page = await repository.listTanks(
+        facilityId: 'facility-1',
+        page: 2,
+        search: 'N-001',
+        status: TankStatus.active,
+        groupId: 'group-1',
+        tag: 'breeding',
+      );
+      final detail = await repository.getTankDetail(
+        facilityId: 'facility-1',
+        tankId: 'tank-1',
+      );
+      final tags = await repository.listTankTags('facility-1');
+      final draft = TankDraft(
+        name: 'Nursery 1',
+        code: 'N-001',
+        expectedGuppyCount: 80,
+        groupId: 'group-1',
+        tags: const ['breeding'],
+        automationEnabled: true,
+        notes: 'Observe',
+      );
+      await repository.createTank(facilityId: 'facility-1', draft: draft);
+      await repository.updateTank(
+        facilityId: 'facility-1',
+        tankId: 'tank-1',
+        draft: draft,
+      );
+      await repository.archiveTank(facilityId: 'facility-1', tankId: 'tank-1');
+
+      expect(page.totalItems, 1000);
+      expect(page.items.single.name, 'Nursery 1');
+      expect(requests.first.url.queryParameters['status'], 'ACTIVE');
+      expect(requests.first.url.queryParameters['tag'], 'breeding');
+      expect(detail.observationState, TankObservationState.stale);
+      expect(detail.deviceStatus, TankDeviceStatus.offline);
+      expect(detail.recentActivity.single.title, 'Tank created');
+      expect(tags, ['breeding', 'priority']);
+      expect(requests[3].body, contains('expectedGuppyCount'));
+      expect(requests[4].method, 'PATCH');
+      expect(requests[5].url.path, endsWith('/tank-1/archive'));
+    },
+  );
 }
 
 const _facilityJson = '''
@@ -244,6 +311,54 @@ const _tankGroupJson = '''
   "createdAt": "2026-10-19T08:00:00Z",
   "updatedAt": "2026-10-19T08:00:00Z",
   "archivedAt": null
+}
+''';
+
+const _tankJson = '''
+{
+  "id": "tank-1",
+  "facilityId": "facility-1",
+  "name": "Nursery 1",
+  "code": "N-001",
+  "expectedGuppyCount": 80,
+  "detectedGuppyCount": 76,
+  "detectionConfidence": 0.93,
+  "countObservedAt": "2026-10-19T07:00:00Z",
+  "groupId": "group-1",
+  "groupName": "Nursery",
+  "tags": ["breeding"],
+  "automationEnabled": true,
+  "status": "ACTIVE",
+  "notes": "Observe",
+  "createdAt": "2026-10-18T08:00:00Z",
+  "updatedAt": "2026-10-19T08:00:00Z",
+  "archivedAt": null
+}
+''';
+
+const _tankPageJson =
+    '''
+{
+  "items": [$_tankJson],
+  "page": 2,
+  "size": 50,
+  "totalItems": 1000,
+  "totalPages": 20
+}
+''';
+
+const _tankDetailJson =
+    '''
+{
+  "tank": $_tankJson,
+  "observationState": "STALE",
+  "deviceStatus": "OFFLINE",
+  "feedingTimes": ["08:00", "16:00"],
+  "lastFeedingAt": "2026-10-19T08:00:00Z",
+  "nextFeedingAt": "2026-10-19T16:00:00Z",
+  "recentActivity": [
+    {"type":"TANK_CREATED","title":"Tank created","occurredAt":"2026-10-18T08:00:00Z"}
+  ]
 }
 ''';
 

@@ -7,6 +7,7 @@ import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_team.dart';
 import '../domain/tank_group.dart';
+import '../domain/tank.dart';
 
 class HttpFacilityRepository implements FacilityRepository {
   HttpFacilityRepository({
@@ -206,9 +207,120 @@ class HttpFacilityRepository implements FacilityRepository {
     return _tankGroupFromJson(body as Map<String, dynamic>);
   }
 
-  Future<http.Response> _authorizedGet(String path) async {
+  @override
+  Future<TankPage> listTanks({
+    required String facilityId,
+    required int page,
+    int size = 50,
+    String? search,
+    TankStatus? status,
+    String? groupId,
+    bool unassigned = false,
+    String? tag,
+  }) async {
+    final response = await _authorizedGet(
+      '/api/v1/facilities/$facilityId/tanks',
+      queryParameters: {
+        'page': '$page',
+        'size': '$size',
+        if (search != null && search.trim().isNotEmpty) 'query': search.trim(),
+        if (status != null) 'status': status.name.toUpperCase(),
+        if (groupId != null) 'groupId': groupId,
+        if (unassigned) 'unassigned': 'true',
+        if (tag != null && tag.isNotEmpty) 'tag': tag,
+      },
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    final json = body as Map<String, dynamic>;
+    return TankPage(
+      items: (json['items'] as List<dynamic>)
+          .map((item) => _tankFromJson(item as Map<String, dynamic>))
+          .toList(growable: false),
+      page: json['page'] as int,
+      size: json['size'] as int,
+      totalItems: json['totalItems'] as int,
+      totalPages: json['totalPages'] as int,
+    );
+  }
+
+  @override
+  Future<TankDetail> getTankDetail({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    final response = await _authorizedGet(
+      '/api/v1/facilities/$facilityId/tanks/$tankId',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _tankDetailFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<List<String>> listTankTags(String facilityId) async {
+    final response = await _authorizedGet(
+      '/api/v1/facilities/$facilityId/tank-tags',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return (body as List<dynamic>).cast<String>();
+  }
+
+  @override
+  Future<Tank> createTank({
+    required String facilityId,
+    required TankDraft draft,
+  }) async {
+    final response = await _authorizedPost(
+      '/api/v1/facilities/$facilityId/tanks',
+      body: _tankDraftToJson(draft),
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _tankFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Tank> updateTank({
+    required String facilityId,
+    required String tankId,
+    required TankDraft draft,
+  }) async {
+    final response = await _authorizedPatch(
+      '/api/v1/facilities/$facilityId/tanks/$tankId',
+      body: _tankDraftToJson(draft),
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _tankFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Tank> archiveTank({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    final response = await _authorizedPost(
+      '/api/v1/facilities/$facilityId/tanks/$tankId/archive',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _tankFromJson(body as Map<String, dynamic>);
+  }
+
+  Future<http.Response> _authorizedGet(
+    String path, {
+    Map<String, String>? queryParameters,
+  }) async {
     try {
-      return await _client.get(_resolve(path), headers: await _headers());
+      final uri = _resolve(path);
+      return await _client.get(
+        queryParameters == null
+            ? uri
+            : uri.replace(queryParameters: queryParameters),
+        headers: await _headers(),
+      );
     } on http.ClientException {
       throw const FacilityException(
         'Could not connect to AquaSense. Check your connection and try again.',
@@ -372,6 +484,99 @@ class HttpFacilityRepository implements FacilityRepository {
           : null,
     );
   }
+
+  Map<String, dynamic> _tankDraftToJson(TankDraft draft) => {
+    'name': draft.name,
+    'code': draft.code,
+    'expectedGuppyCount': draft.expectedGuppyCount,
+    'groupId': draft.groupId,
+    'tags': draft.tags,
+    'automationEnabled': draft.automationEnabled,
+    'notes': draft.notes,
+  };
+
+  Tank _tankFromJson(Map<String, dynamic> json) {
+    DateTime? date(String key) {
+      final value = json[key];
+      return value is String ? DateTime.parse(value).toUtc() : null;
+    }
+
+    return Tank(
+      id: json['id'] as String,
+      facilityId: json['facilityId'] as String,
+      name: json['name'] as String,
+      code: json['code'] as String,
+      expectedGuppyCount: json['expectedGuppyCount'] as int,
+      detectedGuppyCount: json['detectedGuppyCount'] as int?,
+      detectionConfidence: (json['detectionConfidence'] as num?)?.toDouble(),
+      countObservedAt: date('countObservedAt'),
+      groupId: json['groupId'] as String?,
+      groupName: json['groupName'] as String?,
+      tags: (json['tags'] as List<dynamic>).cast<String>(),
+      automationEnabled: json['automationEnabled'] as bool,
+      status: _tankStatusFromJson(json['status']),
+      notes: json['notes'] as String?,
+      createdAt: date('createdAt')!,
+      updatedAt: date('updatedAt')!,
+      archivedAt: date('archivedAt'),
+    );
+  }
+
+  TankDetail _tankDetailFromJson(Map<String, dynamic> json) {
+    DateTime? date(String key) {
+      final value = json[key];
+      return value is String ? DateTime.parse(value).toUtc() : null;
+    }
+
+    return TankDetail(
+      tank: _tankFromJson(json['tank'] as Map<String, dynamic>),
+      observationState: switch (json['observationState']) {
+        'NO_DATA' => TankObservationState.noData,
+        'CURRENT' => TankObservationState.current,
+        'STALE' => TankObservationState.stale,
+        _ => throw const FacilityException(
+          'The server returned an unknown observation state.',
+          code: 'invalid_server_response',
+        ),
+      },
+      deviceStatus: switch (json['deviceStatus']) {
+        'NOT_CONFIGURED' => TankDeviceStatus.notConfigured,
+        'ONLINE' => TankDeviceStatus.online,
+        'OFFLINE' => TankDeviceStatus.offline,
+        'STALE' => TankDeviceStatus.stale,
+        'UNHEALTHY' => TankDeviceStatus.unhealthy,
+        _ => throw const FacilityException(
+          'The server returned an unknown device status.',
+          code: 'invalid_server_response',
+        ),
+      },
+      feedingTimes: (json['feedingTimes'] as List<dynamic>).cast<String>(),
+      lastFeedingAt: date('lastFeedingAt'),
+      nextFeedingAt: date('nextFeedingAt'),
+      recentActivity: (json['recentActivity'] as List<dynamic>)
+          .map((item) {
+            final activity = item as Map<String, dynamic>;
+            return TankActivity(
+              type: activity['type'] as String,
+              title: activity['title'] as String,
+              occurredAt: DateTime.parse(
+                activity['occurredAt'] as String,
+              ).toUtc(),
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+
+  TankStatus _tankStatusFromJson(dynamic value) => switch (value) {
+    'ACTIVE' => TankStatus.active,
+    'PAUSED' => TankStatus.paused,
+    'ARCHIVED' => TankStatus.archived,
+    _ => throw const FacilityException(
+      'The server returned an unknown tank status.',
+      code: 'invalid_server_response',
+    ),
+  };
 
   FacilityRole _roleFromJson(dynamic value) {
     return switch (value) {

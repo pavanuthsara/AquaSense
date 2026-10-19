@@ -15,7 +15,7 @@ Only one task should normally be marked `In progress`.
 ## Current Task
 
 No task is currently in progress. The recommended next task is
-**MOB-009 — Tank and tag management**.
+**MOB-011 — Group feeding schedules**.
 
 ## Task Backlog
 
@@ -29,8 +29,8 @@ No task is currently in progress. The recommended next task is
 | MOB-006 | Multiple-facility switching | MOB-005 | Done |
 | MOB-007 | Worker invitations and roles | MOB-005 | Done |
 | MOB-008 | Tank-group management | MOB-005, MOB-007 | Done |
-| MOB-009 | Tank and tag management | MOB-008 | Not started |
-| MOB-010 | Tank-detail screen | MOB-009 | Not started |
+| MOB-009 | Tank and tag management | MOB-008 | Done |
+| MOB-010 | Tank-detail screen | MOB-009 | Done |
 | MOB-011 | Group feeding schedules | MOB-008 | Not started |
 | MOB-012 | Per-tank schedule overrides | MOB-010, MOB-011 | Not started |
 | MOB-013 | Feeder calibration and portion preview | MOB-010 | Not started |
@@ -466,4 +466,81 @@ usability evaluation, and document demonstrated capabilities and limitations.
   group lock when assigning tanks. Nested groups, manual ordering, unarchiving,
   and permanent deletion are intentionally not included.
 - Recommended next task: MOB-009 — Tank and tag management.
+
+### 2026-10-19 — MOB-009: Tank and tag management
+
+- Status: Done
+- Summary: Added facility-scoped tank persistence and a paginated mobile tank
+  inventory. Owners can create, edit, move, pause, tag, and archive tanks;
+  owners and workers can search by name/code and filter by status, group,
+  unassigned state, and tag. Group tank counts are updated transactionally.
+- Files added: Backend tank entity/status, repository, service, controller,
+  Flyway migration, and tank API integration tests; Flutter tank domain model,
+  tank list and form screens, and tank management widget tests.
+- Files changed: Backend tank-group count behavior; Flutter facility repository
+  contract and HTTP/development/test adapters, facility routing and home screen,
+  HTTP repository tests, backend/mobile guides, and this development record.
+- Backend/API changes: Added paginated/filterable
+  `GET /api/v1/facilities/{facilityId}/tanks`,
+  `GET /api/v1/facilities/{facilityId}/tank-tags`, owner-only tank create/edit/
+  archive endpoints, the `tanks` and `tank_tags` tables, facility-unique
+  normalized tank codes, and atomic group-count maintenance.
+- Tests performed: Java 21 Maven integration/unit suite, a real 1,000-entity
+  backend seed/search/filter/pagination test, Dart formatting check, Flutter
+  static analysis, complete Flutter test suite, focused tank repository/widget
+  tests, and Android debug APK build with production-style configuration.
+- Test results: All 35 backend tests and all 46 Flutter tests passed; formatting
+  was unchanged; static analysis reported no issues; Android debug APK built
+  successfully. The 1,000-tank test verified server pagination, search, status,
+  group, unassigned, and tag filtering, and the mobile scale test verified that
+  the inventory remains paginated and searchable.
+- Decisions made: Use server-side pages of 50 with a maximum backend page size
+  of 100; keep archived tanks out of the default view; reserve tank codes after
+  archival for unambiguous history; normalize tags to lowercase; retain an
+  explicit unassigned-tanks view; and serialize facility/group mutations so
+  group counts cannot drift during tank moves.
+- Known limitations: There is no bulk CSV import or bulk edit workflow; the
+  requirement is satisfied through scalable paginated/searchable individual
+  management. Detected counts remain empty until observation ingestion in
+  MOB-015. Permanent deletion and restoration of archived tanks are not
+  included.
+- Recommended next task: MOB-010 — Tank-detail screen.
+
+### 2026-10-19 — MOB-010: Tank-detail screen
+
+- Status: Done
+- Summary: Added a role-aware tank detail screen showing identity, group,
+  tags, automation, expected/detected guppy counts, confidence, observation
+  freshness, hardware state, feeding schedule, last/next feeding, and recent
+  activity. Loading, retryable error, no-data, stale, offline, unhealthy, and
+  not-configured states are represented explicitly. Workers can inspect tanks
+  without seeing owner-only edit or archive actions.
+- Files added: Flutter tank-detail presentation screen.
+- Files changed: Backend tank detail response; Flutter tank domain/repository
+  adapters, tank list/form screens and their navigation, HTTP and fake
+  repository tests, tank management widget tests, guides, and this development
+  record.
+- Backend/API changes: Added
+  `GET /api/v1/facilities/{facilityId}/tanks/{tankId}` with a facility-scoped
+  tank snapshot, observation freshness, device state, schedule/feeding
+  placeholders, and recent tank activity. Both roles can read it; mutations
+  remain owner-only.
+- Tests performed: Backend role/facility-isolation and detail-state integration
+  tests; Flutter HTTP mapping tests; owner and worker widget tests; Dart
+  formatting check; Flutter static analysis and full test suite; Android debug
+  APK build.
+- Test results: All 35 backend tests and all 46 Flutter tests passed; the detail
+  tests verified stale and absent observations, offline/not-configured hardware,
+  schedule and activity rendering, owner actions, and worker action hiding.
+  The Android APK built successfully.
+- Decisions made: Expose truthful explicit no-data/not-configured states rather
+  than fabricate device, schedule, observation, or feeding data; keep detail
+  access available to both roles; enforce owner mutations in the backend as
+  well as hiding them in the worker interface; and preserve one detail contract
+  for later monitoring and feeding tasks to populate.
+- Known limitations: Device health is `NOT_CONFIGURED` until MOB-014; detected
+  counts and confidence require MOB-015; schedules require MOB-011/MOB-012;
+  last/next feeding and operational history require MOB-016/MOB-017. Current
+  activity includes tank creation/settings changes rather than feeding events.
+- Recommended next task: MOB-011 — Group feeding schedules.
 

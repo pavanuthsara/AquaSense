@@ -101,7 +101,30 @@ invitations in the app; external invitation-email delivery is not yet included.
 Active group names are unique within an aquarium after whitespace and case
 normalization. Archived groups are retained for history and returned after
 active groups. A group with a nonzero tank count cannot be archived; MOB-009
-will maintain this server-owned count when tank assignment is introduced.
+maintains this server-owned count when tanks are created, moved, or archived.
+
+## Tank endpoints
+
+- `GET /api/v1/facilities/{facilityId}/tanks` returns a server-paginated tank
+  inventory. It supports `page`, `size`, `query`, `status`, `groupId`,
+  `unassigned`, and `tag` filters. The default view excludes archived tanks.
+- `GET /api/v1/facilities/{facilityId}/tanks/{tankId}` returns tank metadata
+  and the current detail snapshot.
+- `GET /api/v1/facilities/{facilityId}/tank-tags` lists normalized tags used by
+  active tanks.
+- `POST /api/v1/facilities/{facilityId}/tanks` creates a tank for an owner.
+- `PATCH /api/v1/facilities/{facilityId}/tanks/{tankId}` edits or moves an
+  active tank for an owner.
+- `POST /api/v1/facilities/{facilityId}/tanks/{tankId}/archive` safely removes
+  a tank from active operations for an owner.
+
+Tank codes are unique within an aquarium after case normalization. Tags are
+stored in lowercase, group assignments are aquarium-scoped, and group counts
+are updated in the same database transaction as every tank assignment change.
+Workers can search and inspect tanks but cannot create, edit, move, or archive
+them. Device health, feeding schedules, observations, and feeding history are
+represented by explicit not-configured/no-data states until their later tasks
+provide those records.
 
 ## Verify
 

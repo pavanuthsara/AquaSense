@@ -31,8 +31,17 @@ aquarium home screen. AquaSense does not send invitation email yet.
 Tap the grid icon on an aquarium home screen to open **Tank groups**. Owners
 can add and rename flat groups and archive groups that contain no tanks.
 Workers receive the same group list and tank counts as a read-only view.
-Archived groups remain visible for operational history. Until MOB-009 adds
-individual tanks, newly created groups correctly show a count of zero.
+Archived groups remain visible for operational history.
+
+Open **Tanks** from the aquarium home screen to browse the paginated inventory.
+Search by name or code, filter by current status, group, unassigned tanks, or
+tag, and load further pages when required. Owners can add, edit, move, pause,
+and archive tanks; workers receive the same inventory and detail information
+without management controls. Each tank detail shows expected and detected
+guppy counts, confidence and observation freshness, group and tags, automation
+state, device status, schedule, recent feeding times, and activity. Hardware,
+schedule, observation, and feeding sections clearly say when later-stage data
+has not been configured yet.
 
 ## Environments
 
