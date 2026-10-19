@@ -8,6 +8,8 @@ import 'facility_repository_scope.dart';
 import 'facility_selection_controller.dart';
 import 'facility_selection_store_scope.dart';
 import 'facility_setup_screen.dart';
+import 'facility_team_screen.dart';
+import 'pending_invitations_screen.dart';
 import 'selected_facility_scope.dart';
 
 class FacilityGate extends StatefulWidget {
@@ -59,13 +61,45 @@ class _FacilityGateState extends State<FacilityGate> {
       MaterialPageRoute(
         builder: (routeContext) => FacilitySetupScreen(
           repository: _repository!,
-          isFirstFacility: false,
+          isFirstFacility: controller.facilities.isEmpty,
           onCreated: (facility) async {
             await controller.addAndSelect(facility);
             if (routeContext.mounted) {
               Navigator.of(routeContext).pop();
             }
           },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openTeam() async {
+    final facility = _controller!.selectedFacility!;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) =>
+            FacilityTeamScreen(facility: facility, repository: _repository!),
+      ),
+    );
+  }
+
+  Future<void> _openInvitations() async {
+    final controller = _controller!;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (routeContext) => AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) => PendingInvitationsScreen(
+            invitations: controller.pendingInvitations,
+            isAccepting: controller.isSwitching,
+            onAccept: (invitation) async {
+              final accepted = await controller.acceptInvitation(invitation);
+              if (accepted && routeContext.mounted) {
+                Navigator.of(routeContext).pop();
+              }
+              return accepted;
+            },
+          ),
         ),
       ),
     );
@@ -109,6 +143,14 @@ class _FacilityGateState extends State<FacilityGate> {
 
         final selectedFacility = controller.selectedFacility;
         if (selectedFacility == null) {
+          if (controller.pendingInvitations.isNotEmpty) {
+            return PendingInvitationsScreen(
+              invitations: controller.pendingInvitations,
+              isAccepting: controller.isSwitching,
+              onAccept: controller.acceptInvitation,
+              onCreateFacility: _openAddFacility,
+            );
+          }
           return FacilitySetupScreen(
             repository: _repository!,
             onCreated: controller.addAndSelect,
@@ -124,6 +166,9 @@ class _FacilityGateState extends State<FacilityGate> {
             isSwitching: controller.isSwitching,
             onFacilitySelected: controller.select,
             onAddFacility: _openAddFacility,
+            onOpenTeam: _openTeam,
+            onOpenInvitations: _openInvitations,
+            pendingInvitationCount: controller.pendingInvitations.length,
           ),
         );
       },

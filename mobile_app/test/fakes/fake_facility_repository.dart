@@ -1,14 +1,21 @@
 import 'package:mobile_app/features/facility/domain/facility.dart';
 import 'package:mobile_app/features/facility/domain/facility_repository.dart';
+import 'package:mobile_app/features/facility/domain/facility_team.dart';
 
 class FakeFacilityRepository implements FacilityRepository {
   FakeFacilityRepository({
     List<Facility>? facilities,
+    List<FacilityInvitation>? invitations,
+    Map<String, List<FacilityMember>>? members,
     this.listError,
     this.createFailures = 0,
-  }) : facilities = facilities ?? [];
+  }) : facilities = facilities ?? [],
+       invitations = invitations ?? [],
+       members = members ?? {};
 
   final List<Facility> facilities;
+  final List<FacilityInvitation> invitations;
+  final Map<String, List<FacilityMember>> members;
   Object? listError;
   int createFailures;
   int listCalls = 0;
@@ -21,12 +28,13 @@ class FakeFacilityRepository implements FacilityRepository {
     String id = 'facility-1',
     String name = 'Test Aquarium',
     String timeZone = 'Asia/Colombo',
+    FacilityRole role = FacilityRole.owner,
   }) {
     return Facility(
       id: id,
       name: name,
       timeZone: timeZone,
-      role: FacilityRole.owner,
+      role: role,
       createdAt: DateTime.utc(2026, 10, 15),
     );
   }
@@ -94,4 +102,90 @@ class FakeFacilityRepository implements FacilityRepository {
     'Europe/London',
     'UTC',
   ];
+
+  @override
+  Future<Facility> acceptInvitation(String invitationId) async {
+    final index = invitations.indexWhere((item) => item.id == invitationId);
+    if (index == -1) {
+      throw const FacilityException('Invitation not found.');
+    }
+    final invitation = invitations[index];
+    invitations.removeAt(index);
+    final existing = facilities.cast<Facility?>().firstWhere(
+      (item) => item?.id == invitation.facilityId,
+      orElse: () => null,
+    );
+    if (existing != null) {
+      return existing;
+    }
+    final accepted = facility(
+      id: invitation.facilityId,
+      name: invitation.facilityName,
+      role: FacilityRole.worker,
+    );
+    facilities.add(accepted);
+    return accepted;
+  }
+
+  @override
+  Future<FacilityInvitation> inviteWorker({
+    required String facilityId,
+    required String email,
+  }) async {
+    final aquarium = await getFacility(facilityId);
+    final now = DateTime.now().toUtc();
+    final invitation = FacilityInvitation(
+      id: 'invitation-${invitations.length + 1}',
+      facilityId: facilityId,
+      facilityName: aquarium.name,
+      email: email.trim().toLowerCase(),
+      status: FacilityInvitationStatus.pending,
+      expiresAt: now.add(const Duration(days: 7)),
+      createdAt: now,
+    );
+    invitations.add(invitation);
+    return invitation;
+  }
+
+  @override
+  Future<List<FacilityInvitation>> listFacilityInvitations(
+    String facilityId,
+  ) async => List.unmodifiable(
+    invitations.where((item) => item.facilityId == facilityId),
+  );
+
+  @override
+  Future<List<FacilityMember>> listMembers(String facilityId) async =>
+      List.unmodifiable(members[facilityId] ?? const []);
+
+  @override
+  Future<List<FacilityInvitation>> listMyPendingInvitations() async =>
+      List.unmodifiable(
+        invitations.where(
+          (item) => item.status == FacilityInvitationStatus.pending,
+        ),
+      );
+
+  @override
+  Future<void> removeWorker({
+    required String facilityId,
+    required String membershipId,
+  }) async {
+    members[facilityId]?.removeWhere((item) => item.id == membershipId);
+  }
+
+  @override
+  Future<void> revokeInvitation({
+    required String facilityId,
+    required String invitationId,
+  }) async {
+    final index = invitations.indexWhere(
+      (item) => item.facilityId == facilityId && item.id == invitationId,
+    );
+    if (index != -1) {
+      invitations[index] = invitations[index].copyWith(
+        status: FacilityInvitationStatus.revoked,
+      );
+    }
+  }
 }

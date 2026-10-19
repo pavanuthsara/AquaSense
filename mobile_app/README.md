@@ -20,6 +20,14 @@ bar to switch workspaces or create another aquarium. Selections are stored per
 signed-in user, verified against the backend before switching, and safely fall
 back to another accessible aquarium when access has been removed.
 
+Owners can open **Workers** from an aquarium home screen to invite a worker by
+their verified Google email, review invitation status, revoke a pending
+invitation, or remove a worker. Workers can open the aquarium team as a
+read-only view and do not see owner-only controls. A matching invitation is
+shown after the invited person signs in with Google; they can accept it before
+creating their own aquarium or from the invitation indicator on an existing
+aquarium home screen. AquaSense does not send invitation email yet.
+
 ## Environments
 
 Configuration is supplied with compile-time Dart defines. Do not place API

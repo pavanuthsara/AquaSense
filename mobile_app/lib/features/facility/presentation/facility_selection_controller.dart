@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_selection_store.dart';
+import '../domain/facility_team.dart';
 
 class FacilitySelectionController extends ChangeNotifier {
   FacilitySelectionController({
@@ -18,6 +19,7 @@ class FacilitySelectionController extends ChangeNotifier {
   final String _userId;
 
   List<Facility> _facilities = const [];
+  List<FacilityInvitation> _pendingInvitations = const [];
   Facility? _selectedFacility;
   String? _loadError;
   String? _notice;
@@ -25,6 +27,7 @@ class FacilitySelectionController extends ChangeNotifier {
   bool _isSwitching = false;
 
   List<Facility> get facilities => _facilities;
+  List<FacilityInvitation> get pendingInvitations => _pendingInvitations;
   Facility? get selectedFacility => _selectedFacility;
   String? get loadError => _loadError;
   String? get notice => _notice;
@@ -67,6 +70,41 @@ class FacilitySelectionController extends ChangeNotifier {
     }
   }
 
+  Future<bool> acceptInvitation(FacilityInvitation invitation) async {
+    if (_isSwitching) {
+      return false;
+    }
+    _isSwitching = true;
+    _notice = null;
+    notifyListeners();
+    try {
+      final facility = await _repository.acceptInvitation(invitation.id);
+      _replaceFacility(facility);
+      _pendingInvitations = List.unmodifiable(
+        _pendingInvitations.where((item) => item.id != invitation.id),
+      );
+      _selectedFacility = facility;
+      await _saveSelection(facility.id);
+      return true;
+    } on FacilityException catch (error) {
+      _notice = error.message;
+      if (error.code == 'invitation_expired' ||
+          error.code == 'invitation_unavailable' ||
+          error.code == 'invitation_not_found') {
+        _pendingInvitations = List.unmodifiable(
+          _pendingInvitations.where((item) => item.id != invitation.id),
+        );
+      }
+      return false;
+    } catch (_) {
+      _notice = 'The invitation could not be accepted. Try again.';
+      return false;
+    } finally {
+      _isSwitching = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> addAndSelect(Facility facility) async {
     _replaceFacility(facility);
     _selectedFacility = facility;
@@ -91,6 +129,9 @@ class FacilitySelectionController extends ChangeNotifier {
     try {
       final loaded = await _repository.listFacilities();
       _facilities = List.unmodifiable(loaded);
+      _pendingInvitations = List.unmodifiable(
+        await _repository.listMyPendingInvitations(),
+      );
 
       String? preferredId = _selectedFacility?.id;
       if (useSavedSelection) {
@@ -129,6 +170,9 @@ class FacilitySelectionController extends ChangeNotifier {
     try {
       final loaded = await _repository.listFacilities();
       _facilities = List.unmodifiable(loaded);
+      _pendingInvitations = List.unmodifiable(
+        await _repository.listMyPendingInvitations(),
+      );
       final stillSelected = _findById(inaccessibleId);
       _selectedFacility =
           stillSelected ?? (_facilities.isEmpty ? null : _facilities.first);

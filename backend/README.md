@@ -65,6 +65,28 @@ only SHA-256 hashes are retained.
 
 Facility routes require an AquaSense bearer token.
 
+## Team and invitation endpoints
+
+- `GET /api/v1/facilities/{facilityId}/members` lists aquarium owners and
+  workers for any current member.
+- `GET /api/v1/facilities/{facilityId}/invitations` lists invitation history
+  for an owner.
+- `POST /api/v1/facilities/{facilityId}/invitations` creates a seven-day
+  worker invitation for an owner-supplied email address.
+- `DELETE /api/v1/facilities/{facilityId}/invitations/{invitationId}` revokes
+  an invitation before it is accepted.
+- `DELETE /api/v1/facilities/{facilityId}/members/{membershipId}` removes a
+  worker. Owner membership cannot be removed through this endpoint.
+- `GET /api/v1/invitations/me` lists pending invitations matching the signed-in
+  user's verified Google email.
+- `POST /api/v1/invitations/{invitationId}/accept` accepts a matching
+  invitation and creates worker membership.
+
+Invitation creation, listing, revocation, and worker removal are enforced as
+owner-only operations by the API. A worker can list the team but receives a
+forbidden response for owner-only actions. AquaSense currently exposes
+invitations in the app; external invitation-email delivery is not yet included.
+
 ## Verify
 
 ```powershell

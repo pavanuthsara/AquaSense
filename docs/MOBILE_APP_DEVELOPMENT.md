@@ -15,7 +15,7 @@ Only one task should normally be marked `In progress`.
 ## Current Task
 
 No task is currently in progress. The recommended next task is
-**MOB-007 — Worker invitations and roles**.
+**MOB-008 — Tank-group management**.
 
 ## Task Backlog
 
@@ -27,7 +27,7 @@ No task is currently in progress. The recommended next task is
 | MOB-004 | Google authentication backend | MOB-003 | Done |
 | MOB-005 | Aquarium facility creation | MOB-004 | Done |
 | MOB-006 | Multiple-facility switching | MOB-005 | Done |
-| MOB-007 | Worker invitations and roles | MOB-005 | Not started |
+| MOB-007 | Worker invitations and roles | MOB-005 | Done |
 | MOB-008 | Tank-group management | MOB-005, MOB-007 | Not started |
 | MOB-009 | Tank and tag management | MOB-008 | Not started |
 | MOB-010 | Tank-detail screen | MOB-009 | Not started |
@@ -380,4 +380,49 @@ usability evaluation, and document demonstrated capabilities and limitations.
   their repositories must use the selected-facility scope when implemented.
   Worker membership and permission changes belong to MOB-007.
 - Recommended next task: MOB-007 — Worker invitations and roles.
+
+### 2026-10-19 — MOB-007: Worker invitations and roles
+
+- Status: Done
+- Summary: Added email-bound worker invitations, seven-day expiry, acceptance,
+  revocation, worker removal, team member views, and owner/worker permission
+  enforcement. Owners can manage workers from the selected aquarium, while
+  workers receive a read-only team view. Signed-in users see invitations sent
+  to their verified Google email and can accept one before creating an
+  aquarium or while already belonging to another aquarium.
+- Files added: Backend invitation entity/status, repository, service,
+  controller, Flyway migration, and team API integration tests; Flutter team
+  domain models, owner/worker team screen, pending-invitations screen, and
+  invitation/team widget tests.
+- Files changed: Backend facility membership/repositories and integration-test
+  cleanup; Flutter facility repository contracts and HTTP/development/test
+  adapters, facility gate, selection controller, home screen, HTTP repository
+  tests, backend/mobile guides, and this development record.
+- Backend/API changes: Added
+  `GET /api/v1/facilities/{facilityId}/members`, owner-only facility invitation
+  list/create/revoke endpoints, owner-only worker removal,
+  `GET /api/v1/invitations/me`, and
+  `POST /api/v1/invitations/{invitationId}/accept`. Added the
+  `facility_invitations` table. Duplicate active invitations and invitations
+  for existing members are rejected; acceptance is idempotent for the invited
+  user; inaccessible resources are not disclosed.
+- Tests performed: Java 21 Maven integration/unit suite, Dart formatting check,
+  Flutter static analysis, complete Flutter test suite, and Android debug APK
+  build with production-style API and Google client configuration.
+- Test results: All 25 backend tests passed; all 38 Flutter tests passed;
+  formatting was unchanged; static analysis reported no issues; Android debug
+  APK built successfully.
+- Decisions made: Match invitations only to the normalized email stored from a
+  verified Google identity; create worker membership only upon acceptance; use
+  a seven-day invitation lifetime; serialize invitation creation through a
+  facility database lock for duplicate protection; retain accepted, revoked,
+  and expired invitation records for traceability; enforce permissions in the
+  backend and additionally hide owner-only controls from workers.
+- Known limitations: The system does not send invitation email; the invitation
+  becomes visible inside AquaSense after the worker signs in with the matching
+  Google account. Invitation lifetime is currently fixed at seven days. Owner
+  transfer and real-time forced navigation after membership removal are not
+  included; removed access is rejected by the backend and reconciled on the
+  next facility refresh or app start.
+- Recommended next task: MOB-008 — Tank-group management.
 

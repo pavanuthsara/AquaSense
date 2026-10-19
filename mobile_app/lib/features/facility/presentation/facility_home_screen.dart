@@ -12,6 +12,9 @@ class FacilityHomeScreen extends StatelessWidget {
     required this.isSwitching,
     required this.onFacilitySelected,
     required this.onAddFacility,
+    required this.onOpenTeam,
+    required this.onOpenInvitations,
+    required this.pendingInvitationCount,
     super.key,
   });
 
@@ -21,6 +24,9 @@ class FacilityHomeScreen extends StatelessWidget {
   final bool isSwitching;
   final Future<bool> Function(Facility) onFacilitySelected;
   final VoidCallback onAddFacility;
+  final VoidCallback onOpenTeam;
+  final VoidCallback onOpenInvitations;
+  final int pendingInvitationCount;
 
   Future<void> _openFacilitySwitcher(
     BuildContext context,
@@ -77,6 +83,24 @@ class FacilityHomeScreen extends StatelessWidget {
           label: Text(facility.name, overflow: TextOverflow.ellipsis),
         ),
         actions: [
+          if (pendingInvitationCount > 0)
+            IconButton(
+              key: const Key('pending-invitations-button'),
+              tooltip: 'Aquarium invitations',
+              onPressed: onOpenInvitations,
+              icon: Badge(
+                label: Text('$pendingInvitationCount'),
+                child: const Icon(Icons.mail_outline_rounded),
+              ),
+            ),
+          IconButton(
+            key: const Key('facility-team-button'),
+            tooltip: facility.role == FacilityRole.owner
+                ? 'Manage workers'
+                : 'View aquarium team',
+            onPressed: onOpenTeam,
+            icon: const Icon(Icons.group_outlined),
+          ),
           IconButton(
             tooltip: 'View onboarding again',
             onPressed: () => Navigator.of(context).pushNamed(
