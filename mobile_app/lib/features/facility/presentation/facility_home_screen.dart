@@ -13,6 +13,7 @@ class FacilityHomeScreen extends StatelessWidget {
     required this.onFacilitySelected,
     required this.onAddFacility,
     required this.onOpenTeam,
+    required this.onOpenTankGroups,
     required this.onOpenInvitations,
     required this.pendingInvitationCount,
     super.key,
@@ -25,6 +26,7 @@ class FacilityHomeScreen extends StatelessWidget {
   final Future<bool> Function(Facility) onFacilitySelected;
   final VoidCallback onAddFacility;
   final VoidCallback onOpenTeam;
+  final VoidCallback onOpenTankGroups;
   final VoidCallback onOpenInvitations;
   final int pendingInvitationCount;
 
@@ -93,6 +95,14 @@ class FacilityHomeScreen extends StatelessWidget {
                 child: const Icon(Icons.mail_outline_rounded),
               ),
             ),
+          IconButton(
+            key: const Key('tank-groups-button'),
+            tooltip: facility.role == FacilityRole.owner
+                ? 'Manage tank groups'
+                : 'View tank groups',
+            onPressed: onOpenTankGroups,
+            icon: const Icon(Icons.grid_view_rounded),
+          ),
           IconButton(
             key: const Key('facility-team-button'),
             tooltip: facility.role == FacilityRole.owner
@@ -186,8 +196,13 @@ class FacilityHomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Tank groups and tanks will appear here after they are '
-                    'added in the next development stages.',
+                    facility.role == FacilityRole.owner
+                        ? 'Create tank groups to organize the tanks in this '
+                              'aquarium. Individual tanks are added in the '
+                              'next development stage.'
+                        : 'Tank groups organize this aquarium by room, rack, '
+                              'or life stage. Individual tanks are added in '
+                              'the next development stage.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,

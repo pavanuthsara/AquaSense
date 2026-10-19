@@ -11,6 +11,7 @@ import 'facility_setup_screen.dart';
 import 'facility_team_screen.dart';
 import 'pending_invitations_screen.dart';
 import 'selected_facility_scope.dart';
+import 'tank_group_screen.dart';
 
 class FacilityGate extends StatefulWidget {
   const FacilityGate({super.key});
@@ -79,6 +80,16 @@ class _FacilityGateState extends State<FacilityGate> {
       MaterialPageRoute(
         builder: (_) =>
             FacilityTeamScreen(facility: facility, repository: _repository!),
+      ),
+    );
+  }
+
+  Future<void> _openTankGroups() async {
+    final facility = _controller!.selectedFacility!;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) =>
+            TankGroupScreen(facility: facility, repository: _repository!),
       ),
     );
   }
@@ -167,6 +178,7 @@ class _FacilityGateState extends State<FacilityGate> {
             onFacilitySelected: controller.select,
             onAddFacility: _openAddFacility,
             onOpenTeam: _openTeam,
+            onOpenTankGroups: _openTankGroups,
             onOpenInvitations: _openInvitations,
             pendingInvitationCount: controller.pendingInvitations.length,
           ),

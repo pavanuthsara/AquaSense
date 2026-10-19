@@ -15,7 +15,7 @@ Only one task should normally be marked `In progress`.
 ## Current Task
 
 No task is currently in progress. The recommended next task is
-**MOB-008 — Tank-group management**.
+**MOB-009 — Tank and tag management**.
 
 ## Task Backlog
 
@@ -28,7 +28,7 @@ No task is currently in progress. The recommended next task is
 | MOB-005 | Aquarium facility creation | MOB-004 | Done |
 | MOB-006 | Multiple-facility switching | MOB-005 | Done |
 | MOB-007 | Worker invitations and roles | MOB-005 | Done |
-| MOB-008 | Tank-group management | MOB-005, MOB-007 | Not started |
+| MOB-008 | Tank-group management | MOB-005, MOB-007 | Done |
 | MOB-009 | Tank and tag management | MOB-008 | Not started |
 | MOB-010 | Tank-detail screen | MOB-009 | Not started |
 | MOB-011 | Group feeding schedules | MOB-008 | Not started |
@@ -425,4 +425,45 @@ usability evaluation, and document demonstrated capabilities and limitations.
   included; removed access is rejected by the backend and reconciled on the
   next facility refresh or app start.
 - Recommended next task: MOB-008 — Tank-group management.
+
+### 2026-10-19 — MOB-008: Tank-group management
+
+- Status: Done
+- Summary: Added flat, facility-scoped tank groups with owner-only creation,
+  renaming, and safe archival. Owners and workers can view active and archived
+  groups with server-provided tank counts, while workers receive a read-only
+  interface. Empty, loading, retryable error, and pull-to-refresh states are
+  included.
+- Files added: Backend tank-group entity, repository, service, controller,
+  Flyway migration, and API integration tests; Flutter tank-group domain model,
+  management screen, and widget tests.
+- Files changed: Flutter facility repository contract and HTTP/development/test
+  adapters, facility routing and home screen, HTTP repository tests, backend
+  and mobile guides, and this development record.
+- Backend/API changes: Added
+  `GET /api/v1/facilities/{facilityId}/tank-groups`,
+  `POST /api/v1/facilities/{facilityId}/tank-groups`,
+  `PATCH /api/v1/facilities/{facilityId}/tank-groups/{groupId}`, and
+  `POST /api/v1/facilities/{facilityId}/tank-groups/{groupId}/archive`.
+  Added the `tank_groups` table with normalized names, tank counts, timestamps,
+  and soft-archive state. Writes require the owner role; member reads remain
+  facility-scoped and inaccessible facility/group identifiers are not leaked.
+- Tests performed: Java 21 Maven integration/unit suite, Dart formatting check,
+  Flutter static analysis, complete Flutter test suite, focused repository and
+  widget tests, and Android debug APK build with production-style API and
+  Google client configuration.
+- Test results: All 30 backend tests passed; all 42 Flutter tests passed;
+  formatting was unchanged; static analysis reported no issues; Android debug
+  APK built successfully.
+- Decisions made: Keep groups flat; normalize whitespace and case for unique
+  active names; retain archived groups for history; allow reuse of a name after
+  archival; order active groups before archived groups; use a server-owned tank
+  count and reject archival whenever it is nonzero; serialize group naming
+  changes with a facility lock and lock a group while archiving it.
+- Known limitations: Individual tanks do not exist until MOB-009, so groups
+  created in the current application show zero tanks. MOB-009 must update the
+  group count atomically when tanks are created, moved, or archived and use the
+  group lock when assigning tanks. Nested groups, manual ordering, unarchiving,
+  and permanent deletion are intentionally not included.
+- Recommended next task: MOB-009 — Tank and tag management.
 

@@ -1,12 +1,14 @@
 import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_team.dart';
+import '../domain/tank_group.dart';
 
 class DevelopmentFacilityRepository implements FacilityRepository {
   final List<Facility> _facilities = [];
   final Map<String, Facility> _creationRequests = {};
   final Map<String, List<FacilityMember>> _members = {};
   final List<FacilityInvitation> _invitations = [];
+  final Map<String, List<TankGroup>> _tankGroups = {};
 
   @override
   Future<Facility> createFacility({
@@ -173,6 +175,143 @@ class DevelopmentFacilityRepository implements FacilityRepository {
     if (index != -1) {
       _invitations[index] = _invitations[index].copyWith(
         status: FacilityInvitationStatus.revoked,
+      );
+    }
+  }
+
+  @override
+  Future<List<TankGroup>> listTankGroups(String facilityId) async {
+    await getFacility(facilityId);
+    final groups = [...?_tankGroups[facilityId]]
+      ..sort((first, second) {
+        if (first.archived != second.archived) {
+          return first.archived ? 1 : -1;
+        }
+        return first.name.toLowerCase().compareTo(second.name.toLowerCase());
+      });
+    return List.unmodifiable(groups);
+  }
+
+  @override
+  Future<TankGroup> createTankGroup({
+    required String facilityId,
+    required String name,
+  }) async {
+    _requireOwner(facilityId);
+    final groups = _tankGroups.putIfAbsent(facilityId, () => []);
+    final cleanName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
+    _rejectDuplicate(groups, cleanName);
+    final now = DateTime.now().toUtc();
+    final group = TankGroup(
+      id: 'development-group-${groups.length + 1}',
+      facilityId: facilityId,
+      name: cleanName,
+      tankCount: 0,
+      archived: false,
+      createdAt: now,
+      updatedAt: now,
+    );
+    groups.add(group);
+    return group;
+  }
+
+  @override
+  Future<TankGroup> renameTankGroup({
+    required String facilityId,
+    required String groupId,
+    required String name,
+  }) async {
+    _requireOwner(facilityId);
+    final groups = _tankGroups[facilityId] ?? [];
+    final index = groups.indexWhere((group) => group.id == groupId);
+    if (index == -1) {
+      throw const FacilityException(
+        'The tank group was not found.',
+        code: 'tank_group_not_found',
+      );
+    }
+    final existing = groups[index];
+    if (existing.archived) {
+      throw const FacilityException(
+        'An archived tank group cannot be renamed.',
+        code: 'group_archived',
+      );
+    }
+    final cleanName = name.trim().replaceAll(RegExp(r'\s+'), ' ');
+    _rejectDuplicate(groups, cleanName, excludingId: groupId);
+    final updated = existing.copyWith(
+      name: cleanName,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    groups[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<TankGroup> archiveTankGroup({
+    required String facilityId,
+    required String groupId,
+  }) async {
+    _requireOwner(facilityId);
+    final groups = _tankGroups[facilityId] ?? [];
+    final index = groups.indexWhere((group) => group.id == groupId);
+    if (index == -1) {
+      throw const FacilityException(
+        'The tank group was not found.',
+        code: 'tank_group_not_found',
+      );
+    }
+    final existing = groups[index];
+    if (existing.tankCount > 0) {
+      throw const FacilityException(
+        'Move or archive every tank in this group before archiving it.',
+        code: 'group_not_empty',
+      );
+    }
+    if (existing.archived) {
+      return existing;
+    }
+    final now = DateTime.now().toUtc();
+    final archived = existing.copyWith(
+      archived: true,
+      archivedAt: now,
+      updatedAt: now,
+    );
+    groups[index] = archived;
+    return archived;
+  }
+
+  Facility _requireOwner(String facilityId) {
+    final facility = _facilities.firstWhere(
+      (item) => item.id == facilityId,
+      orElse: () => throw const FacilityException(
+        'The aquarium is no longer available.',
+        code: 'facility_not_found',
+      ),
+    );
+    if (facility.role != FacilityRole.owner) {
+      throw const FacilityException(
+        'Only an aquarium owner can manage tank groups.',
+        code: 'owner_required',
+      );
+    }
+    return facility;
+  }
+
+  void _rejectDuplicate(
+    List<TankGroup> groups,
+    String name, {
+    String? excludingId,
+  }) {
+    if (groups.any(
+      (group) =>
+          !group.archived &&
+          group.id != excludingId &&
+          group.name.toLowerCase() == name.toLowerCase(),
+    )) {
+      throw const FacilityException(
+        'An active tank group already uses that name.',
+        code: 'tank_group_name_exists',
       );
     }
   }

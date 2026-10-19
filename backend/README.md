@@ -87,6 +87,22 @@ owner-only operations by the API. A worker can list the team but receives a
 forbidden response for owner-only actions. AquaSense currently exposes
 invitations in the app; external invitation-email delivery is not yet included.
 
+## Tank-group endpoints
+
+- `GET /api/v1/facilities/{facilityId}/tank-groups` lists active and archived
+  groups, including each group's tank count, for owners and workers.
+- `POST /api/v1/facilities/{facilityId}/tank-groups` creates a flat group for
+  an owner.
+- `PATCH /api/v1/facilities/{facilityId}/tank-groups/{groupId}` renames an
+  active group for an owner.
+- `POST /api/v1/facilities/{facilityId}/tank-groups/{groupId}/archive`
+  archives an empty group for an owner.
+
+Active group names are unique within an aquarium after whitespace and case
+normalization. Archived groups are retained for history and returned after
+active groups. A group with a nonzero tank count cannot be archived; MOB-009
+will maintain this server-owned count when tank assignment is introduced.
+
 ## Verify
 
 ```powershell

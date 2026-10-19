@@ -28,6 +28,12 @@ shown after the invited person signs in with Google; they can accept it before
 creating their own aquarium or from the invitation indicator on an existing
 aquarium home screen. AquaSense does not send invitation email yet.
 
+Tap the grid icon on an aquarium home screen to open **Tank groups**. Owners
+can add and rename flat groups and archive groups that contain no tanks.
+Workers receive the same group list and tank counts as a read-only view.
+Archived groups remain visible for operational history. Until MOB-009 adds
+individual tanks, newly created groups correctly show a count of zero.
+
 ## Environments
 
 Configuration is supplied with compile-time Dart defines. Do not place API

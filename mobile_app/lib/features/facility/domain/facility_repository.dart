@@ -1,5 +1,6 @@
 import 'facility.dart';
 import 'facility_team.dart';
+import 'tank_group.dart';
 
 abstract interface class FacilityRepository {
   Future<List<Facility>> listFacilities();
@@ -35,5 +36,23 @@ abstract interface class FacilityRepository {
   Future<void> removeWorker({
     required String facilityId,
     required String membershipId,
+  });
+
+  Future<List<TankGroup>> listTankGroups(String facilityId);
+
+  Future<TankGroup> createTankGroup({
+    required String facilityId,
+    required String name,
+  });
+
+  Future<TankGroup> renameTankGroup({
+    required String facilityId,
+    required String groupId,
+    required String name,
+  });
+
+  Future<TankGroup> archiveTankGroup({
+    required String facilityId,
+    required String groupId,
   });
 }

@@ -1,26 +1,31 @@
 import 'package:mobile_app/features/facility/domain/facility.dart';
 import 'package:mobile_app/features/facility/domain/facility_repository.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
+import 'package:mobile_app/features/facility/domain/tank_group.dart';
 
 class FakeFacilityRepository implements FacilityRepository {
   FakeFacilityRepository({
     List<Facility>? facilities,
     List<FacilityInvitation>? invitations,
     Map<String, List<FacilityMember>>? members,
+    Map<String, List<TankGroup>>? tankGroups,
     this.listError,
     this.createFailures = 0,
   }) : facilities = facilities ?? [],
        invitations = invitations ?? [],
-       members = members ?? {};
+       members = members ?? {},
+       tankGroups = tankGroups ?? {};
 
   final List<Facility> facilities;
   final List<FacilityInvitation> invitations;
   final Map<String, List<FacilityMember>> members;
+  final Map<String, List<TankGroup>> tankGroups;
   Object? listError;
   int createFailures;
   int listCalls = 0;
   int createCalls = 0;
   int getCalls = 0;
+  int listTankGroupsCalls = 0;
   final List<String> creationKeys = [];
   final Set<String> inaccessibleFacilityIds = {};
 
@@ -185,6 +190,105 @@ class FakeFacilityRepository implements FacilityRepository {
     if (index != -1) {
       invitations[index] = invitations[index].copyWith(
         status: FacilityInvitationStatus.revoked,
+      );
+    }
+  }
+
+  @override
+  Future<List<TankGroup>> listTankGroups(String facilityId) async {
+    listTankGroupsCalls += 1;
+    final result = List<TankGroup>.unmodifiable(
+      tankGroups[facilityId] ?? const [],
+    );
+    return result;
+  }
+
+  @override
+  Future<TankGroup> createTankGroup({
+    required String facilityId,
+    required String name,
+  }) async {
+    _requireOwner(facilityId);
+    final groups = tankGroups.putIfAbsent(facilityId, () => []);
+    final now = DateTime.now().toUtc();
+    final group = TankGroup(
+      id: 'group-${groups.length + 1}',
+      facilityId: facilityId,
+      name: name.trim(),
+      tankCount: 0,
+      archived: false,
+      createdAt: now,
+      updatedAt: now,
+    );
+    groups.add(group);
+    return group;
+  }
+
+  @override
+  Future<TankGroup> renameTankGroup({
+    required String facilityId,
+    required String groupId,
+    required String name,
+  }) async {
+    _requireOwner(facilityId);
+    final groups = tankGroups[facilityId] ?? [];
+    final index = groups.indexWhere((group) => group.id == groupId);
+    if (index == -1) {
+      throw const FacilityException(
+        'The tank group was not found.',
+        code: 'tank_group_not_found',
+      );
+    }
+    final updated = groups[index].copyWith(
+      name: name.trim(),
+      updatedAt: DateTime.now().toUtc(),
+    );
+    groups[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<TankGroup> archiveTankGroup({
+    required String facilityId,
+    required String groupId,
+  }) async {
+    _requireOwner(facilityId);
+    final groups = tankGroups[facilityId] ?? [];
+    final index = groups.indexWhere((group) => group.id == groupId);
+    if (index == -1) {
+      throw const FacilityException(
+        'The tank group was not found.',
+        code: 'tank_group_not_found',
+      );
+    }
+    if (groups[index].tankCount > 0) {
+      throw const FacilityException(
+        'Move or archive every tank in this group before archiving it.',
+        code: 'group_not_empty',
+      );
+    }
+    final now = DateTime.now().toUtc();
+    final archived = groups[index].copyWith(
+      archived: true,
+      archivedAt: now,
+      updatedAt: now,
+    );
+    groups[index] = archived;
+    return archived;
+  }
+
+  void _requireOwner(String facilityId) {
+    final facility = facilities.firstWhere(
+      (item) => item.id == facilityId,
+      orElse: () => throw const FacilityException(
+        'The aquarium is no longer available.',
+        code: 'facility_not_found',
+      ),
+    );
+    if (facility.role != FacilityRole.owner) {
+      throw const FacilityException(
+        'Only an aquarium owner can manage tank groups.',
+        code: 'owner_required',
       );
     }
   }

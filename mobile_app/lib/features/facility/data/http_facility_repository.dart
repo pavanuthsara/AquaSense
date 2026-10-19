@@ -6,6 +6,7 @@ import '../../auth/domain/auth_session_storage.dart';
 import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_team.dart';
+import '../domain/tank_group.dart';
 
 class HttpFacilityRepository implements FacilityRepository {
   HttpFacilityRepository({
@@ -151,6 +152,60 @@ class HttpFacilityRepository implements FacilityRepository {
     _requireSuccess(response, _decode(response));
   }
 
+  @override
+  Future<List<TankGroup>> listTankGroups(String facilityId) async {
+    final response = await _authorizedGet(
+      '/api/v1/facilities/$facilityId/tank-groups',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return (body as List<dynamic>)
+        .map((item) => _tankGroupFromJson(item as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  @override
+  Future<TankGroup> createTankGroup({
+    required String facilityId,
+    required String name,
+  }) async {
+    final response = await _authorizedPost(
+      '/api/v1/facilities/$facilityId/tank-groups',
+      body: {'name': name},
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _tankGroupFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<TankGroup> renameTankGroup({
+    required String facilityId,
+    required String groupId,
+    required String name,
+  }) async {
+    final response = await _authorizedPatch(
+      '/api/v1/facilities/$facilityId/tank-groups/$groupId',
+      body: {'name': name},
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _tankGroupFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<TankGroup> archiveTankGroup({
+    required String facilityId,
+    required String groupId,
+  }) async {
+    final response = await _authorizedPost(
+      '/api/v1/facilities/$facilityId/tank-groups/$groupId/archive',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _tankGroupFromJson(body as Map<String, dynamic>);
+  }
+
   Future<http.Response> _authorizedGet(String path) async {
     try {
       return await _client.get(_resolve(path), headers: await _headers());
@@ -171,6 +226,24 @@ class HttpFacilityRepository implements FacilityRepository {
         _resolve(path),
         headers: await _headers(),
         body: body == null ? null : jsonEncode(body),
+      );
+    } on http.ClientException {
+      throw const FacilityException(
+        'Could not connect to AquaSense. Check your connection and try again.',
+        code: 'connection_error',
+      );
+    }
+  }
+
+  Future<http.Response> _authorizedPatch(
+    String path, {
+    required Map<String, dynamic> body,
+  }) async {
+    try {
+      return await _client.patch(
+        _resolve(path),
+        headers: await _headers(),
+        body: jsonEncode(body),
       );
     } on http.ClientException {
       throw const FacilityException(
@@ -281,6 +354,22 @@ class HttpFacilityRepository implements FacilityRepository {
       },
       expiresAt: DateTime.parse(json['expiresAt'] as String).toUtc(),
       createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
+    );
+  }
+
+  TankGroup _tankGroupFromJson(Map<String, dynamic> json) {
+    final archivedAt = json['archivedAt'];
+    return TankGroup(
+      id: json['id'] as String,
+      facilityId: json['facilityId'] as String,
+      name: json['name'] as String,
+      tankCount: json['tankCount'] as int,
+      archived: json['archived'] as bool,
+      createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
+      updatedAt: DateTime.parse(json['updatedAt'] as String).toUtc(),
+      archivedAt: archivedAt is String
+          ? DateTime.parse(archivedAt).toUtc()
+          : null,
     );
   }
 

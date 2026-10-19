@@ -6,6 +6,7 @@ import 'package:mobile_app/features/auth/domain/auth_session_storage.dart';
 import 'package:mobile_app/features/facility/data/http_facility_repository.dart';
 import 'package:mobile_app/features/facility/domain/facility.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
+import 'package:mobile_app/features/facility/domain/tank_group.dart';
 
 void main() {
   test('lists facilities with the saved bearer token', () async {
@@ -136,6 +137,58 @@ void main() {
       '/api/v1/facilities/facility-1/members/membership-1',
     );
   });
+
+  test('tank group operations use facility-scoped endpoints', () async {
+    final requests = <http.Request>[];
+    final repository = HttpFacilityRepository(
+      apiBaseUrl: 'https://api.example.com',
+      sessionStorage: _MemorySessionStorage(),
+      client: MockClient((request) async {
+        requests.add(request);
+        if (request.method == 'GET') {
+          return http.Response('[$_tankGroupJson]', 200);
+        }
+        return http.Response(
+          _tankGroupJson,
+          request.method == 'POST' ? 201 : 200,
+        );
+      }),
+    );
+
+    final groups = await repository.listTankGroups('facility-1');
+    final created = await repository.createTankGroup(
+      facilityId: 'facility-1',
+      name: 'Nursery',
+    );
+    await repository.renameTankGroup(
+      facilityId: 'facility-1',
+      groupId: created.id,
+      name: 'Juvenile',
+    );
+    await repository.archiveTankGroup(
+      facilityId: 'facility-1',
+      groupId: created.id,
+    );
+
+    expect(groups.single, isA<TankGroup>());
+    expect(groups.single.tankCount, 12);
+    expect(requests.map((request) => request.method), [
+      'GET',
+      'POST',
+      'PATCH',
+      'POST',
+    ]);
+    expect(requests[0].url.path, '/api/v1/facilities/facility-1/tank-groups');
+    expect(requests[1].body, contains('Nursery'));
+    expect(
+      requests[2].url.path,
+      '/api/v1/facilities/facility-1/tank-groups/group-1',
+    );
+    expect(
+      requests[3].url.path,
+      '/api/v1/facilities/facility-1/tank-groups/group-1/archive',
+    );
+  });
 }
 
 const _facilityJson = '''
@@ -178,6 +231,19 @@ const _memberJson = '''
   "displayName": "Test Owner",
   "role": "OWNER",
   "joinedAt": "2026-10-15T08:00:00Z"
+}
+''';
+
+const _tankGroupJson = '''
+{
+  "id": "group-1",
+  "facilityId": "facility-1",
+  "name": "Nursery",
+  "tankCount": 12,
+  "archived": false,
+  "createdAt": "2026-10-19T08:00:00Z",
+  "updatedAt": "2026-10-19T08:00:00Z",
+  "archivedAt": null
 }
 ''';
 
