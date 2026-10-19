@@ -1,5 +1,8 @@
 # AquaSense Mobile Development
 
+> The disease identification feature has its own backlog: see
+> [DISEASE_IDENTIFICATION.md](DISEASE_IDENTIFICATION.md).
+
 This file is the source of truth for the feeding mobile application's backlog,
 current task, implementation decisions, verification, and completed work.
 
