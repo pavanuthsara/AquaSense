@@ -174,6 +174,22 @@ ten minutes. Feeding is allowed only when the camera, edge processor, and
 feeder are all configured, online, and healthy. Device tokens are stored as
 SHA-256 hashes and are never returned after provisioning.
 
+## Appetite observations
+
+- `POST /api/v1/device-observations` accepts a tank ID, detected guppy count,
+  confidence, `HIGH` or `LOW` appetite result, model version, and observation
+  timestamp. It uses the MOB-014 device ID/token headers and accepts only an
+  edge processor assigned to that tank.
+- `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/appetite-observation`
+  returns the latest observation to an aquarium member. Tank-detail responses
+  include the same record.
+
+Observations older than five minutes or more than one minute in the future are
+stale. Confidence below 80% is low, and detected count is inconsistent when it
+differs from expected by more than the larger of five fish or 20%. Flagged
+observations remain visible for review but cannot update trusted count data or
+pass the feeding-decision safety guard.
+
 ## Verify
 
 ```powershell

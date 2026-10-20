@@ -67,6 +67,13 @@ shown once for copying into that device. Workers have read-only health access.
 Schedule, observation, and feeding sections clearly say when later-stage data
 has not been configured yet.
 
+When the edge processor submits an appetite observation, tank details show
+the appetite result, detected count, confidence, observation time, and model
+version. Stale, low-confidence, and expected-count mismatch reasons are shown
+clearly, together with whether the observation is valid for a feeding
+decision. Invalid data remains visible for review but does not replace the
+tank's trusted detected count.
+
 ## Environments
 
 Configuration is supplied with compile-time Dart defines. Do not place API
