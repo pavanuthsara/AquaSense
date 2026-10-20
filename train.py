@@ -32,7 +32,7 @@ model.train(
     batch=4,
     workers=0,
     project=str(ROOT / "runs"),
-    name="guppy_detector_v1",
+    name="guppy_detector_v2",
     plots=True
 )
 
