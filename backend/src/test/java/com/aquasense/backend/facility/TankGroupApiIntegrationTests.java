@@ -5,10 +5,15 @@ import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 
 import com.aquasense.backend.auth.model.AppUser;
@@ -32,6 +37,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 class TankGroupApiIntegrationTests {
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     @Autowired
     private MockMvc mockMvc;
 
@@ -134,6 +140,105 @@ class TankGroupApiIntegrationTests {
                         .header("Authorization", bearer(worker.token())))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code", is("owner_required")));
+        mockMvc.perform(put(
+                        "/api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule",
+                        facilityId,
+                        groupId)
+                        .header("Authorization", bearer(worker.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"times\":[\"08:00\"],\"automationEnabled\":true}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is("owner_required")));
+    }
+
+    @Test
+    void ownerCanConfigureAndPauseAGroupScheduleInTheFacilityTimeZone() throws Exception {
+        TestUser owner = user("schedule-owner", "owner@example.com", "Owner");
+        String facilityId = createFacility(owner.token(), "schedule-facility", "Schedule Reef");
+        String groupId = createGroup(owner.token(), facilityId, "Nursery", 201);
+        ZoneId timeZone = ZoneId.of("Asia/Colombo");
+        LocalTime first = Instant.now().atZone(timeZone).plusHours(2)
+                .withSecond(0).withNano(0).toLocalTime();
+        LocalTime second = first.plusHours(4);
+
+        mockMvc.perform(put(
+                        "/api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule",
+                        facilityId,
+                        groupId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scheduleJson(List.of(second, first), true)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.feedingTimes", hasSize(2)))
+                .andExpect(jsonPath("$.feedingAutomationEnabled", is(true)))
+                .andExpect(jsonPath("$.nextSessionAt").isNotEmpty());
+
+        var stored = jdbcTemplate.query(
+                "SELECT local_time, next_execution_at FROM group_feeding_times "
+                        + "WHERE tank_group_id = ? ORDER BY local_time",
+                (resultSet, row) -> new StoredFeedingTime(
+                        resultSet.getTime("local_time").toLocalTime(),
+                        resultSet.getTimestamp("next_execution_at").toInstant()),
+                UUID.fromString(groupId));
+        org.assertj.core.api.Assertions.assertThat(stored).hasSize(2);
+        stored.forEach(item -> {
+            org.assertj.core.api.Assertions.assertThat(item.nextExecutionAt()).isAfter(Instant.now().minusSeconds(5));
+            org.assertj.core.api.Assertions.assertThat(
+                    item.nextExecutionAt().atZone(timeZone).toLocalTime()).isEqualTo(item.localTime());
+        });
+
+        mockMvc.perform(put(
+                        "/api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule",
+                        facilityId,
+                        groupId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(scheduleJson(List.of(first, second), false)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.feedingAutomationEnabled", is(false)))
+                .andExpect(jsonPath("$.nextSessionAt").doesNotExist());
+        org.assertj.core.api.Assertions.assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM group_feeding_times WHERE tank_group_id = ? AND next_execution_at IS NULL",
+                Integer.class,
+                UUID.fromString(groupId))).isEqualTo(2);
+    }
+
+    @Test
+    void scheduleRequiresUniqueValidTimesAndAnActiveGroup() throws Exception {
+        TestUser owner = user("validation-owner", "owner@example.com", "Owner");
+        String facilityId = createFacility(owner.token(), "validation-facility", "Validation Reef");
+        String groupId = createGroup(owner.token(), facilityId, "Nursery", 201);
+
+        mockMvc.perform(put(
+                        "/api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule",
+                        facilityId,
+                        groupId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"times\":[],\"automationEnabled\":true}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put(
+                        "/api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule",
+                        facilityId,
+                        groupId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"times\":[\"08:00\",\"08:00\"],\"automationEnabled\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code", is("duplicate_feeding_time")));
+
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/tank-groups/{groupId}/archive", facilityId, groupId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk());
+        mockMvc.perform(put(
+                        "/api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule",
+                        facilityId,
+                        groupId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"times\":[\"08:00\"],\"automationEnabled\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code", is("group_archived")));
     }
 
     @Test
@@ -223,6 +328,17 @@ class TankGroupApiIntegrationTests {
         return "Bearer " + accessToken;
     }
 
+    private String scheduleJson(List<LocalTime> times, boolean automationEnabled) {
+        String values = times.stream()
+                .map(TIME_FORMAT::format)
+                .map(value -> "\"" + value + "\"")
+                .collect(java.util.stream.Collectors.joining(","));
+        return "{\"times\":[" + values + "],\"automationEnabled\":" + automationEnabled + "}";
+    }
+
     private record TestUser(AppUser user, String token) {
+    }
+
+    private record StoredFeedingTime(LocalTime localTime, Instant nextExecutionAt) {
     }
 }

@@ -33,6 +33,12 @@ can add and rename flat groups and archive groups that contain no tanks.
 Workers receive the same group list and tank counts as a read-only view.
 Archived groups remain visible for operational history.
 
+Open a group to view its daily feeding schedule in the aquarium timezone.
+Owners can add or remove session times, enable automatic feeding, or pause it
+without losing the configured times. Workers can inspect the same schedule
+and its next stored UTC execution time, but all schedule controls are
+read-only.
+
 Open **Tanks** from the aquarium home screen to browse the paginated inventory.
 Search by name or code, filter by current status, group, unassigned tanks, or
 tag, and load further pages when required. Owners can add, edit, move, pause,

@@ -97,11 +97,19 @@ invitations in the app; external invitation-email delivery is not yet included.
   active group for an owner.
 - `POST /api/v1/facilities/{facilityId}/tank-groups/{groupId}/archive`
   archives an empty group for an owner.
+- `PUT /api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule`
+  replaces an active group's daily feeding times and enables or pauses its
+  automatic schedule for an owner.
 
 Active group names are unique within an aquarium after whitespace and case
 normalization. Archived groups are retained for history and returned after
 active groups. A group with a nonzero tank count cannot be archived; MOB-009
 maintains this server-owned count when tanks are created, moved, or archived.
+Feeding times are submitted and returned as `HH:mm` wall-clock times in the
+facility's IANA timezone. The API also stores the next occurrence as a UTC
+instant so later feeding workers can execute consistently. Pausing keeps the
+configured times but clears their pending execution instants. Workers can read
+the schedule through the group list but cannot change it.
 
 ## Tank endpoints
 

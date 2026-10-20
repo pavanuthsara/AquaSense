@@ -166,6 +166,12 @@ void main() {
       groupId: created.id,
       name: 'Juvenile',
     );
+    final scheduled = await repository.updateTankGroupFeedingSchedule(
+      facilityId: 'facility-1',
+      groupId: created.id,
+      times: const ['08:00', '16:00'],
+      automationEnabled: true,
+    );
     await repository.archiveTankGroup(
       facilityId: 'facility-1',
       groupId: created.id,
@@ -173,10 +179,14 @@ void main() {
 
     expect(groups.single, isA<TankGroup>());
     expect(groups.single.tankCount, 12);
+    expect(scheduled.feedingTimes, ['08:00', '16:00']);
+    expect(scheduled.feedingAutomationEnabled, isTrue);
+    expect(scheduled.nextSessionAt, DateTime.parse('2026-10-20T02:30:00Z'));
     expect(requests.map((request) => request.method), [
       'GET',
       'POST',
       'PATCH',
+      'PUT',
       'POST',
     ]);
     expect(requests[0].url.path, '/api/v1/facilities/facility-1/tank-groups');
@@ -187,6 +197,11 @@ void main() {
     );
     expect(
       requests[3].url.path,
+      '/api/v1/facilities/facility-1/tank-groups/group-1/feeding-schedule',
+    );
+    expect(requests[3].body, contains('"automationEnabled":true'));
+    expect(
+      requests[4].url.path,
       '/api/v1/facilities/facility-1/tank-groups/group-1/archive',
     );
   });
@@ -308,6 +323,9 @@ const _tankGroupJson = '''
   "name": "Nursery",
   "tankCount": 12,
   "archived": false,
+  "feedingTimes": ["08:00", "16:00"],
+  "feedingAutomationEnabled": true,
+  "nextSessionAt": "2026-10-20T02:30:00Z",
   "createdAt": "2026-10-19T08:00:00Z",
   "updatedAt": "2026-10-19T08:00:00Z",
   "archivedAt": null

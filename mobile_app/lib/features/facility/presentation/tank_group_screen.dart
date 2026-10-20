@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/tank_group.dart';
+import 'group_feeding_schedule_screen.dart';
 
 class TankGroupScreen extends StatefulWidget {
   const TankGroupScreen({
@@ -126,6 +127,19 @@ class _TankGroupScreenState extends State<TankGroupScreen> {
     );
   }
 
+  Future<void> _openSchedule(TankGroup group) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => GroupFeedingScheduleScreen(
+          facility: widget.facility,
+          group: group,
+          repository: widget.repository,
+        ),
+      ),
+    );
+    if (changed == true) await _reload(showLoading: false);
+  }
+
   Future<void> _runMutation(
     Future<TankGroup> Function() mutation, {
     required String successMessage,
@@ -191,7 +205,9 @@ class _TankGroupScreenState extends State<TankGroupScreen> {
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) => _GroupCard(
                 group: _groups[index],
+                timeZone: widget.facility.timeZone,
                 isOwner: _isOwner,
+                onSchedule: () => _openSchedule(_groups[index]),
                 onRename: () => _renameGroup(_groups[index]),
                 onArchive: () => _archiveGroup(_groups[index]),
               ),
@@ -200,18 +216,22 @@ class _TankGroupScreenState extends State<TankGroupScreen> {
   }
 }
 
-enum _GroupAction { rename, archive }
+enum _GroupAction { schedule, rename, archive }
 
 class _GroupCard extends StatelessWidget {
   const _GroupCard({
     required this.group,
+    required this.timeZone,
     required this.isOwner,
+    required this.onSchedule,
     required this.onRename,
     required this.onArchive,
   });
 
   final TankGroup group;
+  final String timeZone;
   final bool isOwner;
+  final VoidCallback onSchedule;
   final VoidCallback onRename;
   final VoidCallback onArchive;
 
@@ -223,6 +243,7 @@ class _GroupCard extends StatelessWidget {
     return Card(
       key: Key('tank-group-${group.id}'),
       child: ListTile(
+        onTap: onSchedule,
         leading: CircleAvatar(
           child: Icon(
             group.archived
@@ -231,13 +252,29 @@ class _GroupCard extends StatelessWidget {
           ),
         ),
         title: Text(group.name),
-        subtitle: Text(group.archived ? '$countLabel · Archived' : countLabel),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(group.archived ? '$countLabel · Archived' : countLabel),
+            Text(
+              group.feedingTimes.isEmpty
+                  ? 'No feeding schedule'
+                  : '${group.feedingTimes.join(', ')} · '
+                        '${group.feedingAutomationEnabled ? 'Automatic' : 'Paused'}',
+            ),
+            Text(timeZone.replaceAll('_', ' ')),
+          ],
+        ),
+        isThreeLine: true,
         trailing: isOwner && !group.archived
             ? PopupMenuButton<_GroupAction>(
                 key: Key('tank-group-actions-${group.id}'),
                 tooltip: 'Group actions',
                 onSelected: (action) {
                   switch (action) {
+                    case _GroupAction.schedule:
+                      onSchedule();
+                      break;
                     case _GroupAction.rename:
                       onRename();
                       break;
@@ -247,6 +284,10 @@ class _GroupCard extends StatelessWidget {
                   }
                 },
                 itemBuilder: (_) => [
+                  const PopupMenuItem(
+                    value: _GroupAction.schedule,
+                    child: Text('Feeding schedule'),
+                  ),
                   const PopupMenuItem(
                     value: _GroupAction.rename,
                     child: Text('Rename'),
@@ -262,7 +303,7 @@ class _GroupCard extends StatelessWidget {
                   ),
                 ],
               )
-            : null,
+            : const Icon(Icons.chevron_right_rounded),
       ),
     );
   }

@@ -284,6 +284,45 @@ class FakeFacilityRepository implements FacilityRepository {
     return archived;
   }
 
+  @override
+  Future<TankGroup> updateTankGroupFeedingSchedule({
+    required String facilityId,
+    required String groupId,
+    required List<String> times,
+    required bool automationEnabled,
+  }) async {
+    _requireOwner(facilityId);
+    final groups = tankGroups[facilityId] ?? [];
+    final index = groups.indexWhere((group) => group.id == groupId);
+    if (index == -1) {
+      throw const FacilityException(
+        'The tank group was not found.',
+        code: 'tank_group_not_found',
+      );
+    }
+    if (groups[index].archived) {
+      throw const FacilityException(
+        'An archived tank group cannot have its feeding schedule changed.',
+        code: 'group_archived',
+      );
+    }
+    final cleanTimes = times.toSet().toList()..sort();
+    if (cleanTimes.isEmpty) {
+      throw const FacilityException(
+        'Add at least one daily feeding time.',
+        code: 'invalid_feeding_schedule',
+      );
+    }
+    final updated = groups[index].copyWith(
+      feedingTimes: List.unmodifiable(cleanTimes),
+      feedingAutomationEnabled: automationEnabled,
+      clearNextSession: !automationEnabled,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    groups[index] = updated;
+    return updated;
+  }
+
   void _requireOwner(String facilityId) {
     final facility = facilities.firstWhere(
       (item) => item.id == facilityId,

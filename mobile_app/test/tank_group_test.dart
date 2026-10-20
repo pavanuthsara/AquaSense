@@ -107,6 +107,88 @@ void main() {
     expect(find.byKey(const Key('tank-group-actions-group-1')), findsNothing);
   });
 
+  testWidgets('owner can pause a configured group feeding schedule', (
+    tester,
+  ) async {
+    final facility = FakeFacilityRepository.facility(name: 'Schedule Reef');
+    final repository = FakeFacilityRepository(
+      facilities: [facility],
+      tankGroups: {
+        facility.id: [
+          _group(
+            facilityId: facility.id,
+            tankCount: 20,
+            feedingTimes: const ['08:00', '16:00'],
+            feedingAutomationEnabled: true,
+            nextSessionAt: DateTime.parse('2026-10-20T02:30:00Z'),
+          ),
+        ],
+      },
+    );
+    await tester.pumpWidget(buildApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tank-groups-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('08:00, 16:00 · Automatic'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('tank-group-group-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Asia/Colombo.'), findsOneWidget);
+    expect(find.byKey(const Key('group-feeding-time-08:00')), findsOneWidget);
+    expect(find.byKey(const Key('group-next-session')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('remove-group-feeding-time-08:00')));
+    await tester.tap(find.byKey(const Key('group-feeding-automation-switch')));
+    await tester.tap(find.byKey(const Key('save-group-feeding-schedule')));
+    await tester.pumpAndSettle();
+
+    final updated = repository.tankGroups[facility.id]!.single;
+    expect(updated.feedingTimes, ['16:00']);
+    expect(updated.feedingAutomationEnabled, isFalse);
+    expect(updated.nextSessionAt, isNull);
+    expect(find.text('16:00 · Paused'), findsOneWidget);
+  });
+
+  testWidgets('worker can inspect a group schedule but cannot edit it', (
+    tester,
+  ) async {
+    final facility = FakeFacilityRepository.facility(
+      name: 'Worker Schedule Reef',
+      role: FacilityRole.worker,
+    );
+    final repository = FakeFacilityRepository(
+      facilities: [facility],
+      tankGroups: {
+        facility.id: [
+          _group(
+            facilityId: facility.id,
+            tankCount: 24,
+            feedingTimes: const ['07:30', '17:30'],
+            feedingAutomationEnabled: true,
+          ),
+        ],
+      },
+    );
+    await tester.pumpWidget(buildApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tank-groups-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tank-group-group-1')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Workers can view this schedule but cannot change it.'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('group-feeding-time-07:30')), findsOneWidget);
+    expect(find.byKey(const Key('add-group-feeding-time')), findsNothing);
+    expect(find.byKey(const Key('save-group-feeding-schedule')), findsNothing);
+    final toggle = tester.widget<SwitchListTile>(
+      find.byKey(const Key('group-feeding-automation-switch')),
+    );
+    expect(toggle.onChanged, isNull);
+  });
+
   testWidgets('occupied group explains why archive is unavailable', (
     tester,
   ) async {
@@ -130,13 +212,22 @@ void main() {
   });
 }
 
-TankGroup _group({required String facilityId, required int tankCount}) {
+TankGroup _group({
+  required String facilityId,
+  required int tankCount,
+  List<String> feedingTimes = const [],
+  bool feedingAutomationEnabled = false,
+  DateTime? nextSessionAt,
+}) {
   return TankGroup(
     id: 'group-1',
     facilityId: facilityId,
     name: 'Nursery',
     tankCount: tankCount,
     archived: false,
+    feedingTimes: feedingTimes,
+    feedingAutomationEnabled: feedingAutomationEnabled,
+    nextSessionAt: nextSessionAt,
     createdAt: DateTime.utc(2026, 10, 19),
     updatedAt: DateTime.utc(2026, 10, 19),
   );

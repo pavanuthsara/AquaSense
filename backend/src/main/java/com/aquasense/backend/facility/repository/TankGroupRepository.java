@@ -13,7 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface TankGroupRepository extends JpaRepository<TankGroup, UUID> {
-    @EntityGraph(attributePaths = "facility")
+    @EntityGraph(attributePaths = {"facility", "feedingTimes"})
     List<TankGroup> findAllByFacility_IdOrderByNameAsc(UUID facilityId);
 
     boolean existsByFacility_IdAndNormalizedNameAndArchivedAtIsNull(
@@ -26,7 +26,7 @@ public interface TankGroupRepository extends JpaRepository<TankGroup, UUID> {
             UUID id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = "facility")
+    @EntityGraph(attributePaths = {"facility", "feedingTimes"})
     @Query("""
             select tankGroup from TankGroup tankGroup
             where tankGroup.id = :id and tankGroup.facility.id = :facilityId

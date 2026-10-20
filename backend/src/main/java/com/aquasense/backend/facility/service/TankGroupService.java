@@ -1,7 +1,11 @@
 package com.aquasense.backend.facility.service;
 
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -19,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TankGroupService {
+    private static final DateTimeFormatter FEEDING_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private static final Comparator<TankGroup> GROUP_ORDER = Comparator
             .comparing(TankGroup::isArchived)
             .thenComparing(TankGroup::getName, String.CASE_INSENSITIVE_ORDER);
@@ -88,6 +93,36 @@ public class TankGroupService {
                     "Move or archive every tank in this group before archiving it");
         }
         group.archive(Instant.now());
+        return group;
+    }
+
+    @Transactional
+    public TankGroup configureFeedingSchedule(
+            UUID userId,
+            UUID facilityId,
+            UUID groupId,
+            List<String> requestedTimes,
+            boolean automationEnabled) {
+        requireOwner(userId, facilityId);
+        TankGroup group = lockGroup(facilityId, groupId);
+        if (group.isArchived()) {
+            throw new FacilityException(
+                    HttpStatus.CONFLICT,
+                    "group_archived",
+                    "An archived tank group cannot have its feeding schedule changed");
+        }
+        List<LocalTime> localTimes = requestedTimes.stream()
+                .map(time -> LocalTime.parse(time, FEEDING_TIME_FORMAT))
+                .sorted()
+                .toList();
+        if (new LinkedHashSet<>(localTimes).size() != localTimes.size()) {
+            throw new FacilityException(
+                    HttpStatus.BAD_REQUEST,
+                    "duplicate_feeding_time",
+                    "Each daily feeding time must be unique");
+        }
+        ZoneId timeZone = ZoneId.of(group.getFacility().getTimeZone());
+        group.configureFeedingSchedule(localTimes, automationEnabled, timeZone, Instant.now());
         return group;
     }
 

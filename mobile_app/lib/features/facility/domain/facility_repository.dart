@@ -57,6 +57,13 @@ abstract interface class FacilityRepository {
     required String groupId,
   });
 
+  Future<TankGroup> updateTankGroupFeedingSchedule({
+    required String facilityId,
+    required String groupId,
+    required List<String> times,
+    required bool automationEnabled,
+  });
+
   Future<TankPage> listTanks({
     required String facilityId,
     required int page,

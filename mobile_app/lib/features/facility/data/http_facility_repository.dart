@@ -208,6 +208,22 @@ class HttpFacilityRepository implements FacilityRepository {
   }
 
   @override
+  Future<TankGroup> updateTankGroupFeedingSchedule({
+    required String facilityId,
+    required String groupId,
+    required List<String> times,
+    required bool automationEnabled,
+  }) async {
+    final response = await _authorizedPut(
+      '/api/v1/facilities/$facilityId/tank-groups/$groupId/feeding-schedule',
+      body: {'times': times, 'automationEnabled': automationEnabled},
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _tankGroupFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
   Future<TankPage> listTanks({
     required String facilityId,
     required int page,
@@ -365,6 +381,24 @@ class HttpFacilityRepository implements FacilityRepository {
     }
   }
 
+  Future<http.Response> _authorizedPut(
+    String path, {
+    required Map<String, dynamic> body,
+  }) async {
+    try {
+      return await _client.put(
+        _resolve(path),
+        headers: await _headers(),
+        body: jsonEncode(body),
+      );
+    } on http.ClientException {
+      throw const FacilityException(
+        'Could not connect to AquaSense. Check your connection and try again.',
+        code: 'connection_error',
+      );
+    }
+  }
+
   Future<http.Response> _authorizedDelete(String path) async {
     try {
       return await _client.delete(_resolve(path), headers: await _headers());
@@ -471,11 +505,19 @@ class HttpFacilityRepository implements FacilityRepository {
 
   TankGroup _tankGroupFromJson(Map<String, dynamic> json) {
     final archivedAt = json['archivedAt'];
+    final nextSessionAt = json['nextSessionAt'];
     return TankGroup(
       id: json['id'] as String,
       facilityId: json['facilityId'] as String,
       name: json['name'] as String,
       tankCount: json['tankCount'] as int,
+      feedingTimes: (json['feedingTimes'] as List<dynamic>? ?? const [])
+          .cast<String>(),
+      feedingAutomationEnabled:
+          json['feedingAutomationEnabled'] as bool? ?? false,
+      nextSessionAt: nextSessionAt is String
+          ? DateTime.parse(nextSessionAt).toUtc()
+          : null,
       archived: json['archived'] as bool,
       createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
       updatedAt: DateTime.parse(json['updatedAt'] as String).toUtc(),

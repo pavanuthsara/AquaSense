@@ -14,8 +14,7 @@ Only one task should normally be marked `In progress`.
 
 ## Current Task
 
-No task is currently in progress. The recommended next task is
-**MOB-011 — Group feeding schedules**.
+**No task is currently in progress.**
 
 ## Task Backlog
 
@@ -31,7 +30,7 @@ No task is currently in progress. The recommended next task is
 | MOB-008 | Tank-group management | MOB-005, MOB-007 | Done |
 | MOB-009 | Tank and tag management | MOB-008 | Done |
 | MOB-010 | Tank-detail screen | MOB-009 | Done |
-| MOB-011 | Group feeding schedules | MOB-008 | Not started |
+| MOB-011 | Group feeding schedules | MOB-008 | Done |
 | MOB-012 | Per-tank schedule overrides | MOB-010, MOB-011 | Not started |
 | MOB-013 | Feeder calibration and portion preview | MOB-010 | Not started |
 | MOB-014 | Device health integration | MOB-010 | Not started |
@@ -543,4 +542,41 @@ usability evaluation, and document demonstrated capabilities and limitations.
   last/next feeding and operational history require MOB-016/MOB-017. Current
   activity includes tank creation/settings changes rather than feeding events.
 - Recommended next task: MOB-011 — Group feeding schedules.
+
+### 2026-10-20 — MOB-011: Group feeding schedules
+
+- Status: Done
+- Summary: Added facility-scoped daily feeding schedules for tank groups.
+  Owners can configure one or more session-start times, enable automatic
+  feeding, or pause it without losing the times. Workers receive a read-only
+  schedule view. Group cards show the effective times, automation state, and
+  aquarium timezone.
+- Files added: Backend group-feeding-time entity and Flyway migration; Flutter
+  group feeding schedule screen.
+- Files changed: Backend tank-group model, repository, service, controller,
+  integration tests, and guide; Flutter facility repository contracts and
+  HTTP/development/test adapters, tank-group domain/list UI, repository and
+  widget tests, mobile guide, and this development record.
+- Backend/API changes: Added owner-only
+  `PUT /api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule`.
+  Group responses now include `feedingTimes`, `feedingAutomationEnabled`, and
+  `nextSessionAt`. Added `group_feeding_times` and the group automation flag.
+- Tests performed: Java 21 Maven integration/unit suite, timezone conversion
+  and role/validation integration tests, Dart formatting, Flutter static
+  analysis, focused repository/widget tests, full Flutter test suite, and an
+  Android debug APK build with production-style API/Google configuration.
+- Test results: All 37 backend tests and all 48 Flutter tests passed; static
+  analysis reported no issues; the Android debug APK built successfully.
+- Decisions made: Store recurring schedule inputs as `HH:mm` local wall-clock
+  times and calculate each next occurrence using the facility's IANA timezone;
+  persist that occurrence as a UTC instant; sort times and reject duplicates;
+  limit a group to 24 daily sessions; preserve times while paused but clear
+  pending execution instants; start newly created groups paused; and pause a
+  schedule automatically when its group is archived.
+- Known limitations: MOB-011 stores the next execution snapshot but does not
+  yet run feeding sessions or advance it after execution; that belongs to the
+  MOB-016 scheduler. Per-tank inheritance and overrides belong to MOB-012.
+  The development-only mobile repository displays configured local times but
+  leaves server-authoritative UTC conversion to the backend.
+- Recommended next task: MOB-012 — Per-tank schedule overrides.
 
