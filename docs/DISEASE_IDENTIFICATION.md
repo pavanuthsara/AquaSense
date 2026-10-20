@@ -55,7 +55,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-006 | Photo source (camera and gallery) | DIS-003 | Done |
 | DIS-007 | Disease check screen | DIS-005, DIS-006 | Done |
 | DIS-008 | Save results and history screen | DIS-002, DIS-007 | Done |
-| DIS-009 | Home screen entry and app wiring | DIS-007, DIS-008 | Not started |
+| DIS-009 | Home screen entry and app wiring | DIS-007, DIS-008 | Done |
 | DIS-010 | Real-phone test with own fish | DIS-009 | Not started |
 
 Give your agent one task at a time, in this order. After each task: run the
@@ -403,3 +403,22 @@ run on a Raspberry Pi later.
   errors, missing session, development retry, save retry keeps the key,
   history order and filtering by aquarium, empty and error states).
 - Next: DIS-009.
+
+### 2026-10-20 — DIS-009: Home screen entry and app wiring — Done
+
+- Added `DiseaseCheckScope` (classifier, repository, photo source) above
+  `MaterialApp` in `app.dart`. The three new `AquaSenseApp` parameters are
+  optional, so existing tests did not change. `bootstrap.dart` uses the HTTP
+  repository with real sign-in and the in-memory one otherwise. The model is
+  still only loaded on the first check.
+- Added `FishHealthCard` (**Check fish health** and **History**). It finds the
+  selected aquarium and the disease parts through scopes, so the change to the
+  shared `facility_home_screen.dart` is one import and two lines under the
+  tanks panel.
+- Tests: `test/disease_check_flow_test.dart` (home, check, save with tank
+  name, history).
+- Full checks: `dart format` clean, `flutter analyze --fatal-infos` clean,
+  `flutter test` 82 passed (27 of them new), backend `mvnw test` 49 passed.
+  `flutter build apk --debug` was not run (no Android SDK on the cloud
+  machine); run it on your PC.
+- Next: DIS-010 (real-phone test with your own fish).

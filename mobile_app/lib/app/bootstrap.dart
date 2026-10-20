@@ -8,6 +8,9 @@ import '../features/auth/data/development_authentication_repository.dart';
 import '../features/auth/data/google_backend_authentication_repository.dart';
 import '../features/auth/data/secure_auth_session_storage.dart';
 import '../features/auth/domain/authentication_repository.dart';
+import '../features/disease_check/data/development_disease_check_repository.dart';
+import '../features/disease_check/data/http_disease_check_repository.dart';
+import '../features/disease_check/domain/disease_check_repository.dart';
 import '../features/facility/data/development_facility_repository.dart';
 import '../features/facility/data/http_facility_repository.dart';
 import '../features/facility/data/shared_preferences_facility_selection_store.dart';
@@ -24,6 +27,7 @@ Future<void> bootstrap({
   AuthenticationRepository? authenticationRepository,
   FacilityRepository? facilityRepository,
   FacilitySelectionStore? facilitySelectionStore,
+  DiseaseCheckRepository? diseaseCheckRepository,
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -50,6 +54,14 @@ Future<void> bootstrap({
               sessionStorage: sessionStorage,
             )
           : DevelopmentFacilityRepository());
+  final resolvedDiseaseCheckRepository =
+      diseaseCheckRepository ??
+      (resolvedEnvironment.usesRealAuthentication
+          ? HttpDiseaseCheckRepository(
+              apiBaseUrl: resolvedEnvironment.apiBaseUrl,
+              sessionStorage: sessionStorage,
+            )
+          : DevelopmentDiseaseCheckRepository());
   final resolvedFacilitySelectionStore =
       facilitySelectionStore ?? SharedPreferencesFacilitySelectionStore();
 
@@ -78,6 +90,7 @@ Future<void> bootstrap({
         onboardingRepository: resolvedOnboardingRepository,
         authenticationRepository: resolvedAuthenticationRepository,
         facilityRepository: resolvedFacilityRepository,
+        diseaseCheckRepository: resolvedDiseaseCheckRepository,
         facilitySelectionStore: resolvedFacilitySelectionStore,
       ),
     ),
