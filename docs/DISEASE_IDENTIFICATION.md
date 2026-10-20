@@ -52,7 +52,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-003 | Domain models, interfaces and disease info | DIS-001 | Done |
 | DIS-004 | Image preparation (letterbox) with tests | DIS-003 | Done |
 | DIS-005 | On-device TFLite classifier | DIS-004 | Done |
-| DIS-006 | Photo source (camera and gallery) | DIS-003 | Not started |
+| DIS-006 | Photo source (camera and gallery) | DIS-003 | Done |
 | DIS-007 | Disease check screen | DIS-005, DIS-006 | Not started |
 | DIS-008 | Save results and history screen | DIS-002, DIS-007 | Not started |
 | DIS-009 | Home screen entry and app wiring | DIS-007, DIS-008 | Not started |
@@ -359,3 +359,13 @@ run on a Raspberry Pi later.
   task cannot download the Android SDK. Run it on your PC; CI also builds the
   APK.
 - Next: DIS-006.
+
+### 2026-10-20 — DIS-006: Photo source — Done
+
+- Added `ImagePickerPhotoSource` (camera and gallery through `image_picker`).
+  Photos are shrunk to at most 1024 px while picking, so the check stays fast.
+  Camera or gallery errors become a `FishPhotoException` with a plain message.
+- Added test fakes: `FakeFishPhotoSource` and `FakeDiseaseClassifier` (used by
+  the screen tests in DIS-007).
+- Analyze is clean.
+- Next: DIS-007.
