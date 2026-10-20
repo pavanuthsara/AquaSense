@@ -3,7 +3,7 @@ from ultralytics import YOLO
 
 # Load your trained guppy detector
 model = YOLO(
-    "runs/guppy_detector_v1/weights/best.pt"
+    "runs/guppy_detector_v3/weights/best.pt"
 )
 
 # Evaluate using validation images
