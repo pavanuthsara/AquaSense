@@ -6,6 +6,7 @@ import 'package:mobile_app/features/auth/domain/auth_session_storage.dart';
 import 'package:mobile_app/features/facility/data/http_facility_repository.dart';
 import 'package:mobile_app/features/facility/domain/facility.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
+import 'package:mobile_app/features/facility/domain/feeder_calibration.dart';
 import 'package:mobile_app/features/facility/domain/tank_group.dart';
 import 'package:mobile_app/features/facility/domain/tank.dart';
 
@@ -284,6 +285,52 @@ void main() {
       expect(requests[6].url.path, endsWith('/tank-1/archive'));
     },
   );
+
+  test(
+    'feeder calibration and portion preview use facility endpoints',
+    () async {
+      final requests = <http.Request>[];
+      final repository = HttpFacilityRepository(
+        apiBaseUrl: 'https://api.example.com',
+        sessionStorage: _MemorySessionStorage(),
+        client: MockClient((request) async {
+          requests.add(request);
+          if (request.url.path.endsWith('/portion-preview')) {
+            return http.Response(_portionPreviewJson, 200);
+          }
+          if (request.method == 'POST') {
+            return http.Response(_calibrationJson, 201);
+          }
+          return http.Response(
+            '{"configured":true,"calibration":$_calibrationJson}',
+            200,
+          );
+        }),
+      );
+
+      final active = await repository.getFeederCalibration('facility-1');
+      final created = await repository.createFeederCalibration(
+        facilityId: 'facility-1',
+        draft: const FeederCalibrationDraft(
+          unitsPerFish: 0.1,
+          minimumUnits: 1,
+          maximumUnits: 5,
+        ),
+      );
+      final preview = await repository.getPortionPreview(
+        facilityId: 'facility-1',
+        tankId: 'tank-1',
+        fishCount: 80,
+      );
+
+      expect(active?.version, 1);
+      expect(created.maximumUnits, 5);
+      expect(preview.portionUnits, 5);
+      expect(preview.limit, PortionLimit.maximum);
+      expect(requests[1].body, contains('"unitsPerFish":0.1'));
+      expect(requests[2].url.queryParameters['fishCount'], '80');
+    },
+  );
 }
 
 const _facilityJson = '''
@@ -392,6 +439,29 @@ const _tankDetailJson =
   "recentActivity": [
     {"type":"TANK_CREATED","title":"Tank created","occurredAt":"2026-10-18T08:00:00Z"}
   ]
+}
+''';
+
+const _calibrationJson = '''
+{
+  "id": "calibration-1",
+  "version": 1,
+  "unitsPerFish": 0.1,
+  "minimumUnits": 1.0,
+  "maximumUnits": 5.0,
+  "createdAt": "2026-10-20T08:00:00Z"
+}
+''';
+
+const _portionPreviewJson =
+    '''
+{
+  "configured": true,
+  "fishCount": 80,
+  "calibration": $_calibrationJson,
+  "rawUnits": 8.0,
+  "portionUnits": 5.0,
+  "limitedBy": "MAXIMUM"
 }
 ''';
 

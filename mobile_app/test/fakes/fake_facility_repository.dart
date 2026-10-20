@@ -1,6 +1,7 @@
 import 'package:mobile_app/features/facility/domain/facility.dart';
 import 'package:mobile_app/features/facility/domain/facility_repository.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
+import 'package:mobile_app/features/facility/domain/feeder_calibration.dart';
 import 'package:mobile_app/features/facility/domain/tank_group.dart';
 import 'package:mobile_app/features/facility/domain/tank.dart';
 
@@ -12,6 +13,7 @@ class FakeFacilityRepository implements FacilityRepository {
     Map<String, List<TankGroup>>? tankGroups,
     List<Tank>? tanks,
     Map<String, TankDetail>? tankDetails,
+    Map<String, List<FeederCalibration>>? calibrations,
     this.listError,
     this.createFailures = 0,
   }) : facilities = facilities ?? [],
@@ -19,7 +21,8 @@ class FakeFacilityRepository implements FacilityRepository {
        members = members ?? {},
        tankGroups = tankGroups ?? {},
        tanks = tanks ?? [],
-       tankDetails = tankDetails ?? {};
+       tankDetails = tankDetails ?? {},
+       calibrations = calibrations ?? {};
 
   final List<Facility> facilities;
   final List<FacilityInvitation> invitations;
@@ -27,6 +30,7 @@ class FakeFacilityRepository implements FacilityRepository {
   final Map<String, List<TankGroup>> tankGroups;
   final List<Tank> tanks;
   final Map<String, TankDetail> tankDetails;
+  final Map<String, List<FeederCalibration>> calibrations;
   Object? listError;
   int createFailures;
   int listCalls = 0;
@@ -575,6 +579,52 @@ class FakeFacilityRepository implements FacilityRepository {
       updatedAt: now,
     );
     return tanks[index];
+  }
+
+  @override
+  Future<FeederCalibration?> getFeederCalibration(String facilityId) async {
+    await getFacility(facilityId);
+    final items = calibrations[facilityId] ?? const [];
+    return items.isEmpty ? null : items.last;
+  }
+
+  @override
+  Future<FeederCalibration> createFeederCalibration({
+    required String facilityId,
+    required FeederCalibrationDraft draft,
+  }) async {
+    _requireOwner(facilityId);
+    if (draft.minimumUnits > draft.maximumUnits) {
+      throw const FacilityException(
+        'Minimum feeder units cannot exceed maximum feeder units.',
+        code: 'invalid_calibration_bounds',
+      );
+    }
+    final items = calibrations.putIfAbsent(facilityId, () => []);
+    final calibration = FeederCalibration(
+      id: 'calibration-${items.length + 1}',
+      version: items.length + 1,
+      unitsPerFish: draft.unitsPerFish,
+      minimumUnits: draft.minimumUnits,
+      maximumUnits: draft.maximumUnits,
+      createdAt: DateTime.now().toUtc(),
+    );
+    items.add(calibration);
+    return calibration;
+  }
+
+  @override
+  Future<PortionPreview> getPortionPreview({
+    required String facilityId,
+    required String tankId,
+    int? fishCount,
+  }) async {
+    final tank = _tank(facilityId, tankId);
+    return calculatePortionPreview(
+      calibration: await getFeederCalibration(facilityId),
+      fishCount:
+          fishCount ?? tank.detectedGuppyCount ?? tank.expectedGuppyCount,
+    );
   }
 
   Tank _tank(String facilityId, String tankId) => tanks.firstWhere(

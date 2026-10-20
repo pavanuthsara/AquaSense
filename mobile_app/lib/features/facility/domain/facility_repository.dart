@@ -1,5 +1,6 @@
 import 'facility.dart';
 import 'facility_team.dart';
+import 'feeder_calibration.dart';
 import 'tank_group.dart';
 import 'tank.dart';
 
@@ -103,5 +104,18 @@ abstract interface class FacilityRepository {
   Future<Tank> archiveTank({
     required String facilityId,
     required String tankId,
+  });
+
+  Future<FeederCalibration?> getFeederCalibration(String facilityId);
+
+  Future<FeederCalibration> createFeederCalibration({
+    required String facilityId,
+    required FeederCalibrationDraft draft,
+  });
+
+  Future<PortionPreview> getPortionPreview({
+    required String facilityId,
+    required String tankId,
+    int? fishCount,
   });
 }

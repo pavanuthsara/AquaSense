@@ -5,6 +5,7 @@ import '../domain/facility_repository.dart';
 import '../domain/tank.dart';
 import 'tank_form_screen.dart';
 import 'tank_feeding_schedule_screen.dart';
+import 'portion_preview_screen.dart';
 
 class TankDetailScreen extends StatefulWidget {
   const TankDetailScreen({
@@ -98,6 +99,20 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
     if (changed == true) await _load();
   }
 
+  Future<void> _openPortionPreview() async {
+    final tank = _detail?.tank;
+    if (tank == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => PortionPreviewScreen(
+          facility: widget.facility,
+          tank: tank,
+          repository: widget.repository,
+        ),
+      ),
+    );
+  }
+
   Future<void> _archive() async {
     final tank = _detail?.tank;
     if (tank == null) return;
@@ -147,6 +162,13 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
       appBar: AppBar(
         title: Text(detail?.tank.name ?? 'Tank details'),
         actions: [
+          if (detail != null)
+            IconButton(
+              key: const Key('portion-preview-button'),
+              tooltip: 'Preview feeding portion',
+              onPressed: _openPortionPreview,
+              icon: const Icon(Icons.scale_outlined),
+            ),
           if (_isOwner && detail?.tank.status != TankStatus.archived) ...[
             IconButton(
               key: const Key('edit-tank-schedule-button'),

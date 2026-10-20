@@ -1,6 +1,7 @@
 import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_team.dart';
+import '../domain/feeder_calibration.dart';
 import '../domain/tank_group.dart';
 import '../domain/tank.dart';
 
@@ -11,6 +12,7 @@ class DevelopmentFacilityRepository implements FacilityRepository {
   final List<FacilityInvitation> _invitations = [];
   final Map<String, List<TankGroup>> _tankGroups = {};
   final Map<String, List<Tank>> _tanks = {};
+  final Map<String, List<FeederCalibration>> _calibrations = {};
   final Map<String, TankScheduleMode> _tankScheduleModes = {};
   final Map<String, List<String>> _tankOverrideTimes = {};
 
@@ -600,6 +602,52 @@ class DevelopmentFacilityRepository implements FacilityRepository {
     );
     tanks[index] = archived;
     return archived;
+  }
+
+  @override
+  Future<FeederCalibration?> getFeederCalibration(String facilityId) async {
+    await getFacility(facilityId);
+    final items = _calibrations[facilityId] ?? const [];
+    return items.isEmpty ? null : items.last;
+  }
+
+  @override
+  Future<FeederCalibration> createFeederCalibration({
+    required String facilityId,
+    required FeederCalibrationDraft draft,
+  }) async {
+    _requireOwner(facilityId);
+    if (draft.minimumUnits > draft.maximumUnits) {
+      throw const FacilityException(
+        'Minimum feeder units cannot exceed maximum feeder units.',
+        code: 'invalid_calibration_bounds',
+      );
+    }
+    final items = _calibrations.putIfAbsent(facilityId, () => []);
+    final calibration = FeederCalibration(
+      id: 'development-calibration-${items.length + 1}',
+      version: items.length + 1,
+      unitsPerFish: draft.unitsPerFish,
+      minimumUnits: draft.minimumUnits,
+      maximumUnits: draft.maximumUnits,
+      createdAt: DateTime.now().toUtc(),
+    );
+    items.add(calibration);
+    return calibration;
+  }
+
+  @override
+  Future<PortionPreview> getPortionPreview({
+    required String facilityId,
+    required String tankId,
+    int? fishCount,
+  }) async {
+    final tank = _findTank(facilityId, tankId);
+    return calculatePortionPreview(
+      calibration: await getFeederCalibration(facilityId),
+      fishCount:
+          fishCount ?? tank.detectedGuppyCount ?? tank.expectedGuppyCount,
+    );
   }
 
   Tank _findTank(String facilityId, String tankId) {

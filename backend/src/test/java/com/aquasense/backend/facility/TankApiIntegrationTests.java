@@ -23,6 +23,7 @@ import com.aquasense.backend.facility.model.Tank;
 import com.aquasense.backend.facility.repository.FacilityInvitationRepository;
 import com.aquasense.backend.facility.repository.FacilityMembershipRepository;
 import com.aquasense.backend.facility.repository.FacilityRepository;
+import com.aquasense.backend.facility.repository.FeederCalibrationRepository;
 import com.aquasense.backend.facility.repository.TankGroupRepository;
 import com.aquasense.backend.facility.repository.TankRepository;
 import com.jayway.jsonpath.JsonPath;
@@ -46,6 +47,8 @@ class TankApiIntegrationTests {
     @Autowired
     private FacilityRepository facilities;
     @Autowired
+    private FeederCalibrationRepository calibrations;
+    @Autowired
     private FacilityMembershipRepository memberships;
     @Autowired
     private FacilityInvitationRepository invitations;
@@ -58,6 +61,7 @@ class TankApiIntegrationTests {
 
     @BeforeEach
     void cleanDatabase() {
+        calibrations.deleteAll();
         tanks.deleteAll();
         groups.deleteAll();
         invitations.deleteAll();
@@ -323,6 +327,88 @@ class TankApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.scheduleMode", is("OVERRIDE")))
                 .andExpect(jsonPath("$.feedingTimes", is(java.util.List.of("07:00"))));
+    }
+
+    @Test
+    void ownerCreatesVersionedCalibrationAndPreviewEnforcesBounds() throws Exception {
+        TestUser owner = user("calibration-owner", "calibration@example.com", "Owner");
+        String facilityId = createFacility(owner.token(), "calibration-facility", "Calibration Reef");
+        String tankId = createTank(owner.token(), facilityId, basicTank("Preview Tank", "P-1"), 201);
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/feeder-calibration", facilityId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.configured", is(false)));
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/feeder-calibration", facilityId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"unitsPerFish":0.1,"minimumUnits":1,"maximumUnits":5}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.version", is(1)));
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}/portion-preview",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(owner.token()))
+                        .queryParam("fishCount", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rawUnits", is(0.1000)))
+                .andExpect(jsonPath("$.portionUnits", is(1.0000)))
+                .andExpect(jsonPath("$.limitedBy", is("MINIMUM")));
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}/portion-preview",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fishCount", is(60)))
+                .andExpect(jsonPath("$.rawUnits", is(6.0000)))
+                .andExpect(jsonPath("$.portionUnits", is(5.0000)))
+                .andExpect(jsonPath("$.limitedBy", is("MAXIMUM")));
+
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/feeder-calibration", facilityId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"unitsPerFish":0.2,"minimumUnits":0.5,"maximumUnits":100}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.version", is(2)));
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}/portion-preview",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.calibration.version", is(2)))
+                .andExpect(jsonPath("$.portionUnits", is(12.0000)))
+                .andExpect(jsonPath("$.limitedBy", is("NONE")));
+    }
+
+    @Test
+    void workerCanPreviewButCannotChangeCalibration() throws Exception {
+        TestUser owner = user("cal-worker-owner", "cal-owner@example.com", "Owner");
+        TestUser worker = user("cal-worker", "cal-worker@example.com", "Worker");
+        String facilityId = createFacility(owner.token(), "cal-worker-facility", "Worker Calibration");
+        String tankId = createTank(owner.token(), facilityId, basicTank("Worker Tank", "W-1"), 201);
+        String invitationId = invite(owner.token(), facilityId, worker.user().getEmail());
+        accept(worker.token(), invitationId);
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/feeder-calibration", facilityId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"unitsPerFish":0.15,"minimumUnits":1,"maximumUnits":20}
+                                """))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}/portion-preview",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(worker.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.portionUnits", is(9.0000)));
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/feeder-calibration", facilityId)
+                        .header("Authorization", bearer(worker.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"unitsPerFish":0.2,"minimumUnits":1,"maximumUnits":20}
+                                """))
+                .andExpect(status().isForbidden());
     }
 
     private String basicTank(String name, String code) {

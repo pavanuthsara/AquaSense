@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile_app/app/app.dart';
 import 'package:mobile_app/app/config/app_environment.dart';
 import 'package:mobile_app/features/facility/domain/facility.dart';
+import 'package:mobile_app/features/facility/domain/feeder_calibration.dart';
 import 'package:mobile_app/features/facility/domain/tank.dart';
 import 'package:mobile_app/features/facility/domain/tank_group.dart';
 import 'package:mobile_app/features/onboarding/domain/onboarding_repository.dart';
@@ -285,6 +286,95 @@ void main() {
       TankScheduleMode.inherited,
     );
     expect(repository.tankDetails[tank.id]!.feedingTimes, ['08:00', '16:00']);
+  });
+
+  testWidgets('owner publishes calibration and previews bounded feeder units', (
+    tester,
+  ) async {
+    final facility = FakeFacilityRepository.facility(name: 'Portion Reef');
+    final tank = _tank(
+      facilityId: facility.id,
+      id: 'portion-tank',
+      name: 'Portion Tank',
+      code: 'P-001',
+    );
+    final repository = FakeFacilityRepository(
+      facilities: [facility],
+      tanks: [tank],
+    );
+    await tester.pumpWidget(buildApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tanks-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tank-portion-tank')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('portion-preview-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('calibration-not-configured')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('configure-feeder-calibration')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('calibration-rate')), '0.1');
+    await tester.enterText(find.byKey(const Key('calibration-minimum')), '1');
+    await tester.enterText(find.byKey(const Key('calibration-maximum')), '5');
+    await tester.tap(find.byKey(const Key('save-feeder-calibration')));
+    await tester.pumpAndSettle();
+
+    expect(repository.calibrations[facility.id], hasLength(1));
+    expect(find.text('5.0000 feeder units'), findsOneWidget);
+    expect(find.text('Maximum portion applied.'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('portion-fish-count')), '1');
+    await tester.tap(find.byKey(const Key('refresh-portion-preview')));
+    await tester.pumpAndSettle();
+    expect(find.text('1.0000 feeder units'), findsOneWidget);
+    expect(find.text('Minimum portion applied.'), findsOneWidget);
+    expect(find.textContaining('gram'), findsNothing);
+  });
+
+  testWidgets('worker can preview but cannot change feeder calibration', (
+    tester,
+  ) async {
+    final facility = FakeFacilityRepository.facility(
+      name: 'Worker Portion Reef',
+      role: FacilityRole.worker,
+    );
+    final tank = _tank(
+      facilityId: facility.id,
+      id: 'worker-portion-tank',
+      name: 'Worker Portion Tank',
+      code: 'WP-001',
+    );
+    final repository = FakeFacilityRepository(
+      facilities: [facility],
+      tanks: [tank],
+      calibrations: {
+        facility.id: [
+          FeederCalibration(
+            id: 'calibration-1',
+            version: 1,
+            unitsPerFish: 0.1,
+            minimumUnits: 1,
+            maximumUnits: 20,
+            createdAt: DateTime.utc(2026, 10, 20),
+          ),
+        ],
+      },
+    );
+    await tester.pumpWidget(buildApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tanks-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tank-worker-portion-tank')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('portion-preview-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('8.0000 feeder units'), findsOneWidget);
+    expect(find.byKey(const Key('configure-feeder-calibration')), findsNothing);
+    expect(
+      find.text('Only an aquarium owner can change feeder calibration.'),
+      findsOneWidget,
+    );
   });
 }
 

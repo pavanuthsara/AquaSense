@@ -32,7 +32,7 @@ Only one task should normally be marked `In progress`.
 | MOB-010 | Tank-detail screen | MOB-009 | Done |
 | MOB-011 | Group feeding schedules | MOB-008 | Done |
 | MOB-012 | Per-tank schedule overrides | MOB-010, MOB-011 | Done |
-| MOB-013 | Feeder calibration and portion preview | MOB-010 | Not started |
+| MOB-013 | Feeder calibration and portion preview | MOB-010 | Done |
 | MOB-014 | Device health integration | MOB-010 | Not started |
 | MOB-015 | Appetite-observation ingestion | MOB-013, MOB-014 | Not started |
 | MOB-016 | Scheduled feeding-session state machine | MOB-012–MOB-015 | Not started |
@@ -617,4 +617,44 @@ usability evaluation, and document demonstrated capabilities and limitations.
   setting. The override screen copies inherited times as an editing starting
   point but saves them as a full replacement.
 - Recommended next task: MOB-013 — Feeder calibration and portion preview.
+
+### 2026-10-20 — MOB-013: Feeder calibration and portion preview
+
+- Status: Done
+- Summary: Added immutable, versioned facility feeder calibrations and a
+  tank-level portion preview. Owners can publish calibration versions using
+  abstract feeder units; owners and workers can preview a bounded portion from
+  detected, expected, or manually supplied fish counts. The interface avoids
+  unvalidated physical-mass claims.
+- Files added: Backend feeder calibration entity, repository, service,
+  controller, and Flyway migration; Flutter calibration/portion domain model,
+  portion preview screen, and calculation tests.
+- Files changed: Backend tank integration tests and guide; Flutter facility
+  repository contract and HTTP/development/test adapters, tank detail screen,
+  repository/widget tests, mobile guide, and this development record.
+- Backend/API changes: Added
+  `GET/POST /api/v1/facilities/{facilityId}/feeder-calibration` and
+  `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/portion-preview`.
+  Added `feeder_calibrations`; each owner update appends a facility-unique
+  version, and the latest version is active.
+- Tests performed: Java 21 Maven integration/unit suite; calibration version,
+  owner/worker authorization, default count, minimum, normal, maximum, and
+  zero-fish calculation coverage; Dart formatting; Flutter static analysis;
+  local fixed-decimal calculation tests; HTTP and owner/worker widget tests;
+  complete Flutter regression suite; and Android debug APK build.
+- Test results: All 41 backend tests and all 53 Flutter tests passed; static
+  analysis reported no issues; the Android debug APK built successfully.
+- Decisions made: Use facility-wide abstract feeder actuation units; calculate
+  `fish count × units per fish` to four decimal places; apply a positive
+  minimum and maximum while always returning zero movement for zero fish;
+  default previews to detected count and then expected count; use scaled
+  fixed-decimal arithmetic in Flutter to match backend decimal behavior; keep
+  versions immutable; and restrict publishing to owners while allowing
+  workers to inspect previews.
+- Known limitations: Feeder units have not been converted to or displayed as
+  physical mass because experimental validation is still required. The app
+  displays only the active calibration rather than full version history.
+  Calibration is facility-wide until device-specific feeder identity and
+  health are introduced in MOB-014.
+- Recommended next task: MOB-014 — Device health integration.
 

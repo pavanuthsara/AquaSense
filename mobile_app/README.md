@@ -46,6 +46,13 @@ Unassigned tanks remain paused until an owner supplies an override or assigns
 the tank to a group. Workers can see the effective schedule and its source but
 cannot edit it.
 
+Use the scale action on a tank detail screen to preview its portion from the
+detected or expected fish count. Previews use versioned, facility-wide feeder
+units with minimum and maximum safety bounds. Owners can publish a new
+calibration version; workers can inspect calculations but cannot change the
+calibration. The app does not display physical mass because that conversion
+has not yet been experimentally validated.
+
 Open **Tanks** from the aquarium home screen to browse the paginated inventory.
 Search by name or code, filter by current status, group, unassigned tanks, or
 tag, and load further pages when required. Owners can add, edit, move, pause,

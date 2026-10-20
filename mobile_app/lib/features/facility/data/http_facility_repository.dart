@@ -6,6 +6,7 @@ import '../../auth/domain/auth_session_storage.dart';
 import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_team.dart';
+import '../domain/feeder_calibration.dart';
 import '../domain/tank_group.dart';
 import '../domain/tank.dart';
 
@@ -344,6 +345,70 @@ class HttpFacilityRepository implements FacilityRepository {
     return _tankFromJson(body as Map<String, dynamic>);
   }
 
+  @override
+  Future<FeederCalibration?> getFeederCalibration(String facilityId) async {
+    final response = await _authorizedGet(
+      '/api/v1/facilities/$facilityId/feeder-calibration',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    final json = body as Map<String, dynamic>;
+    final calibration = json['calibration'];
+    return calibration is Map<String, dynamic>
+        ? _calibrationFromJson(calibration)
+        : null;
+  }
+
+  @override
+  Future<FeederCalibration> createFeederCalibration({
+    required String facilityId,
+    required FeederCalibrationDraft draft,
+  }) async {
+    final response = await _authorizedPost(
+      '/api/v1/facilities/$facilityId/feeder-calibration',
+      body: {
+        'unitsPerFish': draft.unitsPerFish,
+        'minimumUnits': draft.minimumUnits,
+        'maximumUnits': draft.maximumUnits,
+      },
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _calibrationFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<PortionPreview> getPortionPreview({
+    required String facilityId,
+    required String tankId,
+    int? fishCount,
+  }) async {
+    final response = await _authorizedGet(
+      '/api/v1/facilities/$facilityId/tanks/$tankId/portion-preview',
+      queryParameters: {if (fishCount != null) 'fishCount': '$fishCount'},
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    final json = body as Map<String, dynamic>;
+    final calibration = json['calibration'];
+    return PortionPreview(
+      configured: json['configured'] as bool,
+      fishCount: json['fishCount'] as int,
+      calibration: calibration is Map<String, dynamic>
+          ? _calibrationFromJson(calibration)
+          : null,
+      rawUnits: (json['rawUnits'] as num?)?.toDouble(),
+      portionUnits: (json['portionUnits'] as num?)?.toDouble(),
+      limit: switch (json['limitedBy']) {
+        'NONE' => PortionLimit.none,
+        'MINIMUM' => PortionLimit.minimum,
+        'MAXIMUM' => PortionLimit.maximum,
+        'ZERO_FISH' => PortionLimit.zeroFish,
+        _ => PortionLimit.notConfigured,
+      },
+    );
+  }
+
   Future<http.Response> _authorizedGet(
     String path, {
     Map<String, String>? queryParameters,
@@ -486,6 +551,17 @@ class HttpFacilityRepository implements FacilityRepository {
       name: json['name'] as String,
       timeZone: json['timeZone'] as String,
       role: _roleFromJson(json['role']),
+      createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
+    );
+  }
+
+  FeederCalibration _calibrationFromJson(Map<String, dynamic> json) {
+    return FeederCalibration(
+      id: json['id'] as String,
+      version: json['version'] as int,
+      unitsPerFish: (json['unitsPerFish'] as num).toDouble(),
+      minimumUnits: (json['minimumUnits'] as num).toDouble(),
+      maximumUnits: (json['maximumUnits'] as num).toDouble(),
       createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
     );
   }

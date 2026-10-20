@@ -144,6 +144,21 @@ changes. An unassigned tank without an override is automatically paused, even
 if a client requests automation, so it cannot feed without an effective
 schedule.
 
+## Feeder calibration and portion preview
+
+- `GET /api/v1/facilities/{facilityId}/feeder-calibration` returns the latest
+  active calibration, or an explicit unconfigured state.
+- `POST /api/v1/facilities/{facilityId}/feeder-calibration` publishes an
+  immutable new calibration version. Only owners can publish versions.
+- `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/portion-preview`
+  calculates a bounded preview for the supplied `fishCount`, or defaults to
+  the detected count and then the expected count.
+
+Calibration values and previews use abstract feeder actuation units with four
+decimal places. The calculation is `fish count × units per fish`, bounded by
+the active minimum and maximum. A zero fish count always produces zero feeder
+movement. Physical mass is intentionally not represented until validated.
+
 ## Verify
 
 ```powershell
