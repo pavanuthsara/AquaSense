@@ -52,6 +52,8 @@ public class FacilityMembership {
     }
 
     public Facility getFacility() { return facility; }
+    public UUID getId() { return id; }
+    public AppUser getUser() { return user; }
     public FacilityRole getRole() { return role; }
     public Instant getJoinedAt() { return joinedAt; }
 }

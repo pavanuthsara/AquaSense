@@ -14,4 +14,12 @@ public interface FacilityMembershipRepository extends JpaRepository<FacilityMemb
 
     @EntityGraph(attributePaths = "facility")
     Optional<FacilityMembership> findByUser_IdAndFacility_Id(UUID userId, UUID facilityId);
+
+    @EntityGraph(attributePaths = "user")
+    List<FacilityMembership> findAllByFacility_IdOrderByJoinedAtAsc(UUID facilityId);
+
+    @EntityGraph(attributePaths = {"facility", "user"})
+    Optional<FacilityMembership> findByIdAndFacility_Id(UUID membershipId, UUID facilityId);
+
+    boolean existsByFacility_IdAndUser_EmailIgnoreCase(UUID facilityId, String email);
 }

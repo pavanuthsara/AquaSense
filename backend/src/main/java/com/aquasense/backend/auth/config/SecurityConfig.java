@@ -37,7 +37,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/auth/google/exchange",
                                 "/api/v1/auth/refresh",
-                                "/api/v1/auth/logout")
+                                "/api/v1/auth/logout",
+                                "/api/v1/device-heartbeats")
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))

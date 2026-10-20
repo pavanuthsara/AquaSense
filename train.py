@@ -25,14 +25,14 @@ names:
 model = YOLO("yolov8n.pt")
 
 # Train the guppy detector
-model.train(
+model.train(                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
     data=str(DATASET / "data.yaml"),
     epochs=30,
     imgsz=640,
     batch=4,
     workers=0,
     project=str(ROOT / "runs"),
-    name="guppy_detector_v1",
+    name="guppy_detector_v3",
     plots=True
 )
 
