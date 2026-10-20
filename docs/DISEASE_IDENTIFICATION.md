@@ -51,7 +51,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-002 | Disease-check history API (backend) | — | Done |
 | DIS-003 | Domain models, interfaces and disease info | DIS-001 | Done |
 | DIS-004 | Image preparation (letterbox) with tests | DIS-003 | Done |
-| DIS-005 | On-device TFLite classifier | DIS-004 | Not started |
+| DIS-005 | On-device TFLite classifier | DIS-004 | Done |
 | DIS-006 | Photo source (camera and gallery) | DIS-003 | Not started |
 | DIS-007 | Disease check screen | DIS-005, DIS-006 | Not started |
 | DIS-008 | Save results and history screen | DIS-002, DIS-007 | Not started |
@@ -341,3 +341,21 @@ run on a Raspberry Pi later.
   255 on average, because Pillow smooths more when shrinking big photos; the
   model is not sensitive to this.
 - Next: DIS-005.
+
+### 2026-10-20 — DIS-005: On-device TFLite classifier — Done (APK build still to check)
+
+- Added `lib/features/disease_check/data/tflite_disease_classifier.dart`. It
+  loads the model and labels on the first check (not at app start), reads the
+  input size and type from the model, prepares the photo in a background
+  isolate with `compute`, runs the model, and returns a `DiseasePrediction`.
+  It refuses a labels file that doesn't match the model's number of outputs,
+  and allows a retry if loading failed.
+- The input is written straight into the input tensor's bytes, so no large
+  nested Dart lists are built.
+- Tests: `test/tflite_disease_classifier_test.dart` (float and quantised
+  output decoding). Widget tests cannot load native TFLite, so the class itself
+  is checked on a real phone in DIS-010.
+- Not checked: `flutter build apk --debug`. The cloud machine that wrote this
+  task cannot download the Android SDK. Run it on your PC; CI also builds the
+  APK.
+- Next: DIS-006.
