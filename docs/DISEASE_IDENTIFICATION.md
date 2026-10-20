@@ -49,7 +49,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 |---|---|---|---|
 | DIS-001 | Setup: branch, docs, model assets, packages | — | Done |
 | DIS-002 | Disease-check history API (backend) | — | Done |
-| DIS-003 | Domain models, interfaces and disease info | DIS-001 | Not started |
+| DIS-003 | Domain models, interfaces and disease info | DIS-001 | Done |
 | DIS-004 | Image preparation (letterbox) with tests | DIS-003 | Not started |
 | DIS-005 | On-device TFLite classifier | DIS-004 | Not started |
 | DIS-006 | Photo source (camera and gallery) | DIS-003 | Not started |
@@ -311,3 +311,16 @@ run on a Raspberry Pi later.
   `D:\dev`. Windows Developer Mode must be on for plugin symlinks.
 - Tests: see the verification results in the commit for this task.
 - Next: DIS-003.
+
+### 2026-10-20 — DIS-003: Domain models, interfaces and disease info — Done
+
+- Merged `main` into this branch first (MOB-007 to MOB-014). The disease-check
+  migration became `V10__create_disease_check_tables.sql`, because main
+  already uses V3 to V9. Backend: 49 tests pass.
+- Added `lib/features/disease_check/domain/`: `DiseasePrediction` (scores
+  sorted highest first, the 0.6 "not sure" rule, bundled model version),
+  `DiseaseCheckRecord`, the `DiseaseClassifier`, `DiseaseCheckRepository`
+  and `FishPhotoSource` interfaces, and `DiseaseInfo` (plain advice for each
+  label, with a readable fallback for new labels such as fin rot).
+- Tests: `test/disease_prediction_test.dart` (4 tests). Analyze is clean.
+- Next: DIS-004.
