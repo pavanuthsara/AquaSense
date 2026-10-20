@@ -13,6 +13,8 @@ import com.aquasense.backend.facility.model.TankGroup;
 import com.aquasense.backend.facility.model.TankScheduleMode;
 import com.aquasense.backend.facility.model.TankStatus;
 import com.aquasense.backend.facility.service.TankService;
+import com.aquasense.backend.facility.service.DeviceHealthService;
+import com.aquasense.backend.facility.service.DeviceHealthService.DeviceHealth;
 import com.aquasense.backend.facility.service.TankService.TankInput;
 import com.aquasense.backend.facility.service.TankService.TankPage;
 import jakarta.validation.Valid;
@@ -41,9 +43,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class TankController {
     private static final DateTimeFormatter FEEDING_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private final TankService tankService;
+    private final DeviceHealthService deviceHealthService;
 
-    public TankController(TankService tankService) {
+    public TankController(TankService tankService, DeviceHealthService deviceHealthService) {
         this.tankService = tankService;
+        this.deviceHealthService = deviceHealthService;
     }
 
     @GetMapping("/tanks")
@@ -67,7 +71,8 @@ public class TankController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID facilityId,
             @PathVariable UUID tankId) {
-        return TankDetailResponse.from(tankService.get(userId(jwt), facilityId, tankId));
+        Tank tank = tankService.get(userId(jwt), facilityId, tankId);
+        return TankDetailResponse.from(tank, deviceHealthService.healthForTank(tankId));
     }
 
     @GetMapping("/tank-tags")
@@ -109,8 +114,9 @@ public class TankController {
             @PathVariable UUID facilityId,
             @PathVariable UUID tankId,
             @Valid @RequestBody TankScheduleRequest request) {
-        return TankDetailResponse.from(tankService.configureFeedingSchedule(
-                userId(jwt), facilityId, tankId, request.mode(), request.times()));
+        Tank tank = tankService.configureFeedingSchedule(
+                userId(jwt), facilityId, tankId, request.mode(), request.times());
+        return TankDetailResponse.from(tank, deviceHealthService.healthForTank(tankId));
     }
 
     private UUID userId(Jwt jwt) {
@@ -209,13 +215,14 @@ public class TankController {
             TankResponse tank,
             String observationState,
             String deviceStatus,
+            DeviceHealthController.DeviceHealthResponse deviceHealth,
             TankScheduleMode scheduleMode,
             List<String> inheritedFeedingTimes,
             List<String> feedingTimes,
             Instant lastFeedingAt,
             Instant nextFeedingAt,
             List<TankActivityResponse> recentActivity) {
-        static TankDetailResponse from(Tank tank) {
+        static TankDetailResponse from(Tank tank, DeviceHealth deviceHealth) {
             List<TankActivityResponse> activity = new ArrayList<>();
             if (!tank.getUpdatedAt().equals(tank.getCreatedAt())) {
                 activity.add(new TankActivityResponse("SETTINGS_UPDATED", "Tank settings updated", tank.getUpdatedAt()));
@@ -257,7 +264,8 @@ public class TankController {
             return new TankDetailResponse(
                     TankResponse.from(tank),
                     observationState,
-                    "NOT_CONFIGURED",
+                    deviceHealth.overallState().name(),
+                    DeviceHealthController.DeviceHealthResponse.from(deviceHealth),
                     tank.getScheduleMode(),
                     inheritedTimes,
                     effectiveTimes,

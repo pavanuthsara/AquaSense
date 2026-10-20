@@ -422,6 +422,41 @@ class FakeFacilityRepository implements FacilityRepository {
   }
 
   @override
+  Future<TankHardwareHealth> getTankDeviceHealth({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    final detail = await getTankDetail(facilityId: facilityId, tankId: tankId);
+    return detail.deviceHealth ??
+        TankHardwareHealth(
+          overallState: detail.deviceStatus,
+          feedingAllowed: detail.deviceStatus == TankDeviceStatus.online,
+          components: TankDeviceType.values
+              .map(
+                (type) =>
+                    TankDeviceComponent(type: type, state: detail.deviceStatus),
+              )
+              .toList(),
+        );
+  }
+
+  @override
+  Future<ProvisionedTankDevice> provisionTankDevice({
+    required String facilityId,
+    required String tankId,
+    required TankDeviceType type,
+  }) async {
+    _requireOwner(facilityId);
+    await getTankDetail(facilityId: facilityId, tankId: tankId);
+    return ProvisionedTankDevice(
+      deviceId: 'device-${type.name}-$tankId',
+      type: type,
+      heartbeatToken: 'test-heartbeat-token',
+      createdAt: DateTime.now().toUtc(),
+    );
+  }
+
+  @override
   Future<TankDetail> updateTankFeedingSchedule({
     required String facilityId,
     required String tankId,

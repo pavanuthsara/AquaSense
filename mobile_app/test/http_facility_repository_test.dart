@@ -331,6 +331,58 @@ void main() {
       expect(requests[2].url.queryParameters['fishCount'], '80');
     },
   );
+
+  test('device health and provisioning use tank hardware endpoints', () async {
+    final requests = <http.Request>[];
+    final repository = HttpFacilityRepository(
+      apiBaseUrl: 'https://api.example.com',
+      sessionStorage: _MemorySessionStorage(),
+      client: MockClient((request) async {
+        requests.add(request);
+        if (request.method == 'POST') {
+          return http.Response(
+            '{"deviceId":"device-1","type":"FEEDER",'
+            '"heartbeatToken":"secret-token",'
+            '"createdAt":"2026-10-20T10:00:00Z"}',
+            201,
+          );
+        }
+        return http.Response(
+          '{"overallState":"UNHEALTHY","feedingAllowed":false,'
+          '"components":[{"type":"CAMERA","deviceId":"camera-1",'
+          '"state":"ONLINE","lastHeartbeatAt":"2026-10-20T09:59:30Z",'
+          '"message":"Ready"},{"type":"EDGE_PROCESSOR",'
+          '"deviceId":null,"state":"NOT_CONFIGURED",'
+          '"lastHeartbeatAt":null,"message":null},{"type":"FEEDER",'
+          '"deviceId":"feeder-1","state":"UNHEALTHY",'
+          '"lastHeartbeatAt":"2026-10-20T09:59:45Z",'
+          '"message":"Motor jam"}]}',
+          200,
+        );
+      }),
+    );
+
+    final health = await repository.getTankDeviceHealth(
+      facilityId: 'facility-1',
+      tankId: 'tank-1',
+    );
+    final provisioned = await repository.provisionTankDevice(
+      facilityId: 'facility-1',
+      tankId: 'tank-1',
+      type: TankDeviceType.feeder,
+    );
+
+    expect(health.overallState, TankDeviceStatus.unhealthy);
+    expect(health.feedingAllowed, isFalse);
+    expect(health.components.last.message, 'Motor jam');
+    expect(provisioned.heartbeatToken, 'secret-token');
+    expect(requests.first.method, 'GET');
+    expect(requests.last.method, 'POST');
+    expect(
+      requests.last.url.path,
+      '/api/v1/facilities/facility-1/tanks/tank-1/devices/FEEDER/provision',
+    );
+  });
 }
 
 const _facilityJson = '''

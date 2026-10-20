@@ -81,6 +81,17 @@ abstract interface class FacilityRepository {
     required String tankId,
   });
 
+  Future<TankHardwareHealth> getTankDeviceHealth({
+    required String facilityId,
+    required String tankId,
+  });
+
+  Future<ProvisionedTankDevice> provisionTankDevice({
+    required String facilityId,
+    required String tankId,
+    required TankDeviceType type,
+  });
+
   Future<TankDetail> updateTankFeedingSchedule({
     required String facilityId,
     required String tankId,

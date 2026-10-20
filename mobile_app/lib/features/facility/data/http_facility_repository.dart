@@ -275,6 +275,39 @@ class HttpFacilityRepository implements FacilityRepository {
   }
 
   @override
+  Future<TankHardwareHealth> getTankDeviceHealth({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    final response = await _authorizedGet(
+      '/api/v1/facilities/$facilityId/tanks/$tankId/device-health',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _deviceHealthFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ProvisionedTankDevice> provisionTankDevice({
+    required String facilityId,
+    required String tankId,
+    required TankDeviceType type,
+  }) async {
+    final response = await _authorizedPost(
+      '/api/v1/facilities/$facilityId/tanks/$tankId/devices/${_deviceTypeToApi(type)}/provision',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    final json = body as Map<String, dynamic>;
+    return ProvisionedTankDevice(
+      deviceId: json['deviceId'] as String,
+      type: _deviceTypeFromApi(json['type'] as String),
+      heartbeatToken: json['heartbeatToken'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
+    );
+  }
+
+  @override
   Future<TankDetail> updateTankFeedingSchedule({
     required String facilityId,
     required String tankId,
@@ -690,6 +723,9 @@ class HttpFacilityRepository implements FacilityRepository {
           code: 'invalid_server_response',
         ),
       },
+      deviceHealth: json['deviceHealth'] is Map<String, dynamic>
+          ? _deviceHealthFromJson(json['deviceHealth'] as Map<String, dynamic>)
+          : null,
       scheduleMode: switch (json['scheduleMode']) {
         'OVERRIDE' => TankScheduleMode.override,
         'INHERITED' || null => TankScheduleMode.inherited,
@@ -718,6 +754,50 @@ class HttpFacilityRepository implements FacilityRepository {
           .toList(growable: false),
     );
   }
+
+  TankHardwareHealth _deviceHealthFromJson(Map<String, dynamic> json) {
+    return TankHardwareHealth(
+      overallState: _deviceStatusFromApi(json['overallState']),
+      feedingAllowed: json['feedingAllowed'] as bool? ?? false,
+      components: (json['components'] as List<dynamic>? ?? const [])
+          .map((item) {
+            final component = item as Map<String, dynamic>;
+            return TankDeviceComponent(
+              type: _deviceTypeFromApi(component['type'] as String),
+              deviceId: component['deviceId'] as String?,
+              state: _deviceStatusFromApi(component['state']),
+              lastHeartbeatAt: component['lastHeartbeatAt'] == null
+                  ? null
+                  : DateTime.parse(
+                      component['lastHeartbeatAt'] as String,
+                    ).toUtc(),
+              message: component['message'] as String?,
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+
+  TankDeviceStatus _deviceStatusFromApi(dynamic value) => switch (value) {
+    'ONLINE' => TankDeviceStatus.online,
+    'OFFLINE' => TankDeviceStatus.offline,
+    'STALE' => TankDeviceStatus.stale,
+    'UNHEALTHY' => TankDeviceStatus.unhealthy,
+    _ => TankDeviceStatus.notConfigured,
+  };
+
+  TankDeviceType _deviceTypeFromApi(String value) => switch (value) {
+    'CAMERA' => TankDeviceType.camera,
+    'EDGE_PROCESSOR' => TankDeviceType.edgeProcessor,
+    'FEEDER' => TankDeviceType.feeder,
+    _ => throw FormatException('Unknown device type: $value'),
+  };
+
+  String _deviceTypeToApi(TankDeviceType value) => switch (value) {
+    TankDeviceType.camera => 'CAMERA',
+    TankDeviceType.edgeProcessor => 'EDGE_PROCESSOR',
+    TankDeviceType.feeder => 'FEEDER',
+  };
 
   TankStatus _tankStatusFromJson(dynamic value) => switch (value) {
     'ACTIVE' => TankStatus.active,

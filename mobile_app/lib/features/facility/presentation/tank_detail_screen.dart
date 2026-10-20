@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
@@ -111,6 +112,61 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _provisionDevice(TankDeviceType type) async {
+    try {
+      final provisioned = await widget.repository.provisionTankDevice(
+        facilityId: widget.facility.id,
+        tankId: widget.tankId,
+        type: type,
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('${_deviceType(type)} credential'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Copy this token now. For security, AquaSense will not show it again.',
+              ),
+              const SizedBox(height: 12),
+              SelectableText(
+                provisioned.heartbeatToken,
+                key: const Key('device-heartbeat-token'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(
+                  ClipboardData(text: provisioned.heartbeatToken),
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('Token copied')));
+                }
+              },
+              icon: const Icon(Icons.copy_rounded),
+              label: const Text('Copy'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+      await _load();
+    } on FacilityException catch (error) {
+      _message(error.message);
+    }
   }
 
   Future<void> _archive() async {
@@ -298,6 +354,28 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
                     ? 'Not scheduled'
                     : _date(detail.nextFeedingAt!),
               ),
+              if (detail.deviceHealth != null) ...[
+                const Divider(height: 24),
+                _InfoRow(
+                  label: 'Feeding safety',
+                  value: detail.deviceHealth!.feedingAllowed
+                      ? 'Ready — all required hardware is healthy'
+                      : 'Blocked — hardware attention required',
+                ),
+                ...detail.deviceHealth!.components.map(
+                  (component) => _DeviceHealthRow(
+                    component: component,
+                    canProvision:
+                        _isOwner && tank.status != TankStatus.archived,
+                    onProvision: () => _provisionDevice(component.type),
+                    typeLabel: _deviceType(component.type),
+                    statusLabel: _deviceDescription(component.state),
+                    heartbeatLabel: component.lastHeartbeatAt == null
+                        ? 'No heartbeat received'
+                        : 'Last heartbeat ${_date(component.lastHeartbeatAt!)}',
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 14),
@@ -347,11 +425,72 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
     TankDeviceStatus.unhealthy => 'Unhealthy — feeding blocked',
   };
 
+  String _deviceType(TankDeviceType type) => switch (type) {
+    TankDeviceType.camera => 'Camera',
+    TankDeviceType.edgeProcessor => 'Edge processor',
+    TankDeviceType.feeder => 'Feeder',
+  };
+
   String _date(DateTime value) {
     final local = value.toLocal();
     String two(int number) => number.toString().padLeft(2, '0');
     return '${local.year}-${two(local.month)}-${two(local.day)} '
         '${two(local.hour)}:${two(local.minute)}';
+  }
+}
+
+class _DeviceHealthRow extends StatelessWidget {
+  const _DeviceHealthRow({
+    required this.component,
+    required this.canProvision,
+    required this.onProvision,
+    required this.typeLabel,
+    required this.statusLabel,
+    required this.heartbeatLabel,
+  });
+
+  final TankDeviceComponent component;
+  final bool canProvision;
+  final VoidCallback onProvision;
+  final String typeLabel;
+  final String statusLabel;
+  final String heartbeatLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = component.message;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  typeLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Text(statusLabel),
+                Text(
+                  heartbeatLabel,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                if (message != null && message.isNotEmpty)
+                  Text(message, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          if (canProvision)
+            TextButton(
+              key: Key('provision-${component.type.name}-device'),
+              onPressed: onProvision,
+              child: Text(component.deviceId == null ? 'Connect' : 'Rotate'),
+            ),
+        ],
+      ),
+    );
   }
 }
 

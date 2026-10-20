@@ -159,6 +159,21 @@ decimal places. The calculation is `fish count × units per fish`, bounded by
 the active minimum and maximum. A zero fish count always produces zero feeder
 movement. Physical mass is intentionally not represented until validated.
 
+## Tank device health
+
+- `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/device-health` returns
+  aggregate and per-component camera, edge-processor, and feeder health.
+- `POST /api/v1/facilities/{facilityId}/tanks/{tankId}/devices/{type}/provision`
+  is owner-only and returns a one-time heartbeat token. Provisioning the same
+  type again rotates its credential and invalidates the old token.
+- `POST /api/v1/device-heartbeats` accepts `X-Device-Id` and
+  `X-Device-Token` headers plus `healthy` and an optional status `message`.
+
+A component is stale after two minutes without a heartbeat and offline after
+ten minutes. Feeding is allowed only when the camera, edge processor, and
+feeder are all configured, online, and healthy. Device tokens are stored as
+SHA-256 hashes and are never returned after provisioning.
+
 ## Verify
 
 ```powershell

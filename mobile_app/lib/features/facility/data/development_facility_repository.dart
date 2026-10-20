@@ -15,6 +15,7 @@ class DevelopmentFacilityRepository implements FacilityRepository {
   final Map<String, List<FeederCalibration>> _calibrations = {};
   final Map<String, TankScheduleMode> _tankScheduleModes = {};
   final Map<String, List<String>> _tankOverrideTimes = {};
+  final Map<String, Map<TankDeviceType, TankDeviceComponent>> _tankDevices = {};
 
   @override
   Future<Facility> createFacility({
@@ -424,12 +425,17 @@ class DevelopmentFacilityRepository implements FacilityRepository {
     final feedingTimes = mode == TankScheduleMode.override
         ? _tankOverrideTimes[tankId] ?? const <String>[]
         : group?.feedingTimes ?? const <String>[];
+    final deviceHealth = await getTankDeviceHealth(
+      facilityId: facilityId,
+      tankId: tankId,
+    );
     return TankDetail(
       tank: tank.copyWith(scheduleMode: mode),
       observationState: tank.countObservedAt == null
           ? TankObservationState.noData
           : TankObservationState.current,
-      deviceStatus: TankDeviceStatus.notConfigured,
+      deviceStatus: deviceHealth.overallState,
+      deviceHealth: deviceHealth,
       scheduleMode: mode,
       inheritedFeedingTimes: group?.feedingTimes ?? const [],
       feedingTimes: feedingTimes,
@@ -440,6 +446,63 @@ class DevelopmentFacilityRepository implements FacilityRepository {
           occurredAt: tank.createdAt,
         ),
       ],
+    );
+  }
+
+  @override
+  Future<TankHardwareHealth> getTankDeviceHealth({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    _findTank(facilityId, tankId);
+    final configured = _tankDevices[tankId] ?? const {};
+    final components = TankDeviceType.values
+        .map(
+          (type) =>
+              configured[type] ??
+              TankDeviceComponent(
+                type: type,
+                state: TankDeviceStatus.notConfigured,
+              ),
+        )
+        .toList(growable: false);
+    final states = components.map((item) => item.state).toSet();
+    final overall = states.contains(TankDeviceStatus.notConfigured)
+        ? TankDeviceStatus.notConfigured
+        : states.contains(TankDeviceStatus.unhealthy)
+        ? TankDeviceStatus.unhealthy
+        : states.contains(TankDeviceStatus.offline)
+        ? TankDeviceStatus.offline
+        : states.contains(TankDeviceStatus.stale)
+        ? TankDeviceStatus.stale
+        : TankDeviceStatus.online;
+    return TankHardwareHealth(
+      overallState: overall,
+      feedingAllowed: overall == TankDeviceStatus.online,
+      components: components,
+    );
+  }
+
+  @override
+  Future<ProvisionedTankDevice> provisionTankDevice({
+    required String facilityId,
+    required String tankId,
+    required TankDeviceType type,
+  }) async {
+    _requireOwner(facilityId);
+    _findTank(facilityId, tankId);
+    final now = DateTime.now().toUtc();
+    final deviceId = 'development-${type.name}-$tankId';
+    _tankDevices.putIfAbsent(tankId, () => {})[type] = TankDeviceComponent(
+      type: type,
+      deviceId: deviceId,
+      state: TankDeviceStatus.offline,
+    );
+    return ProvisionedTankDevice(
+      deviceId: deviceId,
+      type: type,
+      heartbeatToken: 'development-token-${type.name}',
+      createdAt: now,
     );
   }
 

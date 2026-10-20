@@ -223,6 +223,81 @@ void main() {
     expect(find.text('Guppy count observed'), findsOneWidget);
   });
 
+  testWidgets('owner sees component health and receives a one-time token', (
+    tester,
+  ) async {
+    final facility = FakeFacilityRepository.facility(name: 'Hardware Reef');
+    final tank = _tank(
+      facilityId: facility.id,
+      id: 'hardware-tank',
+      name: 'Hardware Tank',
+      code: 'HW-001',
+    );
+    final health = TankHardwareHealth(
+      overallState: TankDeviceStatus.unhealthy,
+      feedingAllowed: false,
+      components: [
+        TankDeviceComponent(
+          type: TankDeviceType.camera,
+          state: TankDeviceStatus.online,
+          deviceId: 'camera-1',
+          lastHeartbeatAt: DateTime.utc(2026, 10, 20, 10),
+        ),
+        const TankDeviceComponent(
+          type: TankDeviceType.edgeProcessor,
+          state: TankDeviceStatus.notConfigured,
+        ),
+        const TankDeviceComponent(
+          type: TankDeviceType.feeder,
+          state: TankDeviceStatus.unhealthy,
+          deviceId: 'feeder-1',
+          message: 'Motor jam',
+        ),
+      ],
+    );
+    final repository = FakeFacilityRepository(
+      facilities: [facility],
+      tanks: [tank],
+      tankDetails: {
+        tank.id: TankDetail(
+          tank: tank,
+          observationState: TankObservationState.noData,
+          deviceStatus: health.overallState,
+          deviceHealth: health,
+          feedingTimes: const [],
+          recentActivity: const [],
+        ),
+      },
+    );
+    await tester.pumpWidget(buildApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tanks-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tank-hardware-tank')));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('provision-feeder-device')),
+      200,
+      scrollable: _verticalScrollable(),
+    );
+    expect(find.text('Blocked — hardware attention required'), findsOneWidget);
+    expect(find.text('Motor jam'), findsOneWidget);
+    expect(find.text('Connect'), findsOneWidget);
+    expect(find.text('Rotate'), findsNWidgets(2));
+
+    final position = tester
+        .state<ScrollableState>(_verticalScrollable())
+        .position;
+    position.jumpTo(position.maxScrollExtent);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('provision-feeder-device')));
+    await tester.pumpAndSettle();
+    expect(find.text('Feeder credential'), findsOneWidget);
+    expect(find.byKey(const Key('device-heartbeat-token')), findsOneWidget);
+    expect(find.text('test-heartbeat-token'), findsOneWidget);
+  });
+
   testWidgets('owner can replace inherited times with a tank override', (
     tester,
   ) async {

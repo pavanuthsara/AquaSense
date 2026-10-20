@@ -14,7 +14,8 @@ Only one task should normally be marked `In progress`.
 
 ## Current Task
 
-**No task is currently in progress.**
+No task is currently in progress. Recommended next task: **MOB-015 —
+Appetite-observation ingestion**.
 
 ## Task Backlog
 
@@ -33,7 +34,7 @@ Only one task should normally be marked `In progress`.
 | MOB-011 | Group feeding schedules | MOB-008 | Done |
 | MOB-012 | Per-tank schedule overrides | MOB-010, MOB-011 | Done |
 | MOB-013 | Feeder calibration and portion preview | MOB-010 | Done |
-| MOB-014 | Device health integration | MOB-010 | Not started |
+| MOB-014 | Device health integration | MOB-010 | Done |
 | MOB-015 | Appetite-observation ingestion | MOB-013, MOB-014 | Not started |
 | MOB-016 | Scheduled feeding-session state machine | MOB-012–MOB-015 | Not started |
 | MOB-017 | Dashboard and feeding history | MOB-016 | Not started |
@@ -657,4 +658,46 @@ usability evaluation, and document demonstrated capabilities and limitations.
   Calibration is facility-wide until device-specific feeder identity and
   health are introduced in MOB-014.
 - Recommended next task: MOB-014 — Device health integration.
+
+### 2026-10-20 — MOB-014: Device health integration
+
+- Status: Done
+- Summary: Added per-tank camera, edge-processor, and feeder identities with
+  authenticated heartbeats and derived online, stale, offline, unhealthy, and
+  not-configured states. Tank details now show component health and whether
+  feeding is blocked. Owners can provision or rotate one-time device tokens;
+  workers receive read-only health visibility.
+- Files added: Backend device type/state and tank-device entities, repository,
+  health service, controller, Flyway migration, and device-state unit test.
+- Files changed: Backend security configuration, tank detail controller and
+  integration tests, backend guide; Flutter tank domain and repository
+  contract, HTTP/development/test adapters, tank detail screen, HTTP/widget
+  tests, mobile guide, and this development record.
+- Backend/API changes: Added authenticated member endpoint
+  `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/device-health`, owner-only
+  `POST /api/v1/facilities/{facilityId}/tanks/{tankId}/devices/{type}/provision`,
+  and device-token-authenticated `POST /api/v1/device-heartbeats`. Tank detail
+  responses now include aggregate and per-component health plus
+  `feedingAllowed`. Device tokens are stored only as SHA-256 hashes.
+- Tests performed: Java 21 Maven unit/integration suite; schema migration,
+  membership, owner/worker authorization, credential validation, healthy and
+  unhealthy heartbeat, aggregation, timeout-state, and feeding-safety tests;
+  Dart formatting; Flutter static analysis; HTTP and widget tests; complete
+  Flutter regression suite; and Android debug APK build.
+- Test results: All 43 backend tests and all 55 Flutter tests passed; static
+  analysis reported no issues; the Android debug APK built successfully.
+- Decisions made: Require camera, edge processor, and feeder to all be online
+  and healthy before feeding is allowed; mark heartbeats stale after two
+  minutes and offline after ten; prioritize not-configured, unhealthy,
+  offline, then stale when deriving aggregate health; return provisioning
+  tokens once and invalidate the old token on rotation; reset health to
+  offline after rotation; and keep heartbeat authentication separate from
+  user JWT authentication.
+- Known limitations: Automatic and manual feeder command flows do not exist
+  until MOB-016 and MOB-020. MOB-014 supplies and tests the reusable
+  `requireFeedingReady` safety gate, but those later command services must call
+  it before dispatching hardware commands. Device credentials currently have
+  no explicit revoke action beyond rotation, and heartbeat thresholds are
+  fixed backend constants.
+- Recommended next task: MOB-015 — Appetite-observation ingestion.
 

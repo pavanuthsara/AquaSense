@@ -2,6 +2,8 @@ package com.aquasense.backend.facility;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -25,7 +27,10 @@ import com.aquasense.backend.facility.repository.FacilityMembershipRepository;
 import com.aquasense.backend.facility.repository.FacilityRepository;
 import com.aquasense.backend.facility.repository.FeederCalibrationRepository;
 import com.aquasense.backend.facility.repository.TankGroupRepository;
+import com.aquasense.backend.facility.repository.TankDeviceRepository;
 import com.aquasense.backend.facility.repository.TankRepository;
+import com.aquasense.backend.facility.service.DeviceHealthService;
+import com.aquasense.backend.facility.service.FacilityException;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,11 +62,16 @@ class TankApiIntegrationTests {
     @Autowired
     private TankRepository tanks;
     @Autowired
+    private TankDeviceRepository devices;
+    @Autowired
+    private DeviceHealthService deviceHealthService;
+    @Autowired
     private TokenService tokenService;
 
     @BeforeEach
     void cleanDatabase() {
         calibrations.deleteAll();
+        devices.deleteAll();
         tanks.deleteAll();
         groups.deleteAll();
         invitations.deleteAll();
@@ -409,6 +419,90 @@ class TankApiIntegrationTests {
                                 {"unitsPerFish":0.2,"minimumUnits":1,"maximumUnits":20}
                                 """))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void deviceHeartbeatsDriveHealthAndFeedingSafetyWhileProvisioningIsOwnerOnly() throws Exception {
+        TestUser owner = user("device-owner", "device-owner@example.com", "Owner");
+        TestUser worker = user("device-worker", "device-worker@example.com", "Worker");
+        String facilityId = createFacility(owner.token(), "device-facility", "Device Reef");
+        String tankId = createTank(owner.token(), facilityId, basicTank("Device Tank", "DV-1"), 201);
+        String invitationId = invite(owner.token(), facilityId, worker.user().getEmail());
+        accept(worker.token(), invitationId);
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}/device-health",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(worker.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.overallState", is("NOT_CONFIGURED")))
+                .andExpect(jsonPath("$.feedingAllowed", is(false)))
+                .andExpect(jsonPath("$.components", hasSize(3)));
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/tanks/{tankId}/devices/CAMERA/provision",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(worker.token())))
+                .andExpect(status().isForbidden());
+
+        String camera = provisionDevice(owner.token(), facilityId, tankId, "CAMERA");
+        String edge = provisionDevice(owner.token(), facilityId, tankId, "EDGE_PROCESSOR");
+        String feeder = provisionDevice(owner.token(), facilityId, tankId, "FEEDER");
+        heartbeat(camera, true, "Camera ready", 204);
+        heartbeat(edge, true, "Model loaded", 204);
+        heartbeat(feeder, true, "Feeder ready", 204);
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}", facilityId, tankId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deviceStatus", is("ONLINE")))
+                .andExpect(jsonPath("$.deviceHealth.feedingAllowed", is(true)))
+                .andExpect(jsonPath("$.deviceHealth.components[?(@.type == 'FEEDER')].state",
+                        is(java.util.List.of("ONLINE"))));
+        assertDoesNotThrow(() -> deviceHealthService.requireFeedingReady(
+                UUID.fromString(facilityId), UUID.fromString(tankId)));
+
+        heartbeat(feeder, false, "Motor jam detected", 204);
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}/device-health",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(worker.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.overallState", is("UNHEALTHY")))
+                .andExpect(jsonPath("$.feedingAllowed", is(false)))
+                .andExpect(jsonPath("$.components[?(@.type == 'FEEDER')].message",
+                        is(java.util.List.of("Motor jam detected"))));
+        FacilityException blocked = assertThrows(FacilityException.class, () ->
+                deviceHealthService.requireFeedingReady(
+                        UUID.fromString(facilityId), UUID.fromString(tankId)));
+        org.junit.jupiter.api.Assertions.assertEquals("device_not_ready", blocked.getCode());
+
+        String deviceId = JsonPath.read(feeder, "$.deviceId");
+        mockMvc.perform(post("/api/v1/device-heartbeats")
+                        .header("X-Device-Id", deviceId)
+                        .header("X-Device-Token", "wrong-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"healthy\":true}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code", is("invalid_device_credential")));
+    }
+
+    private String provisionDevice(String token, String facilityId, String tankId, String type) throws Exception {
+        return mockMvc.perform(post(
+                        "/api/v1/facilities/{facilityId}/tanks/{tankId}/devices/{type}/provision",
+                        facilityId, tankId, type)
+                        .header("Authorization", bearer(token)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.heartbeatToken").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    private void heartbeat(String provisionedDevice, boolean healthy, String message, int expectedStatus)
+            throws Exception {
+        String deviceId = JsonPath.read(provisionedDevice, "$.deviceId");
+        String token = JsonPath.read(provisionedDevice, "$.heartbeatToken");
+        mockMvc.perform(post("/api/v1/device-heartbeats")
+                        .header("X-Device-Id", deviceId)
+                        .header("X-Device-Token", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"healthy\":" + healthy + ",\"message\":\"" + message + "\"}"))
+                .andExpect(status().is(expectedStatus));
     }
 
     private String basicTank(String name, String code) {

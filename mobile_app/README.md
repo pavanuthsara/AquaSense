@@ -59,8 +59,12 @@ tag, and load further pages when required. Owners can add, edit, move, pause,
 and archive tanks; workers receive the same inventory and detail information
 without management controls. Each tank detail shows expected and detected
 guppy counts, confidence and observation freshness, group and tags, automation
-state, device status, schedule, recent feeding times, and activity. Hardware,
-schedule, observation, and feeding sections clearly say when later-stage data
+state, device status, schedule, recent feeding times, and activity. The
+hardware section shows separate camera, edge-processor, and feeder states,
+last heartbeats, health messages, and whether feeding is safety-blocked.
+Owners can connect a component or rotate its heartbeat token; the token is
+shown once for copying into that device. Workers have read-only health access.
+Schedule, observation, and feeding sections clearly say when later-stage data
 has not been configured yet.
 
 ## Environments

@@ -4,6 +4,50 @@ enum TankObservationState { noData, current, stale }
 
 enum TankDeviceStatus { notConfigured, online, offline, stale, unhealthy }
 
+enum TankDeviceType { camera, edgeProcessor, feeder }
+
+class TankDeviceComponent {
+  const TankDeviceComponent({
+    required this.type,
+    required this.state,
+    this.deviceId,
+    this.lastHeartbeatAt,
+    this.message,
+  });
+
+  final TankDeviceType type;
+  final String? deviceId;
+  final TankDeviceStatus state;
+  final DateTime? lastHeartbeatAt;
+  final String? message;
+}
+
+class TankHardwareHealth {
+  const TankHardwareHealth({
+    required this.overallState,
+    required this.feedingAllowed,
+    required this.components,
+  });
+
+  final TankDeviceStatus overallState;
+  final bool feedingAllowed;
+  final List<TankDeviceComponent> components;
+}
+
+class ProvisionedTankDevice {
+  const ProvisionedTankDevice({
+    required this.deviceId,
+    required this.type,
+    required this.heartbeatToken,
+    required this.createdAt,
+  });
+
+  final String deviceId;
+  final TankDeviceType type;
+  final String heartbeatToken;
+  final DateTime createdAt;
+}
+
 enum TankScheduleMode { inherited, override }
 
 class Tank {
@@ -146,6 +190,7 @@ class TankDetail {
     this.inheritedFeedingTimes = const [],
     this.lastFeedingAt,
     this.nextFeedingAt,
+    this.deviceHealth,
   });
 
   final Tank tank;
@@ -156,5 +201,6 @@ class TankDetail {
   final List<String> feedingTimes;
   final DateTime? lastFeedingAt;
   final DateTime? nextFeedingAt;
+  final TankHardwareHealth? deviceHealth;
   final List<TankActivity> recentActivity;
 }
