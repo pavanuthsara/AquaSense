@@ -14,6 +14,7 @@ import com.aquasense.backend.auth.model.AppUser;
 import com.aquasense.backend.auth.repository.AppUserRepository;
 import com.aquasense.backend.auth.repository.RefreshTokenRepository;
 import com.aquasense.backend.auth.service.TokenService;
+import com.aquasense.backend.facility.repository.FacilityInvitationRepository;
 import com.aquasense.backend.facility.repository.FacilityMembershipRepository;
 import com.aquasense.backend.facility.repository.FacilityRepository;
 import com.jayway.jsonpath.JsonPath;
@@ -44,10 +45,14 @@ class FacilityApiIntegrationTests {
     private FacilityMembershipRepository memberships;
 
     @Autowired
+    private FacilityInvitationRepository invitations;
+
+    @Autowired
     private TokenService tokenService;
 
     @BeforeEach
     void cleanDatabase() {
+        invitations.deleteAll();
         memberships.deleteAll();
         facilities.deleteAll();
         refreshTokens.deleteAll();
