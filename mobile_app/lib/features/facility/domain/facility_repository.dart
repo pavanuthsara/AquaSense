@@ -80,6 +80,13 @@ abstract interface class FacilityRepository {
     required String tankId,
   });
 
+  Future<TankDetail> updateTankFeedingSchedule({
+    required String facilityId,
+    required String tankId,
+    required TankScheduleMode mode,
+    required List<String> times,
+  });
+
   Future<List<String>> listTankTags(String facilityId);
 
   Future<Tank> createTank({

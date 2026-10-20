@@ -176,6 +176,7 @@ void main() {
           tank: tank,
           observationState: TankObservationState.stale,
           deviceStatus: TankDeviceStatus.offline,
+          scheduleMode: TankScheduleMode.override,
           feedingTimes: const ['08:00', '16:00'],
           lastFeedingAt: DateTime.utc(2026, 10, 19, 8),
           nextFeedingAt: DateTime.utc(2026, 10, 19, 16),
@@ -205,6 +206,7 @@ void main() {
     expect(find.text('92%'), findsOneWidget);
     expect(find.byKey(const Key('edit-tank-button')), findsNothing);
     expect(find.byKey(const Key('archive-tank-button')), findsNothing);
+    expect(find.byKey(const Key('edit-tank-schedule-button')), findsNothing);
 
     await tester.scrollUntilVisible(
       find.text('08:00, 16:00'),
@@ -218,6 +220,71 @@ void main() {
       scrollable: _verticalScrollable(),
     );
     expect(find.text('Guppy count observed'), findsOneWidget);
+  });
+
+  testWidgets('owner can replace inherited times with a tank override', (
+    tester,
+  ) async {
+    final facility = FakeFacilityRepository.facility(name: 'Schedule Reef');
+    final group = _group(facility.id).copyWith(
+      feedingTimes: const ['08:00', '16:00'],
+      feedingAutomationEnabled: true,
+    );
+    final tank = _tank(
+      facilityId: facility.id,
+      id: 'tank-schedule',
+      name: 'Schedule Tank',
+      code: 'S-001',
+      groupId: group.id,
+      groupName: group.name,
+    );
+    final repository = FakeFacilityRepository(
+      facilities: [facility],
+      tankGroups: {
+        facility.id: [group],
+      },
+      tanks: [tank],
+    );
+    await tester.pumpWidget(buildApp(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tanks-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('tank-tank-schedule')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('edit-tank-schedule-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Inherited from Nursery'), findsOneWidget);
+    await tester.tap(find.text('Tank override'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('remove-tank-feeding-time-08:00')));
+    await tester.tap(find.byKey(const Key('save-tank-feeding-schedule')));
+    await tester.pumpAndSettle();
+
+    final updated = repository.tankDetails[tank.id]!;
+    expect(updated.scheduleMode, TankScheduleMode.override);
+    expect(updated.feedingTimes, ['16:00']);
+    await tester.scrollUntilVisible(
+      find.text('Tank override'),
+      180,
+      scrollable: _verticalScrollable(),
+    );
+    expect(find.text('Tank override'), findsOneWidget);
+    expect(find.text('16:00'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('edit-tank-schedule-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Inherit group'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('tank-feeding-time-08:00')), findsOneWidget);
+    expect(find.byKey(const Key('tank-feeding-time-16:00')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('save-tank-feeding-schedule')));
+    await tester.pumpAndSettle();
+    expect(
+      repository.tankDetails[tank.id]!.scheduleMode,
+      TankScheduleMode.inherited,
+    );
+    expect(repository.tankDetails[tank.id]!.feedingTimes, ['08:00', '16:00']);
   });
 }
 

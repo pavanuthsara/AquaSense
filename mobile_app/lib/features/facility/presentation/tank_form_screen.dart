@@ -37,6 +37,10 @@ class _TankFormScreenState extends State<TankFormScreen> {
   bool _saving = false;
   String? _error;
 
+  bool get _canEnableAutomation =>
+      _groupId != _unassigned ||
+      widget.tank?.scheduleMode == TankScheduleMode.override;
+
   @override
   void initState() {
     super.initState();
@@ -49,7 +53,7 @@ class _TankFormScreenState extends State<TankFormScreen> {
     _tags = TextEditingController(text: tank?.tags.join(', '));
     _notes = TextEditingController(text: tank?.notes);
     _groupId = tank?.groupId ?? _unassigned;
-    _automationEnabled = tank?.automationEnabled ?? true;
+    _automationEnabled = tank?.automationEnabled ?? false;
   }
 
   @override
@@ -173,7 +177,12 @@ class _TankFormScreenState extends State<TankFormScreen> {
                 ],
                 onChanged: _saving
                     ? null
-                    : (value) => setState(() => _groupId = value!),
+                    : (value) => setState(() {
+                        _groupId = value!;
+                        if (!_canEnableAutomation) {
+                          _automationEnabled = false;
+                        }
+                      }),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -191,11 +200,13 @@ class _TankFormScreenState extends State<TankFormScreen> {
                 key: const Key('tank-automation-switch'),
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Automatic feeding enabled'),
-                subtitle: const Text(
-                  'Schedules and safety checks are configured in later stages.',
+                subtitle: Text(
+                  _canEnableAutomation
+                      ? 'Runs only when its effective schedule and safety checks allow it.'
+                      : 'Assign a group or save a tank schedule override first.',
                 ),
                 value: _automationEnabled,
-                onChanged: _saving
+                onChanged: _saving || !_canEnableAutomation
                     ? null
                     : (value) => setState(() => _automationEnabled = value),
               ),

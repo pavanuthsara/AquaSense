@@ -224,6 +224,9 @@ void main() {
           if (request.method == 'GET') {
             return http.Response(_tankDetailJson, 200);
           }
+          if (request.url.path.endsWith('/feeding-schedule')) {
+            return http.Response(_tankDetailJson, 200);
+          }
           return http.Response(_tankJson, request.method == 'POST' ? 201 : 200);
         }),
       );
@@ -241,6 +244,12 @@ void main() {
         tankId: 'tank-1',
       );
       final tags = await repository.listTankTags('facility-1');
+      final scheduled = await repository.updateTankFeedingSchedule(
+        facilityId: 'facility-1',
+        tankId: 'tank-1',
+        mode: TankScheduleMode.override,
+        times: const ['08:00', '16:00'],
+      );
       final draft = TankDraft(
         name: 'Nursery 1',
         code: 'N-001',
@@ -264,11 +273,15 @@ void main() {
       expect(requests.first.url.queryParameters['tag'], 'breeding');
       expect(detail.observationState, TankObservationState.stale);
       expect(detail.deviceStatus, TankDeviceStatus.offline);
+      expect(detail.scheduleMode, TankScheduleMode.override);
+      expect(scheduled.feedingTimes, ['08:00', '16:00']);
       expect(detail.recentActivity.single.title, 'Tank created');
       expect(tags, ['breeding', 'priority']);
-      expect(requests[3].body, contains('expectedGuppyCount'));
-      expect(requests[4].method, 'PATCH');
-      expect(requests[5].url.path, endsWith('/tank-1/archive'));
+      expect(requests[3].method, 'PUT');
+      expect(requests[3].body, contains('"mode":"OVERRIDE"'));
+      expect(requests[4].body, contains('expectedGuppyCount'));
+      expect(requests[5].method, 'PATCH');
+      expect(requests[6].url.path, endsWith('/tank-1/archive'));
     },
   );
 }
@@ -371,6 +384,8 @@ const _tankDetailJson =
   "tank": $_tankJson,
   "observationState": "STALE",
   "deviceStatus": "OFFLINE",
+  "scheduleMode": "OVERRIDE",
+  "inheritedFeedingTimes": ["07:00", "17:00"],
   "feedingTimes": ["08:00", "16:00"],
   "lastFeedingAt": "2026-10-19T08:00:00Z",
   "nextFeedingAt": "2026-10-19T16:00:00Z",

@@ -274,6 +274,25 @@ class HttpFacilityRepository implements FacilityRepository {
   }
 
   @override
+  Future<TankDetail> updateTankFeedingSchedule({
+    required String facilityId,
+    required String tankId,
+    required TankScheduleMode mode,
+    required List<String> times,
+  }) async {
+    final response = await _authorizedPut(
+      '/api/v1/facilities/$facilityId/tanks/$tankId/feeding-schedule',
+      body: {
+        'mode': mode == TankScheduleMode.inherited ? 'INHERITED' : 'OVERRIDE',
+        'times': times,
+      },
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _tankDetailFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
   Future<List<String>> listTankTags(String facilityId) async {
     final response = await _authorizedGet(
       '/api/v1/facilities/$facilityId/tank-tags',
@@ -556,6 +575,9 @@ class HttpFacilityRepository implements FacilityRepository {
       groupName: json['groupName'] as String?,
       tags: (json['tags'] as List<dynamic>).cast<String>(),
       automationEnabled: json['automationEnabled'] as bool,
+      scheduleMode: json['scheduleMode'] == 'OVERRIDE'
+          ? TankScheduleMode.override
+          : TankScheduleMode.inherited,
       status: _tankStatusFromJson(json['status']),
       notes: json['notes'] as String?,
       createdAt: date('createdAt')!,
@@ -592,6 +614,17 @@ class HttpFacilityRepository implements FacilityRepository {
           code: 'invalid_server_response',
         ),
       },
+      scheduleMode: switch (json['scheduleMode']) {
+        'OVERRIDE' => TankScheduleMode.override,
+        'INHERITED' || null => TankScheduleMode.inherited,
+        _ => throw const FacilityException(
+          'The server returned an unknown tank schedule mode.',
+          code: 'invalid_server_response',
+        ),
+      },
+      inheritedFeedingTimes:
+          (json['inheritedFeedingTimes'] as List<dynamic>? ?? const [])
+              .cast<String>(),
       feedingTimes: (json['feedingTimes'] as List<dynamic>).cast<String>(),
       lastFeedingAt: date('lastFeedingAt'),
       nextFeedingAt: date('nextFeedingAt'),

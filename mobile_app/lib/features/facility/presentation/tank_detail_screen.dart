@@ -4,6 +4,7 @@ import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/tank.dart';
 import 'tank_form_screen.dart';
+import 'tank_feeding_schedule_screen.dart';
 
 class TankDetailScreen extends StatefulWidget {
   const TankDetailScreen({
@@ -82,6 +83,21 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
     }
   }
 
+  Future<void> _editSchedule() async {
+    final detail = _detail;
+    if (detail == null) return;
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => TankFeedingScheduleScreen(
+          facility: widget.facility,
+          detail: detail,
+          repository: widget.repository,
+        ),
+      ),
+    );
+    if (changed == true) await _load();
+  }
+
   Future<void> _archive() async {
     final tank = _detail?.tank;
     if (tank == null) return;
@@ -132,6 +148,12 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
         title: Text(detail?.tank.name ?? 'Tank details'),
         actions: [
           if (_isOwner && detail?.tank.status != TankStatus.archived) ...[
+            IconButton(
+              key: const Key('edit-tank-schedule-button'),
+              tooltip: 'Edit feeding schedule',
+              onPressed: _editSchedule,
+              icon: const Icon(Icons.schedule_rounded),
+            ),
             IconButton(
               key: const Key('edit-tank-button'),
               tooltip: 'Edit tank',
@@ -227,6 +249,14 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
               _InfoRow(
                 label: 'Device',
                 value: _deviceDescription(detail.deviceStatus),
+              ),
+              _InfoRow(
+                label: 'Schedule source',
+                value: detail.scheduleMode == TankScheduleMode.override
+                    ? 'Tank override'
+                    : tank.groupName == null
+                    ? 'Inherited — no group assigned'
+                    : 'Inherited from ${tank.groupName}',
               ),
               _InfoRow(
                 label: 'Schedule',

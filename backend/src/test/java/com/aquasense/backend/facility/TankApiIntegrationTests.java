@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -173,7 +174,7 @@ class TankApiIntegrationTests {
                         .queryParam("unassigned", "true")
                         .queryParam("size", "100"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalItems", is(167)));
+                .andExpect(jsonPath("$.totalItems", is(500)));
         mockMvc.perform(get("/api/v1/facilities/{facilityId}/tank-tags", facilityId)
                         .header("Authorization", bearer(owner.token())))
                 .andExpect(status().isOk())
@@ -207,10 +208,121 @@ class TankApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.observationState", is("NO_DATA")))
                 .andExpect(jsonPath("$.deviceStatus", is("NOT_CONFIGURED")))
+                .andExpect(jsonPath("$.scheduleMode", is("INHERITED")))
                 .andExpect(jsonPath("$.feedingTimes", hasSize(0)))
                 .andExpect(jsonPath("$.lastFeedingAt").doesNotExist())
                 .andExpect(jsonPath("$.nextFeedingAt").doesNotExist())
                 .andExpect(jsonPath("$.recentActivity[0].type", is("TANK_CREATED")));
+    }
+
+    @Test
+    void ownerCanReplaceInheritedScheduleWithTankOverrideAndWorkerCannotChangeIt() throws Exception {
+        TestUser owner = user("schedule-owner", "schedule-owner@example.com", "Owner");
+        TestUser worker = user("schedule-worker", "schedule-worker@example.com", "Worker");
+        String facilityId = createFacility(owner.token(), "schedule-facility", "Schedule Reef");
+        String groupId = createGroup(owner.token(), facilityId, "Nursery");
+        mockMvc.perform(put("/api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule",
+                        facilityId, groupId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"times":["08:00","16:00"],"automationEnabled":true}
+                                """))
+                .andExpect(status().isOk());
+        String tankId = createTank(owner.token(), facilityId, """
+                {"name":"Nursery 1","code":"NS-1","expectedGuppyCount":80,
+                 "groupId":"%s","tags":[],"automationEnabled":true,"notes":""}
+                """.formatted(groupId), 201);
+        String invitationId = invite(owner.token(), facilityId, worker.user().getEmail());
+        accept(worker.token(), invitationId);
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}", facilityId, tankId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scheduleMode", is("INHERITED")))
+                .andExpect(jsonPath("$.feedingTimes", is(java.util.List.of("08:00", "16:00"))))
+                .andExpect(jsonPath("$.nextFeedingAt").isNotEmpty());
+
+        mockMvc.perform(put("/api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-schedule",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"OVERRIDE","times":["09:30","18:15"]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scheduleMode", is("OVERRIDE")))
+                .andExpect(jsonPath("$.feedingTimes", is(java.util.List.of("09:30", "18:15"))))
+                .andExpect(jsonPath("$.nextFeedingAt").isNotEmpty());
+
+        mockMvc.perform(put("/api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-schedule",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(worker.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"INHERITED","times":[]}
+                                """))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(put("/api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-schedule",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"INHERITED","times":[]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scheduleMode", is("INHERITED")))
+                .andExpect(jsonPath("$.feedingTimes", is(java.util.List.of("08:00", "16:00"))));
+
+        mockMvc.perform(put("/api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule",
+                        facilityId, groupId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"times":["10:00"],"automationEnabled":true}
+                                """))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}", facilityId, tankId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.feedingTimes", is(java.util.List.of("10:00"))));
+    }
+
+    @Test
+    void unassignedTankIsPausedUntilItHasACompleteOverride() throws Exception {
+        TestUser owner = user("unassigned-owner", "unassigned@example.com", "Owner");
+        String facilityId = createFacility(owner.token(), "unassigned-facility", "Safe Reef");
+        String tankId = createTank(owner.token(), facilityId, basicTank("Unassigned", "U-1"), 201);
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}", facilityId, tankId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tank.status", is("PAUSED")))
+                .andExpect(jsonPath("$.scheduleMode", is("INHERITED")))
+                .andExpect(jsonPath("$.feedingTimes", hasSize(0)))
+                .andExpect(jsonPath("$.nextFeedingAt").doesNotExist());
+
+        mockMvc.perform(put("/api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-schedule",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"OVERRIDE","times":[]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code", is("override_schedule_empty")));
+
+        mockMvc.perform(put("/api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-schedule",
+                        facilityId, tankId)
+                        .header("Authorization", bearer(owner.token()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"OVERRIDE","times":["07:00"]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scheduleMode", is("OVERRIDE")))
+                .andExpect(jsonPath("$.feedingTimes", is(java.util.List.of("07:00"))));
     }
 
     private String basicTank(String name, String code) {

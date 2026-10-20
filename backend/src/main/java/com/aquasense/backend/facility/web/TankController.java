@@ -3,12 +3,14 @@ package com.aquasense.backend.facility.web;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import com.aquasense.backend.facility.model.Tank;
 import com.aquasense.backend.facility.model.TankGroup;
+import com.aquasense.backend.facility.model.TankScheduleMode;
 import com.aquasense.backend.facility.model.TankStatus;
 import com.aquasense.backend.facility.service.TankService;
 import com.aquasense.backend.facility.service.TankService.TankInput;
@@ -19,6 +21,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -35,6 +39,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/facilities/{facilityId}")
 public class TankController {
+    private static final DateTimeFormatter FEEDING_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private final TankService tankService;
 
     public TankController(TankService tankService) {
@@ -98,6 +103,16 @@ public class TankController {
         return TankResponse.from(tankService.archive(userId(jwt), facilityId, tankId));
     }
 
+    @PutMapping("/tanks/{tankId}/feeding-schedule")
+    TankDetailResponse configureFeedingSchedule(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID facilityId,
+            @PathVariable UUID tankId,
+            @Valid @RequestBody TankScheduleRequest request) {
+        return TankDetailResponse.from(tankService.configureFeedingSchedule(
+                userId(jwt), facilityId, tankId, request.mode(), request.times()));
+    }
+
     private UUID userId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
     }
@@ -115,6 +130,12 @@ public class TankController {
         }
     }
 
+    public record TankScheduleRequest(
+            @NotNull TankScheduleMode mode,
+            @NotNull @Size(max = 24)
+            List<@NotBlank @Pattern(regexp = "(?:[01]\\d|2[0-3]):[0-5]\\d") String> times) {
+    }
+
     public record TankResponse(
             UUID id,
             UUID facilityId,
@@ -128,6 +149,7 @@ public class TankController {
             String groupName,
             List<String> tags,
             boolean automationEnabled,
+            TankScheduleMode scheduleMode,
             TankStatus status,
             String notes,
             Instant createdAt,
@@ -148,6 +170,7 @@ public class TankController {
                     group == null ? null : group.getName(),
                     tank.getTags().stream().sorted().toList(),
                     tank.isAutomationEnabled(),
+                    tank.getScheduleMode(),
                     status(tank),
                     tank.getNotes(),
                     tank.getCreatedAt(),
@@ -186,6 +209,8 @@ public class TankController {
             TankResponse tank,
             String observationState,
             String deviceStatus,
+            TankScheduleMode scheduleMode,
+            List<String> inheritedFeedingTimes,
             List<String> feedingTimes,
             Instant lastFeedingAt,
             Instant nextFeedingAt,
@@ -204,13 +229,40 @@ public class TankController {
             } else {
                 observationState = "CURRENT";
             }
+            boolean override = tank.getScheduleMode() == TankScheduleMode.OVERRIDE;
+            List<String> inheritedTimes = tank.getGroup() == null
+                    ? List.of()
+                    : tank.getGroup().getFeedingTimes().stream()
+                            .map(item -> item.getLocalTime())
+                            .map(FEEDING_TIME_FORMAT::format)
+                            .toList();
+            List<String> effectiveTimes = override
+                    ? tank.getFeedingTimes().stream()
+                            .map(item -> item.getLocalTime())
+                            .map(FEEDING_TIME_FORMAT::format)
+                            .toList()
+                    : inheritedTimes;
+            Instant nextFeedingAt = null;
+            if (tank.isAutomationEnabled()) {
+                nextFeedingAt = (override
+                        ? tank.getFeedingTimes().stream().map(item -> item.getNextExecutionAt())
+                        : tank.getGroup() == null || !tank.getGroup().isFeedingAutomationEnabled()
+                                ? java.util.stream.Stream.<Instant>empty()
+                                : tank.getGroup().getFeedingTimes().stream()
+                                        .map(item -> item.getNextExecutionAt()))
+                        .filter(java.util.Objects::nonNull)
+                        .min(Instant::compareTo)
+                        .orElse(null);
+            }
             return new TankDetailResponse(
                     TankResponse.from(tank),
                     observationState,
                     "NOT_CONFIGURED",
-                    List.of(),
+                    tank.getScheduleMode(),
+                    inheritedTimes,
+                    effectiveTimes,
                     null,
-                    null,
+                    nextFeedingAt,
                     activity);
         }
     }

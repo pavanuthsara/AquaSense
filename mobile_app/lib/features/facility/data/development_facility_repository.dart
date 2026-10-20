@@ -11,6 +11,8 @@ class DevelopmentFacilityRepository implements FacilityRepository {
   final List<FacilityInvitation> _invitations = [];
   final Map<String, List<TankGroup>> _tankGroups = {};
   final Map<String, List<Tank>> _tanks = {};
+  final Map<String, TankScheduleMode> _tankScheduleModes = {};
+  final Map<String, List<String>> _tankOverrideTimes = {};
 
   @override
   Future<Facility> createFacility({
@@ -409,13 +411,26 @@ class DevelopmentFacilityRepository implements FacilityRepository {
   }) async {
     await getFacility(facilityId);
     final tank = _findTank(facilityId, tankId);
+    final mode = _tankScheduleModes[tankId] ?? TankScheduleMode.inherited;
+    TankGroup? group;
+    for (final item in _tankGroups[facilityId] ?? const <TankGroup>[]) {
+      if (item.id == tank.groupId) {
+        group = item;
+        break;
+      }
+    }
+    final feedingTimes = mode == TankScheduleMode.override
+        ? _tankOverrideTimes[tankId] ?? const <String>[]
+        : group?.feedingTimes ?? const <String>[];
     return TankDetail(
-      tank: tank,
+      tank: tank.copyWith(scheduleMode: mode),
       observationState: tank.countObservedAt == null
           ? TankObservationState.noData
           : TankObservationState.current,
       deviceStatus: TankDeviceStatus.notConfigured,
-      feedingTimes: const [],
+      scheduleMode: mode,
+      inheritedFeedingTimes: group?.feedingTimes ?? const [],
+      feedingTimes: feedingTimes,
       recentActivity: [
         TankActivity(
           type: 'TANK_CREATED',
@@ -424,6 +439,37 @@ class DevelopmentFacilityRepository implements FacilityRepository {
         ),
       ],
     );
+  }
+
+  @override
+  Future<TankDetail> updateTankFeedingSchedule({
+    required String facilityId,
+    required String tankId,
+    required TankScheduleMode mode,
+    required List<String> times,
+  }) async {
+    _requireOwner(facilityId);
+    final tank = _findTank(facilityId, tankId);
+    if (tank.status == TankStatus.archived) {
+      throw const FacilityException(
+        'An archived tank cannot have its feeding schedule changed.',
+        code: 'tank_archived',
+      );
+    }
+    final cleanTimes = times.toSet().toList()..sort();
+    if (mode == TankScheduleMode.override && cleanTimes.isEmpty) {
+      throw const FacilityException(
+        'Add at least one time to the tank override.',
+        code: 'override_schedule_empty',
+      );
+    }
+    _tankScheduleModes[tankId] = mode;
+    if (mode == TankScheduleMode.override) {
+      _tankOverrideTimes[tankId] = List.unmodifiable(cleanTimes);
+    } else {
+      _tankOverrideTimes.remove(tankId);
+    }
+    return getTankDetail(facilityId: facilityId, tankId: tankId);
   }
 
   @override
@@ -458,8 +504,10 @@ class DevelopmentFacilityRepository implements FacilityRepository {
       groupId: group?.id,
       groupName: group?.name,
       tags: _cleanTankTags(draft.tags),
-      automationEnabled: draft.automationEnabled,
-      status: draft.automationEnabled ? TankStatus.active : TankStatus.paused,
+      automationEnabled: group != null && draft.automationEnabled,
+      status: group != null && draft.automationEnabled
+          ? TankStatus.active
+          : TankStatus.paused,
       notes: draft.notes.trim().isEmpty ? null : draft.notes.trim(),
       createdAt: now,
       updatedAt: now,
@@ -505,8 +553,16 @@ class DevelopmentFacilityRepository implements FacilityRepository {
       clearGroup: group == null,
       groupName: group?.name,
       tags: _cleanTankTags(draft.tags),
-      automationEnabled: draft.automationEnabled,
-      status: draft.automationEnabled ? TankStatus.active : TankStatus.paused,
+      automationEnabled:
+          (group != null ||
+              _tankScheduleModes[tankId] == TankScheduleMode.override) &&
+          draft.automationEnabled,
+      status:
+          (group != null ||
+                  _tankScheduleModes[tankId] == TankScheduleMode.override) &&
+              draft.automationEnabled
+          ? TankStatus.active
+          : TankStatus.paused,
       notes: draft.notes.trim(),
       updatedAt: DateTime.now().toUtc(),
     );

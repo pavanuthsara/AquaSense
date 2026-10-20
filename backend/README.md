@@ -125,6 +125,9 @@ the schedule through the group list but cannot change it.
   active tank for an owner.
 - `POST /api/v1/facilities/{facilityId}/tanks/{tankId}/archive` safely removes
   a tank from active operations for an owner.
+- `PUT /api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-schedule`
+  switches an active tank between its complete inherited group schedule and a
+  complete tank-specific replacement.
 
 Tank codes are unique within an aquarium after case normalization. Tags are
 stored in lowercase, group assignments are aquarium-scoped, and group counts
@@ -133,6 +136,13 @@ Workers can search and inspect tanks but cannot create, edit, move, or archive
 them. Device health, feeding schedules, observations, and feeding history are
 represented by explicit not-configured/no-data states until their later tasks
 provide those records.
+
+Tank details return `scheduleMode`, the effective `feedingTimes`, and the next
+UTC execution instant. `INHERITED` always follows the current group schedule;
+`OVERRIDE` requires one or more unique tank times and ignores group schedule
+changes. An unassigned tank without an override is automatically paused, even
+if a client requests automation, so it cannot feed without an effective
+schedule.
 
 ## Verify
 

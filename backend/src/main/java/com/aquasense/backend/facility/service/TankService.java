@@ -1,6 +1,8 @@
 package com.aquasense.backend.facility.service;
 
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -12,6 +14,7 @@ import com.aquasense.backend.facility.model.FacilityMembership;
 import com.aquasense.backend.facility.model.FacilityRole;
 import com.aquasense.backend.facility.model.Tank;
 import com.aquasense.backend.facility.model.TankGroup;
+import com.aquasense.backend.facility.model.TankScheduleMode;
 import com.aquasense.backend.facility.model.TankStatus;
 import com.aquasense.backend.facility.repository.FacilityMembershipRepository;
 import com.aquasense.backend.facility.repository.FacilityRepository;
@@ -29,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TankService {
     private static final int MAX_PAGE_SIZE = 100;
+    private static final DateTimeFormatter FEEDING_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
 
     private final FacilityRepository facilities;
     private final FacilityMembershipRepository memberships;
@@ -82,8 +86,10 @@ public class TankService {
     @Transactional(readOnly = true)
     public Tank get(UUID userId, UUID facilityId, UUID tankId) {
         requireMembership(userId, facilityId);
-        return tanks.findByIdAndFacility_Id(tankId, facilityId)
+        Tank tank = tanks.findByIdAndFacility_Id(tankId, facilityId)
                 .orElseThrow(this::tankNotFound);
+        initializeSchedule(tank);
+        return tank;
     }
 
     @Transactional(readOnly = true)
@@ -184,6 +190,55 @@ public class TankService {
         }
         tank.archive(now);
         return tank;
+    }
+
+    @Transactional
+    public Tank configureFeedingSchedule(
+            UUID userId,
+            UUID facilityId,
+            UUID tankId,
+            TankScheduleMode mode,
+            List<String> requestedTimes) {
+        requireOwner(userId, facilityId);
+        Tank tank = lockTank(facilityId, tankId);
+        if (tank.isArchived()) {
+            throw new FacilityException(
+                    HttpStatus.CONFLICT,
+                    "tank_archived",
+                    "An archived tank cannot have its feeding schedule changed");
+        }
+        List<LocalTime> localTimes = requestedTimes.stream()
+                .map(time -> LocalTime.parse(time, FEEDING_TIME_FORMAT))
+                .sorted()
+                .toList();
+        if (new LinkedHashSet<>(localTimes).size() != localTimes.size()) {
+            throw new FacilityException(
+                    HttpStatus.BAD_REQUEST,
+                    "duplicate_feeding_time",
+                    "Each daily feeding time must be unique");
+        }
+        if (mode == TankScheduleMode.INHERITED && !localTimes.isEmpty()) {
+            throw new FacilityException(
+                    HttpStatus.BAD_REQUEST,
+                    "inherited_schedule_has_times",
+                    "Inherited schedules cannot contain tank-specific times");
+        }
+        if (mode == TankScheduleMode.OVERRIDE && localTimes.isEmpty()) {
+            throw new FacilityException(
+                    HttpStatus.BAD_REQUEST,
+                    "override_schedule_empty",
+                    "Add at least one time to the tank override");
+        }
+        tank.configureSchedule(mode, localTimes, Instant.now());
+        initializeSchedule(tank);
+        return tank;
+    }
+
+    private void initializeSchedule(Tank tank) {
+        tank.getFeedingTimes().size();
+        if (tank.getGroup() != null) {
+            tank.getGroup().getFeedingTimes().size();
+        }
     }
 
     private Specification<Tank> facilityIs(UUID facilityId) {

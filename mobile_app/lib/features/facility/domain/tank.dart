@@ -4,6 +4,8 @@ enum TankObservationState { noData, current, stale }
 
 enum TankDeviceStatus { notConfigured, online, offline, stale, unhealthy }
 
+enum TankScheduleMode { inherited, override }
+
 class Tank {
   const Tank({
     required this.id,
@@ -16,6 +18,7 @@ class Tank {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.scheduleMode = TankScheduleMode.inherited,
     this.detectedGuppyCount,
     this.detectionConfidence,
     this.countObservedAt,
@@ -37,6 +40,7 @@ class Tank {
   final String? groupName;
   final List<String> tags;
   final bool automationEnabled;
+  final TankScheduleMode scheduleMode;
   final TankStatus status;
   final String? notes;
   final DateTime createdAt;
@@ -52,6 +56,7 @@ class Tank {
     String? groupName,
     List<String>? tags,
     bool? automationEnabled,
+    TankScheduleMode? scheduleMode,
     TankStatus? status,
     String? notes,
     DateTime? updatedAt,
@@ -70,6 +75,7 @@ class Tank {
       groupName: clearGroup ? null : groupName ?? this.groupName,
       tags: tags ?? this.tags,
       automationEnabled: automationEnabled ?? this.automationEnabled,
+      scheduleMode: scheduleMode ?? this.scheduleMode,
       status: status ?? this.status,
       notes: notes ?? this.notes,
       createdAt: createdAt,
@@ -136,6 +142,8 @@ class TankDetail {
     required this.deviceStatus,
     required this.feedingTimes,
     required this.recentActivity,
+    this.scheduleMode = TankScheduleMode.inherited,
+    this.inheritedFeedingTimes = const [],
     this.lastFeedingAt,
     this.nextFeedingAt,
   });
@@ -143,6 +151,8 @@ class TankDetail {
   final Tank tank;
   final TankObservationState observationState;
   final TankDeviceStatus deviceStatus;
+  final TankScheduleMode scheduleMode;
+  final List<String> inheritedFeedingTimes;
   final List<String> feedingTimes;
   final DateTime? lastFeedingAt;
   final DateTime? nextFeedingAt;

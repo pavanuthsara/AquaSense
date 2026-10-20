@@ -21,11 +21,11 @@ public interface TankRepository extends JpaRepository<Tank, UUID>, JpaSpecificat
             String normalizedCode,
             UUID id);
 
-    @EntityGraph(attributePaths = {"facility", "group", "tags"})
+    @EntityGraph(attributePaths = {"facility", "group", "tags", "feedingTimes"})
     Optional<Tank> findByIdAndFacility_Id(UUID id, UUID facilityId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @EntityGraph(attributePaths = {"facility", "group", "tags"})
+    @EntityGraph(attributePaths = {"facility", "group", "tags", "feedingTimes"})
     @Query("select tank from Tank tank where tank.id = :id and tank.facility.id = :facilityId")
     Optional<Tank> findByIdAndFacilityIdForUpdate(
             @Param("id") UUID id,

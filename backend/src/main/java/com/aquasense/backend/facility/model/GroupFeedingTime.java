@@ -59,7 +59,7 @@ public class GroupFeedingTime {
         nextExecutionAt = automationEnabled ? nextOccurrence(localTime, timeZone, now) : null;
     }
 
-    static Instant nextOccurrence(LocalTime localTime, ZoneId timeZone, Instant now) {
+    public static Instant nextOccurrence(LocalTime localTime, ZoneId timeZone, Instant now) {
         LocalDate localDate = now.atZone(timeZone).toLocalDate();
         ZonedDateTime candidate = localDate.atTime(localTime).atZone(timeZone);
         if (!candidate.toInstant().isAfter(now)) {

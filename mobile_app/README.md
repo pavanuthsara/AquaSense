@@ -39,6 +39,13 @@ without losing the configured times. Workers can inspect the same schedule
 and its next stored UTC execution time, but all schedule controls are
 read-only.
 
+From an active tank's detail screen, owners can choose **Inherit group** or
+**Tank override**. Inheritance always shows the group's current schedule; an
+override is a complete tank-specific replacement rather than a partial merge.
+Unassigned tanks remain paused until an owner supplies an override or assigns
+the tank to a group. Workers can see the effective schedule and its source but
+cannot edit it.
+
 Open **Tanks** from the aquarium home screen to browse the paginated inventory.
 Search by name or code, filter by current status, group, unassigned tanks, or
 tag, and load further pages when required. Owners can add, edit, move, pause,

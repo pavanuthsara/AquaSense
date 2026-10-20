@@ -395,13 +395,18 @@ class FakeFacilityRepository implements FacilityRepository {
       return configured;
     }
     final tank = _tank(facilityId, tankId);
+    final inheritedTimes = (tankGroups[facilityId] ?? const <TankGroup>[])
+        .where((group) => group.id == tank.groupId)
+        .expand((group) => group.feedingTimes)
+        .toList();
     return TankDetail(
       tank: tank,
       observationState: tank.countObservedAt == null
           ? TankObservationState.noData
           : TankObservationState.current,
       deviceStatus: TankDeviceStatus.notConfigured,
-      feedingTimes: const [],
+      inheritedFeedingTimes: inheritedTimes,
+      feedingTimes: inheritedTimes,
       recentActivity: [
         TankActivity(
           type: 'TANK_CREATED',
@@ -410,6 +415,54 @@ class FakeFacilityRepository implements FacilityRepository {
         ),
       ],
     );
+  }
+
+  @override
+  Future<TankDetail> updateTankFeedingSchedule({
+    required String facilityId,
+    required String tankId,
+    required TankScheduleMode mode,
+    required List<String> times,
+  }) async {
+    _requireOwner(facilityId);
+    final current = await getTankDetail(facilityId: facilityId, tankId: tankId);
+    if (current.tank.status == TankStatus.archived) {
+      throw const FacilityException(
+        'An archived tank cannot have its feeding schedule changed.',
+        code: 'tank_archived',
+      );
+    }
+    final cleanTimes = times.toSet().toList()..sort();
+    if (mode == TankScheduleMode.override && cleanTimes.isEmpty) {
+      throw const FacilityException(
+        'Add at least one time to the tank override.',
+        code: 'override_schedule_empty',
+      );
+    }
+    final inheritedTimes = (tankGroups[facilityId] ?? const <TankGroup>[])
+        .where((group) => group.id == current.tank.groupId)
+        .expand((group) => group.feedingTimes)
+        .toList();
+    final updatedTank = current.tank.copyWith(scheduleMode: mode);
+    final tankIndex = tanks.indexWhere(
+      (tank) => tank.id == tankId && tank.facilityId == facilityId,
+    );
+    if (tankIndex != -1) tanks[tankIndex] = updatedTank;
+    final updated = TankDetail(
+      tank: updatedTank,
+      observationState: current.observationState,
+      deviceStatus: current.deviceStatus,
+      scheduleMode: mode,
+      inheritedFeedingTimes: inheritedTimes,
+      feedingTimes: mode == TankScheduleMode.override
+          ? List.unmodifiable(cleanTimes)
+          : List.unmodifiable(inheritedTimes),
+      lastFeedingAt: current.lastFeedingAt,
+      nextFeedingAt: null,
+      recentActivity: current.recentActivity,
+    );
+    tankDetails[tankId] = updated;
+    return updated;
   }
 
   @override

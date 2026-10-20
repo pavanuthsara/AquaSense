@@ -31,7 +31,7 @@ Only one task should normally be marked `In progress`.
 | MOB-009 | Tank and tag management | MOB-008 | Done |
 | MOB-010 | Tank-detail screen | MOB-009 | Done |
 | MOB-011 | Group feeding schedules | MOB-008 | Done |
-| MOB-012 | Per-tank schedule overrides | MOB-010, MOB-011 | Not started |
+| MOB-012 | Per-tank schedule overrides | MOB-010, MOB-011 | Done |
 | MOB-013 | Feeder calibration and portion preview | MOB-010 | Not started |
 | MOB-014 | Device health integration | MOB-010 | Not started |
 | MOB-015 | Appetite-observation ingestion | MOB-013, MOB-014 | Not started |
@@ -579,4 +579,42 @@ usability evaluation, and document demonstrated capabilities and limitations.
   The development-only mobile repository displays configured local times but
   leaves server-authoritative UTC conversion to the backend.
 - Recommended next task: MOB-012 — Per-tank schedule overrides.
+
+### 2026-10-20 — MOB-012: Per-tank schedule overrides
+
+- Status: Done
+- Summary: Added explicit per-tank schedule modes. A tank can inherit the
+  complete current schedule from its group or use a complete tank-specific
+  replacement. Tank details clearly identify the source and effective times;
+  owners can switch modes and edit overrides, while workers retain read-only
+  visibility. Unassigned inherited tanks are automatically paused.
+- Files added: Backend tank schedule mode and tank-feeding-time entities,
+  Flyway migration, and Flutter tank feeding schedule screen.
+- Files changed: Backend tank model, repository, service, controller,
+  integration tests, and guide; Flutter tank domain/repository adapters, tank
+  form/detail screens, development and test repositories, HTTP and widget
+  tests, mobile guide, and this development record.
+- Backend/API changes: Added owner-only
+  `PUT /api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-schedule`, the
+  `schedule_mode` tank field, and `tank_feeding_times`. Tank responses expose
+  schedule mode, while detail responses expose inherited, effective, and next
+  execution values.
+- Tests performed: Java 21 Maven integration/unit suite; inherited, override,
+  role, validation, group-change, and unassigned-tank safety integration tests;
+  Dart formatting; Flutter static analysis; focused API/widget tests; complete
+  Flutter regression suite; and Android debug APK build.
+- Test results: All 39 backend tests and all 49 Flutter tests passed; static
+  analysis reported no issues; the Android debug APK built successfully.
+- Decisions made: Treat overrides as complete replacements rather than partial
+  additions; retain recurring times as facility-local `HH:mm` values and store
+  override next occurrences as UTC instants; delete tank-specific times when
+  returning to inheritance; immediately reflect later group schedule changes;
+  limit overrides to 24 unique times; and fail safely by forcing automation
+  off whenever an unassigned tank has no override.
+- Known limitations: The scheduler does not yet consume or advance the stored
+  next occurrence; that belongs to MOB-016. There is no bulk override editor,
+  and enabling/disabling a tank's overall automation remains a separate tank
+  setting. The override screen copies inherited times as an editing starting
+  point but saves them as a full replacement.
+- Recommended next task: MOB-013 — Feeder calibration and portion preview.
 
