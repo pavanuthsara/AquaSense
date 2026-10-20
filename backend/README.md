@@ -174,6 +174,22 @@ ten minutes. Feeding is allowed only when the camera, edge processor, and
 feeder are all configured, online, and healthy. Device tokens are stored as
 SHA-256 hashes and are never returned after provisioning.
 
+## Disease-check endpoints
+
+The guppy disease model runs on the phone. The backend only stores the result
+so every member of an aquarium can see the check history. Photos are not
+uploaded.
+
+- `POST /api/v1/facilities/{facilityId}/disease-checks` saves one result
+  (`predictedLabel`, `confidence` 0-1, `uncertain`, `modelVersion`,
+  `checkedAt`, and optional `tankLabel` and `note`). It requires an
+  `Idempotency-Key` header, like facility creation.
+- `GET /api/v1/facilities/{facilityId}/disease-checks?limit=20` lists the
+  newest results first (limit 1-100).
+
+Only members of the aquarium can read or write its checks; anyone else gets
+`facility_not_found`.
+
 ## Verify
 
 ```powershell

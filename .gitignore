@@ -26,6 +26,8 @@ runs/
 *.pt
 *.onnx
 *.tflite
+# ...except the disease model bundled with the mobile app
+!mobile_app/assets/models/*.tflite
 
 # Logs and temporary files
 *.log
