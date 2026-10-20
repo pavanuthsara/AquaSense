@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 
 # Load your custom fine-tuned YOLO model
-model = YOLO("runs/guppy_detector_v1/weights/best.pt")
+model = YOLO("runs/guppy_detector_v3/weights/best.pt")
 
 # Stream the tracking process to keep RAM usage low
 results = model.track(
