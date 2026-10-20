@@ -50,7 +50,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-001 | Setup: branch, docs, model assets, packages | — | Done |
 | DIS-002 | Disease-check history API (backend) | — | Done |
 | DIS-003 | Domain models, interfaces and disease info | DIS-001 | Done |
-| DIS-004 | Image preparation (letterbox) with tests | DIS-003 | Not started |
+| DIS-004 | Image preparation (letterbox) with tests | DIS-003 | Done |
 | DIS-005 | On-device TFLite classifier | DIS-004 | Not started |
 | DIS-006 | Photo source (camera and gallery) | DIS-003 | Not started |
 | DIS-007 | Disease check screen | DIS-005, DIS-006 | Not started |
@@ -324,3 +324,20 @@ run on a Raspberry Pi later.
   label, with a readable fallback for new labels such as fin rot).
 - Tests: `test/disease_prediction_test.dart` (4 tests). Analyze is clean.
 - Next: DIS-004.
+
+### 2026-10-20 — DIS-004: Image preparation with tests — Done
+
+- Added `lib/features/disease_check/data/image_preprocessor.dart`: decode,
+  turn upright from EXIF, shrink so the longer side is the model size, centre
+  on a black square, return RGB values 0-255 (not divided by 255). Same steps
+  and rounding as `ImageOps.pad` in `predict_pi.py`. It is a top-level
+  function so it can run in a background isolate.
+- Tests: `test/disease_image_preprocessor_test.dart` (5 tests: wide and tall
+  letterboxing, value range, uint8 output, corrupt file).
+- Parity check against `predict_pi.py`: 13 photos (7 white spot, 6 healthy;
+  sizes 170 px to 1280x720) were prepared by this Dart code and by Pillow, and
+  both tensors were run through the bundled model. Every photo got the same
+  answer; the largest score difference was 0.0001. Pixels differ by 1-8 out of
+  255 on average, because Pillow smooths more when shrinking big photos; the
+  model is not sensitive to this.
+- Next: DIS-005.
