@@ -53,7 +53,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-004 | Image preparation (letterbox) with tests | DIS-003 | Done |
 | DIS-005 | On-device TFLite classifier | DIS-004 | Done |
 | DIS-006 | Photo source (camera and gallery) | DIS-003 | Done |
-| DIS-007 | Disease check screen | DIS-005, DIS-006 | Not started |
+| DIS-007 | Disease check screen | DIS-005, DIS-006 | Done |
 | DIS-008 | Save results and history screen | DIS-002, DIS-007 | Not started |
 | DIS-009 | Home screen entry and app wiring | DIS-007, DIS-008 | Not started |
 | DIS-010 | Real-phone test with own fish | DIS-009 | Not started |
@@ -369,3 +369,20 @@ run on a Raspberry Pi later.
   the screen tests in DIS-007).
 - Analyze is clean.
 - Next: DIS-007.
+
+### 2026-10-20 — DIS-007: Disease check screen — Done
+
+- Added `DiseaseCheckController` (start, checking, result, error) and
+  `DiseaseCheckScreen`. Start shows photo tips and **Take photo** /
+  **Choose from gallery**. A result shows the photo, the answer in a coloured
+  card (teal for healthy, red for a disease, grey for not sure), the
+  description and advice from `DiseaseInfo`, and a score bar for each label.
+  A score under 0.6 shows **Not sure, take another photo** and repeats the
+  tips. Errors offer **Try again** with the same photo. The line "Screening
+  aid only, not a diagnosis" is always shown.
+- The screen takes an optional `resultActionsBuilder`, used in DIS-008 to add
+  saving.
+- Tests: `test/disease_check_screen_test.dart` (8 tests: start screen, white
+  spot, healthy, not sure, cancelled camera, model error and retry, camera
+  error, check another fish).
+- Next: DIS-008.
