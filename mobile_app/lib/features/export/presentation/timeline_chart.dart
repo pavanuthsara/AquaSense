@@ -305,8 +305,17 @@ class _TimelinePainter extends CustomPainter {
     for (var i = 0; i <= 4; i++) {
       final value = g.minY + (g.maxY - g.minY) * i / 4;
       final y = g.py(value);
-      canvas.drawLine(Offset(_ChartGeometry.left, y), Offset(g.px(g.maxX), y), grid);
-      _text(canvas, _format(value), Offset(_ChartGeometry.left - 6, y), alignRight: true);
+      canvas.drawLine(
+        Offset(_ChartGeometry.left, y),
+        Offset(g.px(g.maxX), y),
+        grid,
+      );
+      _text(
+        canvas,
+        _format(value),
+        Offset(_ChartGeometry.left - 6, y),
+        alignRight: true,
+      );
     }
     final step = _niceStep(g.maxX - g.minX);
     for (var x = (g.minX / step).ceil() * step; x <= g.maxX + 1e-9; x += step) {
@@ -372,7 +381,10 @@ class _TimelinePainter extends CustomPainter {
         drawing = false;
         continue;
       }
-      final point = Offset(g.px(xs[i]), g.py(y.clamp(g.minY, g.maxY).toDouble()));
+      final point = Offset(
+        g.px(xs[i]),
+        g.py(y.clamp(g.minY, g.maxY).toDouble()),
+      );
       if (drawing) {
         path.lineTo(point.dx, point.dy);
       } else {

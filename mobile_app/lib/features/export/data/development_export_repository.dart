@@ -7,9 +7,7 @@ import 'sample_advisory.dart';
 /// Offline repository used when the app runs without the AquaSense backend.
 /// Every plan returns the same bundled sample advisory.
 class DevelopmentExportRepository implements ExportRepository {
-  DevelopmentExportRepository({
-    this.delay = const Duration(milliseconds: 600),
-  });
+  DevelopmentExportRepository({this.delay = const Duration(milliseconds: 600)});
 
   final Duration delay;
   final _saved = <String, List<_SavedPlan>>{};
@@ -54,7 +52,8 @@ class DevelopmentExportRepository implements ExportRepository {
             fishPerBag: advisory.recommendation.fishPerBag,
             bagsNeeded: advisory.recommendation.bagsNeeded,
             survivalPct: advisory.mortality?.survivalAfterUnpackingPct,
-            worstSurvivalPct: advisory.mortality?.worstSurvivalAfterUnpackingPct,
+            worstSurvivalPct:
+                advisory.mortality?.worstSurvivalAfterUnpackingPct,
             createdAt: plan.detail.createdAt,
           );
         })

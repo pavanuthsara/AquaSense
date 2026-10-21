@@ -85,44 +85,47 @@ void main() {
   });
 
   group('HTTP repository', () {
-    test('posts the shipment to the facility endpoint with the token', () async {
-      late http.Request captured;
-      final repository = HttpExportRepository(
-        apiBaseUrl: 'https://api.example.com',
-        sessionStorage: _MemorySessionStorage(),
-        client: MockClient((request) async {
-          captured = request;
-          return http.Response(
-            '{"id":"plan-1","label":null,"createdAt":"2026-10-21T08:00:00Z",'
-            '"request":{},"advisory":$sampleAdvisoryJson}',
-            201,
-          );
-        }),
-      );
+    test(
+      'posts the shipment to the facility endpoint with the token',
+      () async {
+        late http.Request captured;
+        final repository = HttpExportRepository(
+          apiBaseUrl: 'https://api.example.com',
+          sessionStorage: _MemorySessionStorage(),
+          client: MockClient((request) async {
+            captured = request;
+            return http.Response(
+              '{"id":"plan-1","label":null,"createdAt":"2026-10-21T08:00:00Z",'
+              '"request":{},"advisory":$sampleAdvisoryJson}',
+              201,
+            );
+          }),
+        );
 
-      final detail = await repository.createAdvisory(
-        facilityId: 'facility-1',
-        request: const ExportShipmentRequest(
-          species: ExportSpecies.guppy,
-          fishMassG: 0.3,
-          waterL: 0.4,
-          gasL: 1.2,
-          durationH: 36,
-          tempLowC: 24,
-          tempHighC: 28,
-        ),
-      );
+        final detail = await repository.createAdvisory(
+          facilityId: 'facility-1',
+          request: const ExportShipmentRequest(
+            species: ExportSpecies.guppy,
+            fishMassG: 0.3,
+            waterL: 0.4,
+            gasL: 1.2,
+            durationH: 36,
+            tempLowC: 24,
+            tempHighC: 28,
+          ),
+        );
 
-      expect(captured.method, 'POST');
-      expect(
-        captured.url.path,
-        '/api/v1/facilities/facility-1/export-advisories',
-      );
-      expect(captured.headers['authorization'], 'Bearer access-token');
-      expect(jsonDecode(captured.body)['species'], 'guppy');
-      expect(detail.id, 'plan-1');
-      expect(detail.advisory.recommendation.fishPerBag, greaterThan(0));
-    });
+        expect(captured.method, 'POST');
+        expect(
+          captured.url.path,
+          '/api/v1/facilities/facility-1/export-advisories',
+        );
+        expect(captured.headers['authorization'], 'Bearer access-token');
+        expect(jsonDecode(captured.body)['species'], 'guppy');
+        expect(detail.id, 'plan-1');
+        expect(detail.advisory.recommendation.fishPerBag, greaterThan(0));
+      },
+    );
 
     test('maps server errors to readable messages', () async {
       final repository = HttpExportRepository(
@@ -164,9 +167,7 @@ void main() {
   });
 
   group('screens', () {
-    testWidgets('plans a shipment and shows the full advisory', (
-      tester,
-    ) async {
+    testWidgets('plans a shipment and shows the full advisory', (tester) async {
       final repository = DevelopmentExportRepository(delay: Duration.zero);
       await tester.pumpWidget(
         MaterialApp(

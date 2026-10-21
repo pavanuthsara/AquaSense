@@ -63,8 +63,7 @@ class FacilityHomeScreen extends StatelessWidget {
 
   void _openExportPlanning(BuildContext context, Facility facility) {
     final repository =
-        ExportRepositoryScope.maybeOf(context) ??
-        DevelopmentExportRepository();
+        ExportRepositoryScope.maybeOf(context) ?? DevelopmentExportRepository();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>

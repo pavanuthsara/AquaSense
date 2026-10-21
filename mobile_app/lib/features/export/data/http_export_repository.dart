@@ -47,7 +47,8 @@ class HttpExportRepository implements ExportRepository {
     _requireSuccess(response, body);
     return (body as List<dynamic>)
         .map(
-          (item) => ExportAdvisorySummary.fromJson(item as Map<String, dynamic>),
+          (item) =>
+              ExportAdvisorySummary.fromJson(item as Map<String, dynamic>),
         )
         .toList(growable: false);
   }

@@ -728,10 +728,7 @@ class _Banner extends StatelessWidget {
           Icon(icon, color: foreground),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              text,
-              style: TextStyle(color: foreground, height: 1.4),
-            ),
+            child: Text(text, style: TextStyle(color: foreground, height: 1.4)),
           ),
         ],
       ),
