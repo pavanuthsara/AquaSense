@@ -498,6 +498,7 @@ class FakeFacilityRepository implements FacilityRepository {
           : List.unmodifiable(inheritedTimes),
       lastFeedingAt: current.lastFeedingAt,
       nextFeedingAt: null,
+      appetiteObservation: current.appetiteObservation,
       recentActivity: current.recentActivity,
     );
     tankDetails[tankId] = updated;

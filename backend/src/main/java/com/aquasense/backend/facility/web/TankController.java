@@ -15,6 +15,7 @@ import com.aquasense.backend.facility.model.TankStatus;
 import com.aquasense.backend.facility.service.TankService;
 import com.aquasense.backend.facility.service.DeviceHealthService;
 import com.aquasense.backend.facility.service.DeviceHealthService.DeviceHealth;
+import com.aquasense.backend.facility.service.AppetiteObservationService;
 import com.aquasense.backend.facility.service.TankService.TankInput;
 import com.aquasense.backend.facility.service.TankService.TankPage;
 import jakarta.validation.Valid;
@@ -44,10 +45,15 @@ public class TankController {
     private static final DateTimeFormatter FEEDING_TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm");
     private final TankService tankService;
     private final DeviceHealthService deviceHealthService;
+    private final AppetiteObservationService appetiteObservationService;
 
-    public TankController(TankService tankService, DeviceHealthService deviceHealthService) {
+    public TankController(
+            TankService tankService,
+            DeviceHealthService deviceHealthService,
+            AppetiteObservationService appetiteObservationService) {
         this.tankService = tankService;
         this.deviceHealthService = deviceHealthService;
+        this.appetiteObservationService = appetiteObservationService;
     }
 
     @GetMapping("/tanks")
@@ -72,7 +78,12 @@ public class TankController {
             @PathVariable UUID facilityId,
             @PathVariable UUID tankId) {
         Tank tank = tankService.get(userId(jwt), facilityId, tankId);
-        return TankDetailResponse.from(tank, deviceHealthService.healthForTank(tankId));
+        return TankDetailResponse.from(
+                tank,
+                deviceHealthService.healthForTank(tankId),
+                appetiteObservationService.latestForTank(tankId)
+                        .map(AppetiteObservationController.ObservationResponse::from)
+                        .orElse(null));
     }
 
     @GetMapping("/tank-tags")
@@ -116,7 +127,12 @@ public class TankController {
             @Valid @RequestBody TankScheduleRequest request) {
         Tank tank = tankService.configureFeedingSchedule(
                 userId(jwt), facilityId, tankId, request.mode(), request.times());
-        return TankDetailResponse.from(tank, deviceHealthService.healthForTank(tankId));
+        return TankDetailResponse.from(
+                tank,
+                deviceHealthService.healthForTank(tankId),
+                appetiteObservationService.latestForTank(tankId)
+                        .map(AppetiteObservationController.ObservationResponse::from)
+                        .orElse(null));
     }
 
     private UUID userId(Jwt jwt) {
@@ -216,13 +232,17 @@ public class TankController {
             String observationState,
             String deviceStatus,
             DeviceHealthController.DeviceHealthResponse deviceHealth,
+            AppetiteObservationController.ObservationResponse appetiteObservation,
             TankScheduleMode scheduleMode,
             List<String> inheritedFeedingTimes,
             List<String> feedingTimes,
             Instant lastFeedingAt,
             Instant nextFeedingAt,
             List<TankActivityResponse> recentActivity) {
-        static TankDetailResponse from(Tank tank, DeviceHealth deviceHealth) {
+        static TankDetailResponse from(
+                Tank tank,
+                DeviceHealth deviceHealth,
+                AppetiteObservationController.ObservationResponse appetiteObservation) {
             List<TankActivityResponse> activity = new ArrayList<>();
             if (!tank.getUpdatedAt().equals(tank.getCreatedAt())) {
                 activity.add(new TankActivityResponse("SETTINGS_UPDATED", "Tank settings updated", tank.getUpdatedAt()));
@@ -266,6 +286,7 @@ public class TankController {
                     observationState,
                     deviceHealth.overallState().name(),
                     DeviceHealthController.DeviceHealthResponse.from(deviceHealth),
+                    appetiteObservation,
                     tank.getScheduleMode(),
                     inheritedTimes,
                     effectiveTimes,

@@ -28,8 +28,10 @@ import com.aquasense.backend.facility.repository.FacilityRepository;
 import com.aquasense.backend.facility.repository.FeederCalibrationRepository;
 import com.aquasense.backend.facility.repository.TankGroupRepository;
 import com.aquasense.backend.facility.repository.TankDeviceRepository;
+import com.aquasense.backend.facility.repository.AppetiteObservationRepository;
 import com.aquasense.backend.facility.repository.TankRepository;
 import com.aquasense.backend.facility.service.DeviceHealthService;
+import com.aquasense.backend.facility.service.AppetiteObservationService;
 import com.aquasense.backend.facility.service.FacilityException;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,11 +68,16 @@ class TankApiIntegrationTests {
     @Autowired
     private DeviceHealthService deviceHealthService;
     @Autowired
+    private AppetiteObservationRepository observations;
+    @Autowired
+    private AppetiteObservationService appetiteObservationService;
+    @Autowired
     private TokenService tokenService;
 
     @BeforeEach
     void cleanDatabase() {
         calibrations.deleteAll();
+        observations.deleteAll();
         devices.deleteAll();
         tanks.deleteAll();
         groups.deleteAll();
@@ -481,6 +488,75 @@ class TankApiIntegrationTests {
                         .content("{\"healthy\":true}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code", is("invalid_device_credential")));
+    }
+
+    @Test
+    void edgeObservationsAreValidatedDisplayedAndBlockedWhenUnsafe() throws Exception {
+        TestUser owner = user("observation-owner", "observation@example.com", "Owner");
+        String facilityId = createFacility(owner.token(), "observation-facility", "Observation Reef");
+        String tankId = createTank(owner.token(), facilityId, basicTank("Observed Tank", "OBS-1"), 201);
+        String otherTankId = createTank(owner.token(), facilityId, basicTank("Other Tank", "OBS-2"), 201);
+        String edge = provisionDevice(owner.token(), facilityId, tankId, "EDGE_PROCESSOR");
+        String camera = provisionDevice(owner.token(), facilityId, tankId, "CAMERA");
+
+        submitObservation(edge, tankId, 58, "0.9200", "HIGH", Instant.now(), 201)
+                .andExpect(jsonPath("$.validForFeedingDecision", is(true)))
+                .andExpect(jsonPath("$.ownerReviewRequired", is(false)));
+        assertDoesNotThrow(() -> appetiteObservationService.requireValidForFeeding(
+                UUID.fromString(facilityId), UUID.fromString(tankId)));
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}", facilityId, tankId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tank.detectedGuppyCount", is(58)))
+                .andExpect(jsonPath("$.appetiteObservation.appetiteResult", is("HIGH")))
+                .andExpect(jsonPath("$.appetiteObservation.modelVersion", is("guppy-appetite-v1")));
+
+        submitObservation(edge, tankId, 58, "0.9200", "HIGH", Instant.now().minusSeconds(600), 201)
+                .andExpect(jsonPath("$.validForFeedingDecision", is(false)))
+                .andExpect(jsonPath("$.ownerReviewRequired", is(true)))
+                .andExpect(jsonPath("$.reviewReasons", is(java.util.List.of("STALE"))));
+        submitObservation(edge, tankId, 10, "0.5000", "LOW", Instant.now(), 201)
+                .andExpect(jsonPath("$.validForFeedingDecision", is(false)))
+                .andExpect(jsonPath("$.ownerReviewRequired", is(true)))
+                .andExpect(jsonPath("$.reviewReasons", is(java.util.List.of(
+                        "LOW_CONFIDENCE", "COUNT_INCONSISTENT"))));
+        FacilityException invalid = assertThrows(FacilityException.class, () ->
+                appetiteObservationService.requireValidForFeeding(
+                        UUID.fromString(facilityId), UUID.fromString(tankId)));
+        org.junit.jupiter.api.Assertions.assertEquals("observation_not_valid", invalid.getCode());
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/tanks/{tankId}", facilityId, tankId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tank.detectedGuppyCount", is(58)))
+                .andExpect(jsonPath("$.appetiteObservation.detectedGuppyCount", is(10)))
+                .andExpect(jsonPath("$.appetiteObservation.lowConfidence", is(true)));
+
+        submitObservation(edge, otherTankId, 60, "0.9000", "HIGH", Instant.now(), 403)
+                .andExpect(jsonPath("$.code", is("observation_tank_mismatch")));
+        submitObservation(camera, tankId, 60, "0.9000", "HIGH", Instant.now(), 403)
+                .andExpect(jsonPath("$.code", is("edge_processor_required")));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions submitObservation(
+            String provisionedDevice,
+            String tankId,
+            int count,
+            String confidence,
+            String appetite,
+            Instant observedAt,
+            int expectedStatus) throws Exception {
+        String deviceId = JsonPath.read(provisionedDevice, "$.deviceId");
+        String token = JsonPath.read(provisionedDevice, "$.heartbeatToken");
+        return mockMvc.perform(post("/api/v1/device-observations")
+                        .header("X-Device-Id", deviceId)
+                        .header("X-Device-Token", token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"tankId":"%s","detectedGuppyCount":%d,"confidence":%s,
+                                 "appetiteResult":"%s","modelVersion":"guppy-appetite-v1",
+                                 "observedAt":"%s"}
+                                """.formatted(tankId, count, confidence, appetite, observedAt)))
+                .andExpect(status().is(expectedStatus));
     }
 
     private String provisionDevice(String token, String facilityId, String tankId, String type) throws Exception {

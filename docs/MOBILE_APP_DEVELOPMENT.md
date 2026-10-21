@@ -14,8 +14,8 @@ Only one task should normally be marked `In progress`.
 
 ## Current Task
 
-No task is currently in progress. Recommended next task: **MOB-015 —
-Appetite-observation ingestion**.
+No task is currently in progress. Recommended next task: **MOB-016 —
+Scheduled feeding-session state machine**.
 
 ## Task Backlog
 
@@ -35,7 +35,7 @@ Appetite-observation ingestion**.
 | MOB-012 | Per-tank schedule overrides | MOB-010, MOB-011 | Done |
 | MOB-013 | Feeder calibration and portion preview | MOB-010 | Done |
 | MOB-014 | Device health integration | MOB-010 | Done |
-| MOB-015 | Appetite-observation ingestion | MOB-013, MOB-014 | Not started |
+| MOB-015 | Appetite-observation ingestion | MOB-013, MOB-014 | Done |
 | MOB-016 | Scheduled feeding-session state machine | MOB-012–MOB-015 | Not started |
 | MOB-017 | Dashboard and feeding history | MOB-016 | Not started |
 | MOB-018 | In-app alert center | MOB-016, MOB-017 | Not started |
@@ -700,4 +700,50 @@ usability evaluation, and document demonstrated capabilities and limitations.
   no explicit revoke action beyond rotation, and heartbeat thresholds are
   fixed backend constants.
 - Recommended next task: MOB-015 — Appetite-observation ingestion.
+
+### 2026-10-21 — MOB-015: Appetite-observation ingestion
+
+- Status: Done
+- Summary: Added authenticated appetite-observation ingestion for tank edge
+  processors. Observations retain the detected guppy count, confidence,
+  appetite result, model version, observation/receipt times, and explicit
+  safety flags. The latest observation and owner-review reasons now appear on
+  tank details. Only valid observations update trusted tank count data or pass
+  the reusable feeding-decision guard.
+- Files added: Backend appetite result and observation entities, observation
+  repository, service, controller, and Flyway migration.
+- Files changed: Backend security configuration, tank model/detail controller,
+  integration tests, and guide; Flutter tank domain, HTTP and test adapters,
+  tank detail UI, repository/widget tests, mobile guide, and this development
+  record.
+- Backend/API changes: Added device-token-authenticated
+  `POST /api/v1/device-observations` and member-authenticated
+  `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/appetite-observation`.
+  Tank detail responses now include the latest appetite observation. Added
+  `appetite_observations` with source-device and tank relationships, safety
+  flags, and a tank/time index. Device credential verification is reused from
+  MOB-014.
+- Tests performed: Clean Java 21 Maven unit/integration suite; Flyway
+  migration, valid, stale, low-confidence, inconsistent-count, source-device
+  type, tank-ownership, trusted-count update, and feeding-decision rejection
+  tests; Dart formatting; Flutter static analysis; HTTP parsing and tank-detail
+  widget tests; complete Flutter regression suite; and Android debug APK build.
+- Test results: All 44 backend tests and all 55 Flutter tests passed; all 10
+  source migrations applied on a clean build; formatting required no changes;
+  static analysis reported no issues; and the Android debug APK built
+  successfully.
+- Decisions made: Accept observations only from a provisioned edge processor
+  assigned to the same tank; treat data older than five minutes or more than
+  one minute in the future as stale; flag confidence below 80%; flag a count
+  difference greater than the larger of five fish or 20% of the expected
+  count; retain invalid observations for audit/review without replacing the
+  trusted detected count; and re-check freshness when a feeding decision is
+  requested so previously valid data cannot remain usable indefinitely.
+- Known limitations: MOB-015 exposes only the latest observation in the app;
+  filterable history belongs to later monitoring work. Appetite is currently
+  binary (`HIGH` or `LOW`) and thresholds are backend constants. Ingestion
+  does not yet deduplicate retried edge observations. The guard validates the
+  observation, but the complete health, schedule, cooldown, appetite outcome,
+  portion, command, and retry flow belongs to MOB-016.
+- Recommended next task: MOB-016 — Scheduled feeding-session state machine.
 
