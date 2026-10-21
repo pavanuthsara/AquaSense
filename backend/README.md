@@ -190,6 +190,27 @@ differs from expected by more than the larger of five fish or 20%. Flagged
 observations remain visible for review but cannot update trusted count data or
 pass the feeding-decision safety guard.
 
+## Scheduled feeding sessions
+
+The scheduler checks due tank overrides and inherited group schedules every 30
+seconds. It creates at most one session for each tank and scheduled UTC instant,
+then evaluates automation, required device health, the 15-minute cooldown,
+observation freshness, confidence, count consistency, appetite, and calibrated
+portion bounds. Each stopped session retains an explicit skip, block, or failure
+reason for later history and alert screens.
+
+- `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-session/latest`
+  returns the latest session to an aquarium member.
+- `GET /api/v1/feeder-commands/next` lets an authenticated feeder poll its next
+  pending command using `X-Device-Id` and `X-Device-Token`.
+- `POST /api/v1/feeder-commands/{sessionId}/feedback` records the feeder's
+  delivered or failed result using the same device credentials.
+
+`COMMAND_SENT` means only that a bounded command is available to the feeder.
+The backend records `DELIVERED` only after positive feedback from the feeder;
+negative feedback records `FAILED`. Repeated processing of the same occurrence
+returns the existing session, and repeated matching feedback is safe.
+
 ## Verify
 
 ```powershell
