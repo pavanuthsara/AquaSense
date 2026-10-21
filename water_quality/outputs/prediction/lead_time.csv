@@ -1,0 +1,5 @@
+target,best_model,useful_lead_h
+do,GBoost,0.16666666666666666
+ph,GBoost,0.16666666666666666
+ammonia,GBoost,0.16666666666666666
+temperature,GBoost,0.16666666666666666

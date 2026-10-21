@@ -1,0 +1,12 @@
+series,raw_rows,duplicate_rows,do_implausible_%,do_stuck_%,ph_implausible_%,ph_stuck_%,ammonia_implausible_%,ammonia_stuck_%,temperature_implausible_%,temperature_stuck_%,kept
+pond1,83126.0,0.0,21.6,0.0,0.5,0.1,28.5,25.0,0.0,0.0,True
+pond2,172249.0,58353.0,10.4,58.2,68.8,0.0,52.0,20.2,0.0,0.0,True
+pond3,169185.0,0.0,6.3,3.2,2.8,0.0,63.4,0.0,0.0,0.0,True
+pond4,89797.0,44.0,9.6,0.0,0.1,0.1,60.1,0.4,0.0,0.0,True
+pond6,91015.0,0.0,13.1,0.0,19.9,0.0,41.5,0.0,0.0,0.0,True
+pond7,279612.0,0.0,31.4,0.0,27.7,0.0,10.8,0.0,0.0,0.0,True
+pond8,70744.0,0.0,39.3,0.0,41.7,0.0,0.0,0.0,0.0,0.0,True
+pond9,151785.0,0.0,25.5,0.0,30.7,0.0,15.9,3.9,0.0,0.0,True
+pond10,310.0,,,,,,,,,,False
+pond11,627.0,,,,,,,,,,False
+pond12,26.0,,,,,,,,,,False
