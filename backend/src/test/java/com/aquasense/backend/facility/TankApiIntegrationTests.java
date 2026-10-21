@@ -22,6 +22,8 @@ import com.aquasense.backend.auth.repository.RefreshTokenRepository;
 import com.aquasense.backend.auth.service.TokenService;
 import com.aquasense.backend.facility.model.Facility;
 import com.aquasense.backend.facility.model.Tank;
+import com.aquasense.backend.facility.model.FeedingOutcome;
+import com.aquasense.backend.facility.model.FeedingSession;
 import com.aquasense.backend.facility.repository.FacilityInvitationRepository;
 import com.aquasense.backend.facility.repository.FacilityMembershipRepository;
 import com.aquasense.backend.facility.repository.FacilityRepository;
@@ -29,9 +31,11 @@ import com.aquasense.backend.facility.repository.FeederCalibrationRepository;
 import com.aquasense.backend.facility.repository.TankGroupRepository;
 import com.aquasense.backend.facility.repository.TankDeviceRepository;
 import com.aquasense.backend.facility.repository.AppetiteObservationRepository;
+import com.aquasense.backend.facility.repository.FeedingSessionRepository;
 import com.aquasense.backend.facility.repository.TankRepository;
 import com.aquasense.backend.facility.service.DeviceHealthService;
 import com.aquasense.backend.facility.service.AppetiteObservationService;
+import com.aquasense.backend.facility.service.FeedingSessionService;
 import com.aquasense.backend.facility.service.FacilityException;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,11 +76,16 @@ class TankApiIntegrationTests {
     @Autowired
     private AppetiteObservationService appetiteObservationService;
     @Autowired
+    private FeedingSessionRepository feedingSessions;
+    @Autowired
+    private FeedingSessionService feedingSessionService;
+    @Autowired
     private TokenService tokenService;
 
     @BeforeEach
     void cleanDatabase() {
         calibrations.deleteAll();
+        feedingSessions.deleteAll();
         observations.deleteAll();
         devices.deleteAll();
         tanks.deleteAll();
@@ -535,6 +544,140 @@ class TankApiIntegrationTests {
                 .andExpect(jsonPath("$.code", is("observation_tank_mismatch")));
         submitObservation(camera, tankId, 60, "0.9000", "HIGH", Instant.now(), 403)
                 .andExpect(jsonPath("$.code", is("edge_processor_required")));
+    }
+
+    @Test
+    void feedingStateMachineCoversSafetyOutcomesIdempotencyAndFeederFeedback() throws Exception {
+        TestUser owner = user("session-owner", "session@example.com", "Owner");
+        String facilityId = createFacility(owner.token(), "session-facility", "Session Reef");
+        String groupId = createGroup(owner.token(), facilityId, "Session Group");
+        configureGroupSchedule(owner.token(), facilityId, groupId);
+        String tankId = createTank(owner.token(), facilityId, groupedTank("Session Tank", "FS-1", groupId, true), 201);
+        UUID tankUuid = UUID.fromString(tankId);
+        Instant occurrence = Instant.now().minusSeconds(120);
+
+        assertOutcome(tankUuid, occurrence, FeedingOutcome.BLOCKED_UNHEALTHY_DEVICE);
+
+        String camera = provisionDevice(owner.token(), facilityId, tankId, "CAMERA");
+        String edge = provisionDevice(owner.token(), facilityId, tankId, "EDGE_PROCESSOR");
+        String feeder = provisionDevice(owner.token(), facilityId, tankId, "FEEDER");
+        heartbeat(camera, true, "ready", 204);
+        heartbeat(edge, true, "ready", 204);
+        heartbeat(feeder, true, "ready", 204);
+
+        occurrence = occurrence.plusSeconds(1);
+        assertOutcome(tankUuid, occurrence, FeedingOutcome.SKIPPED_STALE_OBSERVATION);
+        submitObservation(edge, tankId, 60, "0.5000", "HIGH", Instant.now(), 201);
+        occurrence = occurrence.plusSeconds(1);
+        assertOutcome(tankUuid, occurrence, FeedingOutcome.SKIPPED_LOW_CONFIDENCE);
+        submitObservation(edge, tankId, 10, "0.9500", "HIGH", Instant.now(), 201);
+        occurrence = occurrence.plusSeconds(1);
+        assertOutcome(tankUuid, occurrence, FeedingOutcome.SKIPPED_COUNT_INCONSISTENT);
+        submitObservation(edge, tankId, 60, "0.9500", "LOW", Instant.now(), 201);
+        occurrence = occurrence.plusSeconds(1);
+        assertOutcome(tankUuid, occurrence, FeedingOutcome.SKIPPED_LOW_APPETITE);
+        submitObservation(edge, tankId, 60, "0.9500", "HIGH", Instant.now(), 201);
+        occurrence = occurrence.plusSeconds(1);
+        assertOutcome(tankUuid, occurrence, FeedingOutcome.BLOCKED_CALIBRATION);
+
+        createCalibration(owner.token(), facilityId);
+        occurrence = occurrence.plusSeconds(1);
+        FeedingSession command = feedingSessionService.processOccurrence(tankUuid, occurrence);
+        org.junit.jupiter.api.Assertions.assertEquals(FeedingOutcome.COMMAND_SENT, command.getOutcome());
+        org.junit.jupiter.api.Assertions.assertEquals("5.0000", command.getPortionUnits().toPlainString());
+        FeedingSession retry = feedingSessionService.processOccurrence(tankUuid, occurrence);
+        org.junit.jupiter.api.Assertions.assertEquals(command.getId(), retry.getId());
+
+        assertOutcome(tankUuid, occurrence.plusSeconds(1), FeedingOutcome.BLOCKED_COOLDOWN);
+        String feederId = JsonPath.read(feeder, "$.deviceId");
+        String feederToken = JsonPath.read(feeder, "$.heartbeatToken");
+        mockMvc.perform(get("/api/v1/feeder-commands/next")
+                        .header("X-Device-Id", feederId)
+                        .header("X-Device-Token", feederToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(command.getId().toString())))
+                .andExpect(jsonPath("$.outcome", is("COMMAND_SENT")))
+                .andExpect(jsonPath("$.feedbackAt").doesNotExist());
+        mockMvc.perform(post("/api/v1/feeder-commands/{sessionId}/feedback", command.getId())
+                        .header("X-Device-Id", feederId)
+                        .header("X-Device-Token", feederToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"delivered\":false,\"reason\":\"motor jam\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome", is("FAILED")))
+                .andExpect(jsonPath("$.reason", is("motor jam")))
+                .andExpect(jsonPath("$.feedbackAt").exists());
+        mockMvc.perform(post("/api/v1/feeder-commands/{sessionId}/feedback", command.getId())
+                        .header("X-Device-Id", feederId)
+                        .header("X-Device-Token", feederToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"delivered\":false,\"reason\":\"duplicate callback\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome", is("FAILED")))
+                .andExpect(jsonPath("$.reason", is("motor jam")));
+        mockMvc.perform(post("/api/v1/feeder-commands/{sessionId}/feedback", command.getId())
+                        .header("X-Device-Id", feederId)
+                        .header("X-Device-Token", feederToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"delivered\":true}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code", is("feedback_conflict")));
+
+        String deliveredTank = createTank(
+                owner.token(), facilityId, groupedTank("Delivered Tank", "FS-2", groupId, true), 201);
+        String deliveredCamera = provisionDevice(owner.token(), facilityId, deliveredTank, "CAMERA");
+        String deliveredEdge = provisionDevice(owner.token(), facilityId, deliveredTank, "EDGE_PROCESSOR");
+        String deliveredFeeder = provisionDevice(owner.token(), facilityId, deliveredTank, "FEEDER");
+        heartbeat(deliveredCamera, true, "ready", 204);
+        heartbeat(deliveredEdge, true, "ready", 204);
+        heartbeat(deliveredFeeder, true, "ready", 204);
+        submitObservation(deliveredEdge, deliveredTank, 50, "0.9500", "HIGH", Instant.now(), 201);
+        FeedingSession pendingDelivery = feedingSessionService.processOccurrence(
+                UUID.fromString(deliveredTank), Instant.now().minusSeconds(60));
+        org.junit.jupiter.api.Assertions.assertEquals(FeedingOutcome.COMMAND_SENT, pendingDelivery.getOutcome());
+        String deliveredFeederId = JsonPath.read(deliveredFeeder, "$.deviceId");
+        String deliveredFeederToken = JsonPath.read(deliveredFeeder, "$.heartbeatToken");
+        mockMvc.perform(post("/api/v1/feeder-commands/{sessionId}/feedback", pendingDelivery.getId())
+                        .header("X-Device-Id", deliveredFeederId)
+                        .header("X-Device-Token", deliveredFeederToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"delivered\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.outcome", is("DELIVERED")))
+                .andExpect(jsonPath("$.feedbackAt").exists());
+
+        String pausedTank = createTank(
+                owner.token(), facilityId, groupedTank("Paused Tank", "FS-3", groupId, false), 201);
+        assertOutcome(UUID.fromString(pausedTank), Instant.now(), FeedingOutcome.BLOCKED_AUTOMATION);
+    }
+
+    private void assertOutcome(UUID tankId, Instant scheduledFor, FeedingOutcome expected) {
+        FeedingSession session = feedingSessionService.processOccurrence(tankId, scheduledFor);
+        org.junit.jupiter.api.Assertions.assertEquals(expected, session.getOutcome());
+    }
+
+    private String groupedTank(String name, String code, String groupId, boolean automationEnabled) {
+        return """
+                {"name":"%s","code":"%s","expectedGuppyCount":60,"groupId":"%s",
+                 "tags":["feeding"],"automationEnabled":%s,"notes":""}
+                """.formatted(name, code, groupId, automationEnabled);
+    }
+
+    private void configureGroupSchedule(String token, String facilityId, String groupId) throws Exception {
+        mockMvc.perform(put("/api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule",
+                        facilityId, groupId)
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"times\":[\"08:00\"],\"automationEnabled\":true}"))
+                .andExpect(status().isOk());
+    }
+
+    private void createCalibration(String token, String facilityId) throws Exception {
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/feeder-calibration", facilityId)
+                        .header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"unitsPerFish\":0.1,\"minimumUnits\":1,\"maximumUnits\":5}"))
+                .andExpect(status().isCreated());
     }
 
     private org.springframework.test.web.servlet.ResultActions submitObservation(

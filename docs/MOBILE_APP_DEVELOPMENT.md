@@ -14,8 +14,8 @@ Only one task should normally be marked `In progress`.
 
 ## Current Task
 
-No task is currently in progress. Recommended next task: **MOB-016 —
-Scheduled feeding-session state machine**.
+No task is currently in progress. **MOB-017 — Dashboard and feeding history**
+is the recommended next task.
 
 ## Task Backlog
 
@@ -36,7 +36,7 @@ Scheduled feeding-session state machine**.
 | MOB-013 | Feeder calibration and portion preview | MOB-010 | Done |
 | MOB-014 | Device health integration | MOB-010 | Done |
 | MOB-015 | Appetite-observation ingestion | MOB-013, MOB-014 | Done |
-| MOB-016 | Scheduled feeding-session state machine | MOB-012–MOB-015 | Not started |
+| MOB-016 | Scheduled feeding-session state machine | MOB-012–MOB-015 | Done |
 | MOB-017 | Dashboard and feeding history | MOB-016 | Not started |
 | MOB-018 | In-app alert center | MOB-016, MOB-017 | Not started |
 | MOB-019 | Android push notifications | MOB-018 | Not started |
@@ -745,4 +745,48 @@ usability evaluation, and document demonstrated capabilities and limitations.
   observation but the complete health, schedule, cooldown, appetite outcome,
   portion, command, and retry flow belongs to MOB-016.
 - Recommended next task: MOB-016 — Scheduled feeding-session state machine.
+
+### 2026-10-21 — MOB-016: Scheduled feeding-session state machine
+
+- Status: Done
+- Summary: Added the scheduled feeding state machine and background scheduler.
+  Every tank/schedule occurrence creates at most one durable session. The
+  decision path checks automation, required device health, cooldown,
+  observation freshness, confidence, fish-count consistency, appetite, and a
+  positive bounded calibration before making a feeder command available.
+  Commands remain `COMMAND_SENT` until authenticated feeder feedback explicitly
+  records `DELIVERED` or `FAILED`.
+- Files added: Feeding outcome and session models; feeding-session, group-time,
+  and tank-time repositories; state-machine and scheduler services;
+  feeding-session/feeder-command controller; and Flyway migration V11.
+- Files changed: Backend application scheduling and security configuration;
+  group/tank schedule models; tank repository; calibration service; tank API
+  integration tests; backend guide; and this development record.
+- Backend/API changes: Added the `feeding_sessions` table with a unique
+  tank/scheduled-occurrence key and indexed pending-command lookup. Added member
+  `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-session/latest`,
+  device-authenticated `GET /api/v1/feeder-commands/next`, and
+  `POST /api/v1/feeder-commands/{sessionId}/feedback`. Enabled a 30-second
+  scheduler and normalized occurrences to database timestamp precision.
+- Tests performed: Java 21 Maven unit/integration suite; migration and state
+  tests for paused automation, unhealthy hardware, missing/stale observation,
+  low confidence, count inconsistency, low appetite, missing calibration,
+  command creation, idempotent retry, cooldown, feeder polling, failed and
+  delivered feedback, and feedback conflict; Flutter static analysis; complete
+  Flutter regression suite; and Android debug APK build.
+- Test results: All 45 backend tests and all 55 Flutter tests passed; Flutter
+  static analysis reported no issues; the Android debug APK built successfully.
+- Decisions made: Use a durable outcome per scheduled occurrence; serialize
+  same-tank processing with a database lock and also enforce a unique database
+  key; apply a 15-minute cooldown from the latest sent command; process only
+  positive, bounded calibrated portions; use device credentials for command
+  polling and feedback; and never equate command dispatch with physical food
+  delivery.
+- Known limitations: The feeder currently polls for commands and pending
+  commands have no expiry/timeout policy. Feeding history and mobile dashboard
+  visibility belong to MOB-017, alerts belong to MOB-018, and manual feeding
+  belongs to MOB-020. Multi-instance scheduler claiming has not yet been added,
+  so production scheduling should run as a single scheduler instance until a
+  distributed claim/lease mechanism is implemented.
+- Recommended next task: MOB-017 — Dashboard and feeding history.
 
