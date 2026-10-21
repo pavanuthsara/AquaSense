@@ -16,6 +16,7 @@ import com.aquasense.backend.auth.google.GoogleIdentityVerifier;
 import com.aquasense.backend.auth.repository.AppUserRepository;
 import com.aquasense.backend.auth.repository.RefreshTokenRepository;
 import com.aquasense.backend.auth.web.AuthenticationFailureException;
+import com.aquasense.backend.facility.repository.FacilityInvitationRepository;
 import com.aquasense.backend.facility.repository.FacilityMembershipRepository;
 import com.aquasense.backend.facility.repository.FacilityRepository;
 import com.jayway.jsonpath.JsonPath;
@@ -49,6 +50,9 @@ class AuthApiIntegrationTests {
     private FacilityMembershipRepository facilityMemberships;
 
     @Autowired
+    private FacilityInvitationRepository facilityInvitations;
+
+    @Autowired
     private FacilityRepository facilities;
 
     @Autowired
@@ -62,6 +66,7 @@ class AuthApiIntegrationTests {
 
     @BeforeEach
     void cleanDatabase() {
+        facilityInvitations.deleteAll();
         facilityMemberships.deleteAll();
         facilities.deleteAll();
         refreshTokens.deleteAll();

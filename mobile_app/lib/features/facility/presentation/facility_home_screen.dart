@@ -12,6 +12,11 @@ class FacilityHomeScreen extends StatelessWidget {
     required this.isSwitching,
     required this.onFacilitySelected,
     required this.onAddFacility,
+    required this.onOpenTeam,
+    required this.onOpenTankGroups,
+    required this.onOpenTanks,
+    required this.onOpenInvitations,
+    required this.pendingInvitationCount,
     super.key,
   });
 
@@ -21,6 +26,11 @@ class FacilityHomeScreen extends StatelessWidget {
   final bool isSwitching;
   final Future<bool> Function(Facility) onFacilitySelected;
   final VoidCallback onAddFacility;
+  final VoidCallback onOpenTeam;
+  final VoidCallback onOpenTankGroups;
+  final VoidCallback onOpenTanks;
+  final VoidCallback onOpenInvitations;
+  final int pendingInvitationCount;
 
   Future<void> _openFacilitySwitcher(
     BuildContext context,
@@ -77,6 +87,32 @@ class FacilityHomeScreen extends StatelessWidget {
           label: Text(facility.name, overflow: TextOverflow.ellipsis),
         ),
         actions: [
+          if (pendingInvitationCount > 0)
+            IconButton(
+              key: const Key('pending-invitations-button'),
+              tooltip: 'Aquarium invitations',
+              onPressed: onOpenInvitations,
+              icon: Badge(
+                label: Text('$pendingInvitationCount'),
+                child: const Icon(Icons.mail_outline_rounded),
+              ),
+            ),
+          IconButton(
+            key: const Key('tank-groups-button'),
+            tooltip: facility.role == FacilityRole.owner
+                ? 'Manage tank groups'
+                : 'View tank groups',
+            onPressed: onOpenTankGroups,
+            icon: const Icon(Icons.grid_view_rounded),
+          ),
+          IconButton(
+            key: const Key('facility-team-button'),
+            tooltip: facility.role == FacilityRole.owner
+                ? 'Manage workers'
+                : 'View aquarium team',
+            onPressed: onOpenTeam,
+            icon: const Icon(Icons.group_outlined),
+          ),
           IconButton(
             tooltip: 'View onboarding again',
             onPressed: () => Navigator.of(context).pushNamed(
@@ -162,13 +198,23 @@ class FacilityHomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Tank groups and tanks will appear here after they are '
-                    'added in the next development stages.',
+                    facility.role == FacilityRole.owner
+                        ? 'Create and organize tanks, expected guppy counts, '
+                              'tags, and automation settings.'
+                        : 'Browse the tanks, groups, guppy counts, and current '
+                              'automation settings for this aquarium.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       height: 1.45,
                     ),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton.icon(
+                    key: const Key('tanks-button'),
+                    onPressed: onOpenTanks,
+                    icon: const Icon(Icons.water_rounded),
+                    label: const Text('View tanks'),
                   ),
                 ],
               ),

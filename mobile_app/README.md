@@ -20,6 +20,53 @@ bar to switch workspaces or create another aquarium. Selections are stored per
 signed-in user, verified against the backend before switching, and safely fall
 back to another accessible aquarium when access has been removed.
 
+Owners can open **Workers** from an aquarium home screen to invite a worker by
+their verified Google email, review invitation status, revoke a pending
+invitation, or remove a worker. Workers can open the aquarium team as a
+read-only view and do not see owner-only controls. A matching invitation is
+shown after the invited person signs in with Google; they can accept it before
+creating their own aquarium or from the invitation indicator on an existing
+aquarium home screen. AquaSense does not send invitation email yet.
+
+Tap the grid icon on an aquarium home screen to open **Tank groups**. Owners
+can add and rename flat groups and archive groups that contain no tanks.
+Workers receive the same group list and tank counts as a read-only view.
+Archived groups remain visible for operational history.
+
+Open a group to view its daily feeding schedule in the aquarium timezone.
+Owners can add or remove session times, enable automatic feeding, or pause it
+without losing the configured times. Workers can inspect the same schedule
+and its next stored UTC execution time, but all schedule controls are
+read-only.
+
+From an active tank's detail screen, owners can choose **Inherit group** or
+**Tank override**. Inheritance always shows the group's current schedule; an
+override is a complete tank-specific replacement rather than a partial merge.
+Unassigned tanks remain paused until an owner supplies an override or assigns
+the tank to a group. Workers can see the effective schedule and its source but
+cannot edit it.
+
+Use the scale action on a tank detail screen to preview its portion from the
+detected or expected fish count. Previews use versioned, facility-wide feeder
+units with minimum and maximum safety bounds. Owners can publish a new
+calibration version; workers can inspect calculations but cannot change the
+calibration. The app does not display physical mass because that conversion
+has not yet been experimentally validated.
+
+Open **Tanks** from the aquarium home screen to browse the paginated inventory.
+Search by name or code, filter by current status, group, unassigned tanks, or
+tag, and load further pages when required. Owners can add, edit, move, pause,
+and archive tanks; workers receive the same inventory and detail information
+without management controls. Each tank detail shows expected and detected
+guppy counts, confidence and observation freshness, group and tags, automation
+state, device status, schedule, recent feeding times, and activity. The
+hardware section shows separate camera, edge-processor, and feeder states,
+last heartbeats, health messages, and whether feeding is safety-blocked.
+Owners can connect a component or rotate its heartbeat token; the token is
+shown once for copying into that device. Workers have read-only health access.
+Schedule, observation, and feeding sections clearly say when later-stage data
+has not been configured yet.
+
 ## Environments
 
 Configuration is supplied with compile-time Dart defines. Do not place API

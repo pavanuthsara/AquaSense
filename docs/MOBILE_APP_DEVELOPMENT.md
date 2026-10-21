@@ -14,8 +14,8 @@ Only one task should normally be marked `In progress`.
 
 ## Current Task
 
-No task is currently in progress. The recommended next task is
-**MOB-007 — Worker invitations and roles**.
+No task is currently in progress. Recommended next task: **MOB-015 —
+Appetite-observation ingestion**.
 
 ## Task Backlog
 
@@ -27,14 +27,14 @@ No task is currently in progress. The recommended next task is
 | MOB-004 | Google authentication backend | MOB-003 | Done |
 | MOB-005 | Aquarium facility creation | MOB-004 | Done |
 | MOB-006 | Multiple-facility switching | MOB-005 | Done |
-| MOB-007 | Worker invitations and roles | MOB-005 | Not started |
-| MOB-008 | Tank-group management | MOB-005, MOB-007 | Not started |
-| MOB-009 | Tank and tag management | MOB-008 | Not started |
-| MOB-010 | Tank-detail screen | MOB-009 | Not started |
-| MOB-011 | Group feeding schedules | MOB-008 | Not started |
-| MOB-012 | Per-tank schedule overrides | MOB-010, MOB-011 | Not started |
-| MOB-013 | Feeder calibration and portion preview | MOB-010 | Not started |
-| MOB-014 | Device health integration | MOB-010 | Not started |
+| MOB-007 | Worker invitations and roles | MOB-005 | Done |
+| MOB-008 | Tank-group management | MOB-005, MOB-007 | Done |
+| MOB-009 | Tank and tag management | MOB-008 | Done |
+| MOB-010 | Tank-detail screen | MOB-009 | Done |
+| MOB-011 | Group feeding schedules | MOB-008 | Done |
+| MOB-012 | Per-tank schedule overrides | MOB-010, MOB-011 | Done |
+| MOB-013 | Feeder calibration and portion preview | MOB-010 | Done |
+| MOB-014 | Device health integration | MOB-010 | Done |
 | MOB-015 | Appetite-observation ingestion | MOB-013, MOB-014 | Not started |
 | MOB-016 | Scheduled feeding-session state machine | MOB-012–MOB-015 | Not started |
 | MOB-017 | Dashboard and feeding history | MOB-016 | Not started |
@@ -380,4 +380,324 @@ usability evaluation, and document demonstrated capabilities and limitations.
   their repositories must use the selected-facility scope when implemented.
   Worker membership and permission changes belong to MOB-007.
 - Recommended next task: MOB-007 — Worker invitations and roles.
+
+### 2026-10-19 — MOB-007: Worker invitations and roles
+
+- Status: Done
+- Summary: Added email-bound worker invitations, seven-day expiry, acceptance,
+  revocation, worker removal, team member views, and owner/worker permission
+  enforcement. Owners can manage workers from the selected aquarium, while
+  workers receive a read-only team view. Signed-in users see invitations sent
+  to their verified Google email and can accept one before creating an
+  aquarium or while already belonging to another aquarium.
+- Files added: Backend invitation entity/status, repository, service,
+  controller, Flyway migration, and team API integration tests; Flutter team
+  domain models, owner/worker team screen, pending-invitations screen, and
+  invitation/team widget tests.
+- Files changed: Backend facility membership/repositories and integration-test
+  cleanup; Flutter facility repository contracts and HTTP/development/test
+  adapters, facility gate, selection controller, home screen, HTTP repository
+  tests, backend/mobile guides, and this development record.
+- Backend/API changes: Added
+  `GET /api/v1/facilities/{facilityId}/members`, owner-only facility invitation
+  list/create/revoke endpoints, owner-only worker removal,
+  `GET /api/v1/invitations/me`, and
+  `POST /api/v1/invitations/{invitationId}/accept`. Added the
+  `facility_invitations` table. Duplicate active invitations and invitations
+  for existing members are rejected; acceptance is idempotent for the invited
+  user; inaccessible resources are not disclosed.
+- Tests performed: Java 21 Maven integration/unit suite, Dart formatting check,
+  Flutter static analysis, complete Flutter test suite, and Android debug APK
+  build with production-style API and Google client configuration.
+- Test results: All 25 backend tests passed; all 38 Flutter tests passed;
+  formatting was unchanged; static analysis reported no issues; Android debug
+  APK built successfully.
+- Decisions made: Match invitations only to the normalized email stored from a
+  verified Google identity; create worker membership only upon acceptance; use
+  a seven-day invitation lifetime; serialize invitation creation through a
+  facility database lock for duplicate protection; retain accepted, revoked,
+  and expired invitation records for traceability; enforce permissions in the
+  backend and additionally hide owner-only controls from workers.
+- Known limitations: The system does not send invitation email; the invitation
+  becomes visible inside AquaSense after the worker signs in with the matching
+  Google account. Invitation lifetime is currently fixed at seven days. Owner
+  transfer and real-time forced navigation after membership removal are not
+  included; removed access is rejected by the backend and reconciled on the
+  next facility refresh or app start.
+- Recommended next task: MOB-008 — Tank-group management.
+
+### 2026-10-19 — MOB-008: Tank-group management
+
+- Status: Done
+- Summary: Added flat, facility-scoped tank groups with owner-only creation,
+  renaming, and safe archival. Owners and workers can view active and archived
+  groups with server-provided tank counts, while workers receive a read-only
+  interface. Empty, loading, retryable error, and pull-to-refresh states are
+  included.
+- Files added: Backend tank-group entity, repository, service, controller,
+  Flyway migration, and API integration tests; Flutter tank-group domain model,
+  management screen, and widget tests.
+- Files changed: Flutter facility repository contract and HTTP/development/test
+  adapters, facility routing and home screen, HTTP repository tests, backend
+  and mobile guides, and this development record.
+- Backend/API changes: Added
+  `GET /api/v1/facilities/{facilityId}/tank-groups`,
+  `POST /api/v1/facilities/{facilityId}/tank-groups`,
+  `PATCH /api/v1/facilities/{facilityId}/tank-groups/{groupId}`, and
+  `POST /api/v1/facilities/{facilityId}/tank-groups/{groupId}/archive`.
+  Added the `tank_groups` table with normalized names, tank counts, timestamps,
+  and soft-archive state. Writes require the owner role; member reads remain
+  facility-scoped and inaccessible facility/group identifiers are not leaked.
+- Tests performed: Java 21 Maven integration/unit suite, Dart formatting check,
+  Flutter static analysis, complete Flutter test suite, focused repository and
+  widget tests, and Android debug APK build with production-style API and
+  Google client configuration.
+- Test results: All 30 backend tests passed; all 42 Flutter tests passed;
+  formatting was unchanged; static analysis reported no issues; Android debug
+  APK built successfully.
+- Decisions made: Keep groups flat; normalize whitespace and case for unique
+  active names; retain archived groups for history; allow reuse of a name after
+  archival; order active groups before archived groups; use a server-owned tank
+  count and reject archival whenever it is nonzero; serialize group naming
+  changes with a facility lock and lock a group while archiving it.
+- Known limitations: Individual tanks do not exist until MOB-009, so groups
+  created in the current application show zero tanks. MOB-009 must update the
+  group count atomically when tanks are created, moved, or archived and use the
+  group lock when assigning tanks. Nested groups, manual ordering, unarchiving,
+  and permanent deletion are intentionally not included.
+- Recommended next task: MOB-009 — Tank and tag management.
+
+### 2026-10-19 — MOB-009: Tank and tag management
+
+- Status: Done
+- Summary: Added facility-scoped tank persistence and a paginated mobile tank
+  inventory. Owners can create, edit, move, pause, tag, and archive tanks;
+  owners and workers can search by name/code and filter by status, group,
+  unassigned state, and tag. Group tank counts are updated transactionally.
+- Files added: Backend tank entity/status, repository, service, controller,
+  Flyway migration, and tank API integration tests; Flutter tank domain model,
+  tank list and form screens, and tank management widget tests.
+- Files changed: Backend tank-group count behavior; Flutter facility repository
+  contract and HTTP/development/test adapters, facility routing and home screen,
+  HTTP repository tests, backend/mobile guides, and this development record.
+- Backend/API changes: Added paginated/filterable
+  `GET /api/v1/facilities/{facilityId}/tanks`,
+  `GET /api/v1/facilities/{facilityId}/tank-tags`, owner-only tank create/edit/
+  archive endpoints, the `tanks` and `tank_tags` tables, facility-unique
+  normalized tank codes, and atomic group-count maintenance.
+- Tests performed: Java 21 Maven integration/unit suite, a real 1,000-entity
+  backend seed/search/filter/pagination test, Dart formatting check, Flutter
+  static analysis, complete Flutter test suite, focused tank repository/widget
+  tests, and Android debug APK build with production-style configuration.
+- Test results: All 35 backend tests and all 46 Flutter tests passed; formatting
+  was unchanged; static analysis reported no issues; Android debug APK built
+  successfully. The 1,000-tank test verified server pagination, search, status,
+  group, unassigned, and tag filtering, and the mobile scale test verified that
+  the inventory remains paginated and searchable.
+- Decisions made: Use server-side pages of 50 with a maximum backend page size
+  of 100; keep archived tanks out of the default view; reserve tank codes after
+  archival for unambiguous history; normalize tags to lowercase; retain an
+  explicit unassigned-tanks view; and serialize facility/group mutations so
+  group counts cannot drift during tank moves.
+- Known limitations: There is no bulk CSV import or bulk edit workflow; the
+  requirement is satisfied through scalable paginated/searchable individual
+  management. Detected counts remain empty until observation ingestion in
+  MOB-015. Permanent deletion and restoration of archived tanks are not
+  included.
+- Recommended next task: MOB-010 — Tank-detail screen.
+
+### 2026-10-19 — MOB-010: Tank-detail screen
+
+- Status: Done
+- Summary: Added a role-aware tank detail screen showing identity, group,
+  tags, automation, expected/detected guppy counts, confidence, observation
+  freshness, hardware state, feeding schedule, last/next feeding, and recent
+  activity. Loading, retryable error, no-data, stale, offline, unhealthy, and
+  not-configured states are represented explicitly. Workers can inspect tanks
+  without seeing owner-only edit or archive actions.
+- Files added: Flutter tank-detail presentation screen.
+- Files changed: Backend tank detail response; Flutter tank domain/repository
+  adapters, tank list/form screens and their navigation, HTTP and fake
+  repository tests, tank management widget tests, guides, and this development
+  record.
+- Backend/API changes: Added
+  `GET /api/v1/facilities/{facilityId}/tanks/{tankId}` with a facility-scoped
+  tank snapshot, observation freshness, device state, schedule/feeding
+  placeholders, and recent tank activity. Both roles can read it; mutations
+  remain owner-only.
+- Tests performed: Backend role/facility-isolation and detail-state integration
+  tests; Flutter HTTP mapping tests; owner and worker widget tests; Dart
+  formatting check; Flutter static analysis and full test suite; Android debug
+  APK build.
+- Test results: All 35 backend tests and all 46 Flutter tests passed; the detail
+  tests verified stale and absent observations, offline/not-configured hardware,
+  schedule and activity rendering, owner actions, and worker action hiding.
+  The Android APK built successfully.
+- Decisions made: Expose truthful explicit no-data/not-configured states rather
+  than fabricate device, schedule, observation, or feeding data; keep detail
+  access available to both roles; enforce owner mutations in the backend as
+  well as hiding them in the worker interface; and preserve one detail contract
+  for later monitoring and feeding tasks to populate.
+- Known limitations: Device health is `NOT_CONFIGURED` until MOB-014; detected
+  counts and confidence require MOB-015; schedules require MOB-011/MOB-012;
+  last/next feeding and operational history require MOB-016/MOB-017. Current
+  activity includes tank creation/settings changes rather than feeding events.
+- Recommended next task: MOB-011 — Group feeding schedules.
+
+### 2026-10-20 — MOB-011: Group feeding schedules
+
+- Status: Done
+- Summary: Added facility-scoped daily feeding schedules for tank groups.
+  Owners can configure one or more session-start times, enable automatic
+  feeding, or pause it without losing the times. Workers receive a read-only
+  schedule view. Group cards show the effective times, automation state, and
+  aquarium timezone.
+- Files added: Backend group-feeding-time entity and Flyway migration; Flutter
+  group feeding schedule screen.
+- Files changed: Backend tank-group model, repository, service, controller,
+  integration tests, and guide; Flutter facility repository contracts and
+  HTTP/development/test adapters, tank-group domain/list UI, repository and
+  widget tests, mobile guide, and this development record.
+- Backend/API changes: Added owner-only
+  `PUT /api/v1/facilities/{facilityId}/tank-groups/{groupId}/feeding-schedule`.
+  Group responses now include `feedingTimes`, `feedingAutomationEnabled`, and
+  `nextSessionAt`. Added `group_feeding_times` and the group automation flag.
+- Tests performed: Java 21 Maven integration/unit suite, timezone conversion
+  and role/validation integration tests, Dart formatting, Flutter static
+  analysis, focused repository/widget tests, full Flutter test suite, and an
+  Android debug APK build with production-style API/Google configuration.
+- Test results: All 37 backend tests and all 48 Flutter tests passed; static
+  analysis reported no issues; the Android debug APK built successfully.
+- Decisions made: Store recurring schedule inputs as `HH:mm` local wall-clock
+  times and calculate each next occurrence using the facility's IANA timezone;
+  persist that occurrence as a UTC instant; sort times and reject duplicates;
+  limit a group to 24 daily sessions; preserve times while paused but clear
+  pending execution instants; start newly created groups paused; and pause a
+  schedule automatically when its group is archived.
+- Known limitations: MOB-011 stores the next execution snapshot but does not
+  yet run feeding sessions or advance it after execution; that belongs to the
+  MOB-016 scheduler. Per-tank inheritance and overrides belong to MOB-012.
+  The development-only mobile repository displays configured local times but
+  leaves server-authoritative UTC conversion to the backend.
+- Recommended next task: MOB-012 — Per-tank schedule overrides.
+
+### 2026-10-20 — MOB-012: Per-tank schedule overrides
+
+- Status: Done
+- Summary: Added explicit per-tank schedule modes. A tank can inherit the
+  complete current schedule from its group or use a complete tank-specific
+  replacement. Tank details clearly identify the source and effective times;
+  owners can switch modes and edit overrides, while workers retain read-only
+  visibility. Unassigned inherited tanks are automatically paused.
+- Files added: Backend tank schedule mode and tank-feeding-time entities,
+  Flyway migration, and Flutter tank feeding schedule screen.
+- Files changed: Backend tank model, repository, service, controller,
+  integration tests, and guide; Flutter tank domain/repository adapters, tank
+  form/detail screens, development and test repositories, HTTP and widget
+  tests, mobile guide, and this development record.
+- Backend/API changes: Added owner-only
+  `PUT /api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-schedule`, the
+  `schedule_mode` tank field, and `tank_feeding_times`. Tank responses expose
+  schedule mode, while detail responses expose inherited, effective, and next
+  execution values.
+- Tests performed: Java 21 Maven integration/unit suite; inherited, override,
+  role, validation, group-change, and unassigned-tank safety integration tests;
+  Dart formatting; Flutter static analysis; focused API/widget tests; complete
+  Flutter regression suite; and Android debug APK build.
+- Test results: All 39 backend tests and all 49 Flutter tests passed; static
+  analysis reported no issues; the Android debug APK built successfully.
+- Decisions made: Treat overrides as complete replacements rather than partial
+  additions; retain recurring times as facility-local `HH:mm` values and store
+  override next occurrences as UTC instants; delete tank-specific times when
+  returning to inheritance; immediately reflect later group schedule changes;
+  limit overrides to 24 unique times; and fail safely by forcing automation
+  off whenever an unassigned tank has no override.
+- Known limitations: The scheduler does not yet consume or advance the stored
+  next occurrence; that belongs to MOB-016. There is no bulk override editor,
+  and enabling/disabling a tank's overall automation remains a separate tank
+  setting. The override screen copies inherited times as an editing starting
+  point but saves them as a full replacement.
+- Recommended next task: MOB-013 — Feeder calibration and portion preview.
+
+### 2026-10-20 — MOB-013: Feeder calibration and portion preview
+
+- Status: Done
+- Summary: Added immutable, versioned facility feeder calibrations and a
+  tank-level portion preview. Owners can publish calibration versions using
+  abstract feeder units; owners and workers can preview a bounded portion from
+  detected, expected, or manually supplied fish counts. The interface avoids
+  unvalidated physical-mass claims.
+- Files added: Backend feeder calibration entity, repository, service,
+  controller, and Flyway migration; Flutter calibration/portion domain model,
+  portion preview screen, and calculation tests.
+- Files changed: Backend tank integration tests and guide; Flutter facility
+  repository contract and HTTP/development/test adapters, tank detail screen,
+  repository/widget tests, mobile guide, and this development record.
+- Backend/API changes: Added
+  `GET/POST /api/v1/facilities/{facilityId}/feeder-calibration` and
+  `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/portion-preview`.
+  Added `feeder_calibrations`; each owner update appends a facility-unique
+  version, and the latest version is active.
+- Tests performed: Java 21 Maven integration/unit suite; calibration version,
+  owner/worker authorization, default count, minimum, normal, maximum, and
+  zero-fish calculation coverage; Dart formatting; Flutter static analysis;
+  local fixed-decimal calculation tests; HTTP and owner/worker widget tests;
+  complete Flutter regression suite; and Android debug APK build.
+- Test results: All 41 backend tests and all 53 Flutter tests passed; static
+  analysis reported no issues; the Android debug APK built successfully.
+- Decisions made: Use facility-wide abstract feeder actuation units; calculate
+  `fish count × units per fish` to four decimal places; apply a positive
+  minimum and maximum while always returning zero movement for zero fish;
+  default previews to detected count and then expected count; use scaled
+  fixed-decimal arithmetic in Flutter to match backend decimal behavior; keep
+  versions immutable; and restrict publishing to owners while allowing
+  workers to inspect previews.
+- Known limitations: Feeder units have not been converted to or displayed as
+  physical mass because experimental validation is still required. The app
+  displays only the active calibration rather than full version history.
+  Calibration is facility-wide until device-specific feeder identity and
+  health are introduced in MOB-014.
+- Recommended next task: MOB-014 — Device health integration.
+
+### 2026-10-20 — MOB-014: Device health integration
+
+- Status: Done
+- Summary: Added per-tank camera, edge-processor, and feeder identities with
+  authenticated heartbeats and derived online, stale, offline, unhealthy, and
+  not-configured states. Tank details now show component health and whether
+  feeding is blocked. Owners can provision or rotate one-time device tokens;
+  workers receive read-only health visibility.
+- Files added: Backend device type/state and tank-device entities, repository,
+  health service, controller, Flyway migration, and device-state unit test.
+- Files changed: Backend security configuration, tank detail controller and
+  integration tests, backend guide; Flutter tank domain and repository
+  contract, HTTP/development/test adapters, tank detail screen, HTTP/widget
+  tests, mobile guide, and this development record.
+- Backend/API changes: Added authenticated member endpoint
+  `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/device-health`, owner-only
+  `POST /api/v1/facilities/{facilityId}/tanks/{tankId}/devices/{type}/provision`,
+  and device-token-authenticated `POST /api/v1/device-heartbeats`. Tank detail
+  responses now include aggregate and per-component health plus
+  `feedingAllowed`. Device tokens are stored only as SHA-256 hashes.
+- Tests performed: Java 21 Maven unit/integration suite; schema migration,
+  membership, owner/worker authorization, credential validation, healthy and
+  unhealthy heartbeat, aggregation, timeout-state, and feeding-safety tests;
+  Dart formatting; Flutter static analysis; HTTP and widget tests; complete
+  Flutter regression suite; and Android debug APK build.
+- Test results: All 43 backend tests and all 55 Flutter tests passed; static
+  analysis reported no issues; the Android debug APK built successfully.
+- Decisions made: Require camera, edge processor, and feeder to all be online
+  and healthy before feeding is allowed; mark heartbeats stale after two
+  minutes and offline after ten; prioritize not-configured, unhealthy,
+  offline, then stale when deriving aggregate health; return provisioning
+  tokens once and invalidate the old token on rotation; reset health to
+  offline after rotation; and keep heartbeat authentication separate from
+  user JWT authentication.
+- Known limitations: Automatic and manual feeder command flows do not exist
+  until MOB-016 and MOB-020. MOB-014 supplies and tests the reusable
+  `requireFeedingReady` safety gate, but those later command services must call
+  it before dispatching hardware commands. Device credentials currently have
+  no explicit revoke action beyond rotation, and heartbeat thresholds are
+  fixed backend constants.
+- Recommended next task: MOB-015 — Appetite-observation ingestion.
 
