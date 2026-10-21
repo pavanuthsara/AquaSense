@@ -7,10 +7,46 @@ import 'package:mobile_app/features/facility/data/http_facility_repository.dart'
 import 'package:mobile_app/features/facility/domain/facility.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
 import 'package:mobile_app/features/facility/domain/feeder_calibration.dart';
+import 'package:mobile_app/features/facility/domain/feeding_monitoring.dart';
 import 'package:mobile_app/features/facility/domain/tank_group.dart';
 import 'package:mobile_app/features/facility/domain/tank.dart';
 
 void main() {
+  test('loads dashboard and filtered cursor feeding history', () async {
+    final requests = <http.Request>[];
+    final repository = HttpFacilityRepository(
+      apiBaseUrl: 'https://api.example.com',
+      sessionStorage: _MemorySessionStorage(),
+      client: MockClient((request) async {
+        requests.add(request);
+        return request.url.path.endsWith('feeding-dashboard')
+            ? http.Response(_feedingDashboardJson, 200)
+            : http.Response(_feedingHistoryJson, 200);
+      }),
+    );
+
+    final dashboard = await repository.getFeedingDashboard('facility-1');
+    final history = await repository.listFeedingHistory(
+      facilityId: 'facility-1',
+      groupId: 'group-1',
+      source: FeedingSource.scheduled,
+      outcome: FeedingOutcome.delivered,
+      cursor: 'next-page',
+      size: 10,
+    );
+
+    expect(dashboard.totalTanks, 12);
+    expect(dashboard.upcoming.single.tankName, 'Nursery 1');
+    expect(dashboard.unhealthyDevices.single.state, 'OFFLINE');
+    expect(history.items.single.outcome, FeedingOutcome.delivered);
+    expect(history.nextCursor, 'cursor-2');
+    expect(requests.last.url.queryParameters['groupId'], 'group-1');
+    expect(requests.last.url.queryParameters['source'], 'SCHEDULED');
+    expect(requests.last.url.queryParameters['outcome'], 'DELIVERED');
+    expect(requests.last.url.queryParameters['cursor'], 'next-page');
+    expect(requests.last.url.queryParameters['size'], '10');
+  });
+
   test('lists facilities with the saved bearer token', () async {
     late http.Request capturedRequest;
     final repository = HttpFacilityRepository(
@@ -534,6 +570,53 @@ const _portionPreviewJson =
   "portionUnits": 5.0,
   "limitedBy": "MAXIMUM"
 }
+''';
+
+const _feedingItemJson = '''
+{
+  "id":"session-1",
+  "tankId":"tank-1",
+  "tankName":"Nursery 1",
+  "groupId":"group-1",
+  "groupName":"Nursery",
+  "scheduledFor":"2026-10-21T08:00:00Z",
+  "source":"SCHEDULED",
+  "outcome":"DELIVERED",
+  "portionUnits":4.5,
+  "commandSentAt":"2026-10-21T08:00:01Z",
+  "feedbackAt":"2026-10-21T08:00:04Z",
+  "reason":null
+}
+''';
+
+const _feedingDashboardJson =
+    '''
+{
+  "generatedAt":"2026-10-21T09:00:00Z",
+  "totalTanks":12,
+  "automatedTanks":10,
+  "upcomingCount":4,
+  "pendingCommands":1,
+  "delivered":8,
+  "skipped":2,
+  "blocked":1,
+  "failed":1,
+  "unhealthyDeviceCount":1,
+  "upcoming":[{
+    "tankId":"tank-1","tankName":"Nursery 1","groupId":"group-1",
+    "groupName":"Nursery","scheduledFor":"2026-10-21T10:00:00Z"
+  }],
+  "unhealthyDevices":[{
+    "tankId":"tank-2","tankName":"Nursery 2","type":"FEEDER",
+    "state":"OFFLINE","lastHeartbeatAt":null
+  }],
+  "recentSessions":[$_feedingItemJson]
+}
+''';
+
+const _feedingHistoryJson =
+    '''
+{"items":[$_feedingItemJson],"nextCursor":"cursor-2"}
 ''';
 
 class _MemorySessionStorage implements AuthSessionStorage {

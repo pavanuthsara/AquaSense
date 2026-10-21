@@ -2,6 +2,7 @@ import 'package:mobile_app/features/facility/domain/facility.dart';
 import 'package:mobile_app/features/facility/domain/facility_repository.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
 import 'package:mobile_app/features/facility/domain/feeder_calibration.dart';
+import 'package:mobile_app/features/facility/domain/feeding_monitoring.dart';
 import 'package:mobile_app/features/facility/domain/tank_group.dart';
 import 'package:mobile_app/features/facility/domain/tank.dart';
 
@@ -14,6 +15,8 @@ class FakeFacilityRepository implements FacilityRepository {
     List<Tank>? tanks,
     Map<String, TankDetail>? tankDetails,
     Map<String, List<FeederCalibration>>? calibrations,
+    Map<String, FeedingDashboard>? dashboards,
+    Map<String, List<FeedingHistoryItem>>? feedingHistory,
     this.listError,
     this.createFailures = 0,
   }) : facilities = facilities ?? [],
@@ -22,7 +25,9 @@ class FakeFacilityRepository implements FacilityRepository {
        tankGroups = tankGroups ?? {},
        tanks = tanks ?? [],
        tankDetails = tankDetails ?? {},
-       calibrations = calibrations ?? {};
+       calibrations = calibrations ?? {},
+       dashboards = dashboards ?? {},
+       feedingHistory = feedingHistory ?? {};
 
   final List<Facility> facilities;
   final List<FacilityInvitation> invitations;
@@ -31,6 +36,8 @@ class FakeFacilityRepository implements FacilityRepository {
   final List<Tank> tanks;
   final Map<String, TankDetail> tankDetails;
   final Map<String, List<FeederCalibration>> calibrations;
+  final Map<String, FeedingDashboard> dashboards;
+  final Map<String, List<FeedingHistoryItem>> feedingHistory;
   Object? listError;
   int createFailures;
   int listCalls = 0;
@@ -660,6 +667,78 @@ class FakeFacilityRepository implements FacilityRepository {
       calibration: await getFeederCalibration(facilityId),
       fishCount:
           fishCount ?? tank.detectedGuppyCount ?? tank.expectedGuppyCount,
+    );
+  }
+
+  @override
+  Future<FeedingDashboard> getFeedingDashboard(String facilityId) async {
+    return dashboards[facilityId] ??
+        FeedingDashboard(
+          generatedAt: DateTime.now().toUtc(),
+          totalTanks: tanks
+              .where(
+                (tank) =>
+                    tank.facilityId == facilityId &&
+                    tank.status != TankStatus.archived,
+              )
+              .length,
+          automatedTanks: tanks
+              .where(
+                (tank) =>
+                    tank.facilityId == facilityId && tank.automationEnabled,
+              )
+              .length,
+          upcomingCount: 0,
+          pendingCommands: 0,
+          delivered: 0,
+          skipped: 0,
+          blocked: 0,
+          failed: 0,
+          unhealthyDeviceCount: 0,
+          upcoming: const [],
+          unhealthyDevices: const [],
+          recentSessions: const [],
+        );
+  }
+
+  @override
+  Future<FeedingHistoryPage> listFeedingHistory({
+    required String facilityId,
+    String? tankId,
+    String? groupId,
+    FeedingSource? source,
+    FeedingOutcome? outcome,
+    DateTime? from,
+    DateTime? to,
+    String? cursor,
+    int size = 25,
+  }) async {
+    var items = List<FeedingHistoryItem>.of(
+      feedingHistory[facilityId] ?? const [],
+    );
+    if (tankId != null) {
+      items = items.where((item) => item.tankId == tankId).toList();
+    }
+    if (groupId != null) {
+      items = items.where((item) => item.groupId == groupId).toList();
+    }
+    if (source != null) {
+      items = items.where((item) => item.source == source).toList();
+    }
+    if (outcome != null) {
+      items = items.where((item) => item.outcome == outcome).toList();
+    }
+    if (from != null) {
+      items = items.where((item) => !item.scheduledFor.isBefore(from)).toList();
+    }
+    if (to != null) {
+      items = items.where((item) => item.scheduledFor.isBefore(to)).toList();
+    }
+    final offset = cursor == null ? 0 : int.tryParse(cursor) ?? 0;
+    final end = (offset + size).clamp(0, items.length);
+    return FeedingHistoryPage(
+      items: items.sublist(offset.clamp(0, items.length), end),
+      nextCursor: end < items.length ? '$end' : null,
     );
   }
 

@@ -36,6 +36,10 @@ public class FeedingSession {
     @Column(nullable = false, length = 48)
     private FeedingOutcome outcome;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private FeedingSource source;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "observation_id")
     private AppetiteObservation observation;
@@ -70,6 +74,7 @@ public class FeedingSession {
         this.tank = tank;
         this.scheduledFor = scheduledFor;
         this.outcome = FeedingOutcome.PROCESSING;
+        this.source = FeedingSource.SCHEDULED;
         this.createdAt = now;
         this.updatedAt = now;
     }
@@ -105,6 +110,7 @@ public class FeedingSession {
     public Tank getTank() { return tank; }
     public Instant getScheduledFor() { return scheduledFor; }
     public FeedingOutcome getOutcome() { return outcome; }
+    public FeedingSource getSource() { return source; }
     public AppetiteObservation getObservation() { return observation; }
     public FeederCalibration getCalibration() { return calibration; }
     public BigDecimal getPortionUnits() { return portionUnits; }

@@ -7,6 +7,7 @@ import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_team.dart';
 import '../domain/feeder_calibration.dart';
+import '../domain/feeding_monitoring.dart';
 import '../domain/tank_group.dart';
 import '../domain/tank.dart';
 
@@ -442,6 +443,56 @@ class HttpFacilityRepository implements FacilityRepository {
     );
   }
 
+  @override
+  Future<FeedingDashboard> getFeedingDashboard(String facilityId) async {
+    final response = await _authorizedGet(
+      '/api/v1/facilities/$facilityId/feeding-dashboard',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return _feedingDashboardFromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<FeedingHistoryPage> listFeedingHistory({
+    required String facilityId,
+    String? tankId,
+    String? groupId,
+    FeedingSource? source,
+    FeedingOutcome? outcome,
+    DateTime? from,
+    DateTime? to,
+    String? cursor,
+    int size = 25,
+  }) async {
+    final path = tankId == null
+        ? '/api/v1/facilities/$facilityId/feeding-history'
+        : '/api/v1/facilities/$facilityId/tanks/$tankId/feeding-history';
+    final response = await _authorizedGet(
+      path,
+      queryParameters: {
+        if (groupId != null) 'groupId': groupId,
+        if (source != null) 'source': _feedingSourceToApi(source),
+        if (outcome != null) 'outcome': _feedingOutcomeToApi(outcome),
+        if (from != null) 'from': from.toUtc().toIso8601String(),
+        if (to != null) 'to': to.toUtc().toIso8601String(),
+        if (cursor != null) 'cursor': cursor,
+        'size': '$size',
+      },
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    final json = body as Map<String, dynamic>;
+    return FeedingHistoryPage(
+      items: (json['items'] as List<dynamic>)
+          .map(
+            (item) => _feedingHistoryItemFromJson(item as Map<String, dynamic>),
+          )
+          .toList(growable: false),
+      nextCursor: json['nextCursor'] as String?,
+    );
+  }
+
   Future<http.Response> _authorizedGet(
     String path, {
     Map<String, String>? queryParameters,
@@ -587,6 +638,114 @@ class HttpFacilityRepository implements FacilityRepository {
       createdAt: DateTime.parse(json['createdAt'] as String).toUtc(),
     );
   }
+
+  FeedingDashboard _feedingDashboardFromJson(Map<String, dynamic> json) {
+    return FeedingDashboard(
+      generatedAt: DateTime.parse(json['generatedAt'] as String).toUtc(),
+      totalTanks: json['totalTanks'] as int,
+      automatedTanks: json['automatedTanks'] as int,
+      upcomingCount: json['upcomingCount'] as int,
+      pendingCommands: json['pendingCommands'] as int,
+      delivered: json['delivered'] as int,
+      skipped: json['skipped'] as int,
+      blocked: json['blocked'] as int,
+      failed: json['failed'] as int,
+      unhealthyDeviceCount: json['unhealthyDeviceCount'] as int,
+      upcoming: (json['upcoming'] as List<dynamic>)
+          .map((item) {
+            final value = item as Map<String, dynamic>;
+            return UpcomingFeedingSession(
+              tankId: value['tankId'] as String,
+              tankName: value['tankName'] as String,
+              groupId: value['groupId'] as String?,
+              groupName: value['groupName'] as String?,
+              scheduledFor: DateTime.parse(
+                value['scheduledFor'] as String,
+              ).toUtc(),
+            );
+          })
+          .toList(growable: false),
+      unhealthyDevices: (json['unhealthyDevices'] as List<dynamic>)
+          .map((item) {
+            final value = item as Map<String, dynamic>;
+            return UnhealthyTankDevice(
+              tankId: value['tankId'] as String,
+              tankName: value['tankName'] as String,
+              type: value['type'] as String,
+              state: value['state'] as String,
+              lastHeartbeatAt: value['lastHeartbeatAt'] == null
+                  ? null
+                  : DateTime.parse(value['lastHeartbeatAt'] as String).toUtc(),
+            );
+          })
+          .toList(growable: false),
+      recentSessions: (json['recentSessions'] as List<dynamic>)
+          .map(
+            (item) => _feedingHistoryItemFromJson(item as Map<String, dynamic>),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  FeedingHistoryItem _feedingHistoryItemFromJson(Map<String, dynamic> json) {
+    DateTime? date(String key) =>
+        json[key] == null ? null : DateTime.parse(json[key] as String).toUtc();
+    return FeedingHistoryItem(
+      id: json['id'] as String,
+      tankId: json['tankId'] as String,
+      tankName: json['tankName'] as String,
+      groupId: json['groupId'] as String?,
+      groupName: json['groupName'] as String?,
+      scheduledFor: date('scheduledFor')!,
+      source: json['source'] == 'MANUAL'
+          ? FeedingSource.manual
+          : FeedingSource.scheduled,
+      outcome: _feedingOutcomeFromApi(json['outcome'] as String),
+      portionUnits: (json['portionUnits'] as num?)?.toDouble(),
+      commandSentAt: date('commandSentAt'),
+      feedbackAt: date('feedbackAt'),
+      reason: json['reason'] as String?,
+    );
+  }
+
+  FeedingOutcome _feedingOutcomeFromApi(String value) => switch (value) {
+    'PROCESSING' => FeedingOutcome.processing,
+    'COMMAND_SENT' => FeedingOutcome.commandSent,
+    'DELIVERED' => FeedingOutcome.delivered,
+    'SKIPPED_LOW_APPETITE' => FeedingOutcome.skippedLowAppetite,
+    'SKIPPED_LOW_CONFIDENCE' => FeedingOutcome.skippedLowConfidence,
+    'SKIPPED_STALE_OBSERVATION' => FeedingOutcome.skippedStaleObservation,
+    'SKIPPED_COUNT_INCONSISTENT' => FeedingOutcome.skippedCountInconsistent,
+    'BLOCKED_AUTOMATION' => FeedingOutcome.blockedAutomation,
+    'BLOCKED_COOLDOWN' => FeedingOutcome.blockedCooldown,
+    'BLOCKED_UNHEALTHY_DEVICE' => FeedingOutcome.blockedUnhealthyDevice,
+    'BLOCKED_CALIBRATION' => FeedingOutcome.blockedCalibration,
+    'FAILED' => FeedingOutcome.failed,
+    _ => throw const FacilityException(
+      'The server returned an unknown feeding outcome.',
+      code: 'invalid_server_response',
+    ),
+  };
+
+  String _feedingSourceToApi(FeedingSource value) => switch (value) {
+    FeedingSource.scheduled => 'SCHEDULED',
+    FeedingSource.manual => 'MANUAL',
+  };
+
+  String _feedingOutcomeToApi(FeedingOutcome value) => switch (value) {
+    FeedingOutcome.processing => 'PROCESSING',
+    FeedingOutcome.commandSent => 'COMMAND_SENT',
+    FeedingOutcome.delivered => 'DELIVERED',
+    FeedingOutcome.skippedLowAppetite => 'SKIPPED_LOW_APPETITE',
+    FeedingOutcome.skippedLowConfidence => 'SKIPPED_LOW_CONFIDENCE',
+    FeedingOutcome.skippedStaleObservation => 'SKIPPED_STALE_OBSERVATION',
+    FeedingOutcome.skippedCountInconsistent => 'SKIPPED_COUNT_INCONSISTENT',
+    FeedingOutcome.blockedAutomation => 'BLOCKED_AUTOMATION',
+    FeedingOutcome.blockedCooldown => 'BLOCKED_COOLDOWN',
+    FeedingOutcome.blockedUnhealthyDevice => 'BLOCKED_UNHEALTHY_DEVICE',
+    FeedingOutcome.blockedCalibration => 'BLOCKED_CALIBRATION',
+    FeedingOutcome.failed => 'FAILED',
+  };
 
   FeederCalibration _calibrationFromJson(Map<String, dynamic> json) {
     return FeederCalibration(

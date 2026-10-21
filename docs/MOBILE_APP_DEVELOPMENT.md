@@ -14,8 +14,8 @@ Only one task should normally be marked `In progress`.
 
 ## Current Task
 
-No task is currently in progress. **MOB-017 — Dashboard and feeding history**
-is the recommended next task.
+No task is currently in progress. The recommended next task is **MOB-018 —
+In-app alert center**.
 
 ## Task Backlog
 
@@ -37,7 +37,7 @@ is the recommended next task.
 | MOB-014 | Device health integration | MOB-010 | Done |
 | MOB-015 | Appetite-observation ingestion | MOB-013, MOB-014 | Done |
 | MOB-016 | Scheduled feeding-session state machine | MOB-012–MOB-015 | Done |
-| MOB-017 | Dashboard and feeding history | MOB-016 | Not started |
+| MOB-017 | Dashboard and feeding history | MOB-016 | Done |
 | MOB-018 | In-app alert center | MOB-016, MOB-017 | Not started |
 | MOB-019 | Android push notifications | MOB-018 | Not started |
 | MOB-020 | Safety-checked manual feeding | MOB-014, MOB-016, MOB-017 | Not started |
@@ -793,4 +793,48 @@ usability evaluation, and document demonstrated capabilities and limitations.
   so production scheduling should run as a single scheduler instance until a
   distributed claim/lease mechanism is implemented.
 - Recommended next task: MOB-017 — Dashboard and feeding history.
+
+### 2026-10-21 — MOB-017: Dashboard and feeding history
+
+- Status: Done
+- Summary: Added a facility feeding dashboard with active-tank and rolling
+  24-hour operation summaries, upcoming sessions, and hardware-attention
+  indicators. Added filterable cursor-paginated history at both facility and
+  tank level, with loading, empty, error, refresh, and load-more states in the
+  mobile app.
+- Files added: Feeding source and monitoring backend types, service,
+  controller, and Flyway migration V12; mobile feeding-monitoring domain
+  models and history screen; and a dashboard/history widget test.
+- Files changed: Feeding-session and schedule repositories, tank/device
+  repositories, backend integration tests, facility repository
+  implementations, facility home/gate and tank-detail screens, mobile
+  repository tests and fakes, backend/mobile guides, and this development
+  record.
+- Backend/API changes: Added `source` to durable feeding sessions and added
+  member-protected dashboard, facility-history, and tank-history endpoints.
+  History supports tank, group, source, outcome, and UTC date-range filters,
+  an opaque keyset cursor, and page sizes from 1 to 100.
+- Tests performed: Clean Java 21 Maven test suite with all migrations;
+  backend dashboard, facility-history, tank-history, filter, invalid-cursor,
+  and cursor-pagination integration scenarios; Dart formatting; complete
+  Flutter widget/unit suite; Flutter static analysis; and Android debug APK
+  build.
+- Test results: All 46 backend tests and all 57 Flutter tests passed; all 12
+  source migrations applied on a clean backend build; Dart formatting required
+  no changes; Flutter static analysis reported no issues; and the Android
+  debug APK built successfully at
+  `mobile_app/build/app/outputs/flutter-apk/app-debug.apk`.
+- Decisions made: Use a rolling 24-hour window for dashboard outcomes and the
+  next 24 hours for upcoming schedules; count every upcoming tank occurrence
+  while returning only the first ten details; use scheduled timestamp plus
+  session ID as the stable history cursor; default pages to 25 records; and
+  reserve the `MANUAL` source for MOB-020 while all current scheduler sessions
+  are recorded as `SCHEDULED`.
+- Known limitations: Dashboard detail lists are intentionally capped while
+  complete records remain available through history. Manual feeding does not
+  yet create `MANUAL` records, and alerts/deep links are deferred to MOB-018.
+  Missing hardware is safety-blocking in the feeding state machine but the
+  dashboard hardware-attention total currently counts configured devices that
+  are not online.
+- Recommended next task: MOB-018 — In-app alert center.
 

@@ -651,6 +651,71 @@ class TankApiIntegrationTests {
         assertOutcome(UUID.fromString(pausedTank), Instant.now(), FeedingOutcome.BLOCKED_AUTOMATION);
     }
 
+    @Test
+    void dashboardAndCursorHistoryExposeFacilityAndTankOperations() throws Exception {
+        TestUser owner = user("monitor-owner", "monitor@example.com", "Monitor Owner");
+        String facilityId = createFacility(owner.token(), "monitor-facility", "Monitor Reef");
+        String groupId = createGroup(owner.token(), facilityId, "Nursery");
+        configureGroupSchedule(owner.token(), facilityId, groupId);
+        String tankId = createTank(
+                owner.token(), facilityId, groupedTank("Nursery One", "MON-1", groupId, true), 201);
+        provisionDevice(owner.token(), facilityId, tankId, "CAMERA");
+
+        UUID tankUuid = UUID.fromString(tankId);
+        Instant base = Instant.now().minusSeconds(300);
+        assertOutcome(tankUuid, base, FeedingOutcome.BLOCKED_UNHEALTHY_DEVICE);
+        assertOutcome(tankUuid, base.plusSeconds(1), FeedingOutcome.BLOCKED_UNHEALTHY_DEVICE);
+        assertOutcome(tankUuid, base.plusSeconds(2), FeedingOutcome.BLOCKED_UNHEALTHY_DEVICE);
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/feeding-dashboard", facilityId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalTanks", is(1)))
+                .andExpect(jsonPath("$.automatedTanks", is(1)))
+                .andExpect(jsonPath("$.upcomingCount", is(1)))
+                .andExpect(jsonPath("$.blocked", is(3)))
+                .andExpect(jsonPath("$.unhealthyDeviceCount", is(1)))
+                .andExpect(jsonPath("$.upcoming[0].tankId", is(tankId)))
+                .andExpect(jsonPath("$.unhealthyDevices[0].state", is("OFFLINE")))
+                .andExpect(jsonPath("$.recentSessions[0].source", is("SCHEDULED")));
+
+        String firstPage = mockMvc.perform(get("/api/v1/facilities/{facilityId}/feeding-history", facilityId)
+                        .header("Authorization", bearer(owner.token()))
+                        .param("groupId", groupId)
+                        .param("source", "SCHEDULED")
+                        .param("outcome", "BLOCKED_UNHEALTHY_DEVICE")
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()", is(2)))
+                .andExpect(jsonPath("$.items[0].tankName", is("Nursery One")))
+                .andExpect(jsonPath("$.items[0].groupName", is("Nursery")))
+                .andExpect(jsonPath("$.nextCursor").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String cursor = JsonPath.read(firstPage, "$.nextCursor");
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/feeding-history", facilityId)
+                        .header("Authorization", bearer(owner.token()))
+                        .param("cursor", cursor)
+                        .param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()", is(1)))
+                .andExpect(jsonPath("$.nextCursor").doesNotExist());
+
+        mockMvc.perform(get(
+                                "/api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-history",
+                                facilityId,
+                                tankId)
+                        .header("Authorization", bearer(owner.token())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()", is(3)));
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/feeding-history", facilityId)
+                        .header("Authorization", bearer(owner.token()))
+                        .param("cursor", "not-a-cursor"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code", is("invalid_cursor")));
+    }
+
     private void assertOutcome(UUID tankId, Instant scheduledFor, FeedingOutcome expected) {
         FeedingSession session = feedingSessionService.processOccurrence(tankId, scheduledFor);
         org.junit.jupiter.api.Assertions.assertEquals(expected, session.getOutcome());

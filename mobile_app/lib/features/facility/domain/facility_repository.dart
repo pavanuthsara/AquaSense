@@ -1,6 +1,7 @@
 import 'facility.dart';
 import 'facility_team.dart';
 import 'feeder_calibration.dart';
+import 'feeding_monitoring.dart';
 import 'tank_group.dart';
 import 'tank.dart';
 
@@ -128,5 +129,19 @@ abstract interface class FacilityRepository {
     required String facilityId,
     required String tankId,
     int? fishCount,
+  });
+
+  Future<FeedingDashboard> getFeedingDashboard(String facilityId);
+
+  Future<FeedingHistoryPage> listFeedingHistory({
+    required String facilityId,
+    String? tankId,
+    String? groupId,
+    FeedingSource? source,
+    FeedingOutcome? outcome,
+    DateTime? from,
+    DateTime? to,
+    String? cursor,
+    int size = 25,
   });
 }

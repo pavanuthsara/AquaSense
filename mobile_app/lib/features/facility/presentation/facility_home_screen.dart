@@ -4,6 +4,9 @@ import '../../../app/routing/app_routes.dart';
 import '../../auth/presentation/authentication_controller.dart';
 import '../../auth/presentation/authentication_scope.dart';
 import '../domain/facility.dart';
+import '../domain/facility_repository.dart';
+import '../domain/feeding_monitoring.dart';
+import 'feeding_history_screen.dart';
 import 'selected_facility_scope.dart';
 
 class FacilityHomeScreen extends StatelessWidget {
@@ -17,6 +20,7 @@ class FacilityHomeScreen extends StatelessWidget {
     required this.onOpenTanks,
     required this.onOpenInvitations,
     required this.pendingInvitationCount,
+    required this.repository,
     super.key,
   });
 
@@ -31,6 +35,7 @@ class FacilityHomeScreen extends StatelessWidget {
   final VoidCallback onOpenTanks;
   final VoidCallback onOpenInvitations;
   final int pendingInvitationCount;
+  final FacilityRepository repository;
 
   Future<void> _openFacilitySwitcher(
     BuildContext context,
@@ -153,28 +158,17 @@ class FacilityHomeScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _SummaryCard(
-                  icon: Icons.water_rounded,
-                  label: 'Tanks',
-                  value: '0',
-                ),
-                _SummaryCard(
-                  icon: Icons.groups_rounded,
-                  label: 'Workers',
-                  value: '1 owner',
-                ),
-                _SummaryCard(
-                  icon: Icons.schedule_rounded,
-                  label: 'Schedules',
-                  value: '0',
-                ),
-              ],
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _SummaryCard(
+                icon: Icons.groups_rounded,
+                label: 'Team',
+                value: facility.role == FacilityRole.owner
+                    ? '1 owner'
+                    : 'Worker',
+              ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -219,11 +213,224 @@ class FacilityHomeScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const SizedBox(height: 32),
+            _FeedingDashboardPanel(facility: facility, repository: repository),
           ],
         ),
       ),
     );
   }
+}
+
+class _FeedingDashboardPanel extends StatefulWidget {
+  const _FeedingDashboardPanel({
+    required this.facility,
+    required this.repository,
+  });
+
+  final Facility facility;
+  final FacilityRepository repository;
+
+  @override
+  State<_FeedingDashboardPanel> createState() => _FeedingDashboardPanelState();
+}
+
+class _FeedingDashboardPanelState extends State<_FeedingDashboardPanel> {
+  FeedingDashboard? _dashboard;
+  Object? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final dashboard = await widget.repository.getFeedingDashboard(
+        widget.facility.id,
+      );
+      if (mounted) {
+        setState(() {
+          _dashboard = dashboard;
+          _loading = false;
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _error = error;
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openHistory() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => FeedingHistoryScreen(
+          facility: widget.facility,
+          repository: widget.repository,
+        ),
+      ),
+    );
+    await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      );
+    }
+    if (_error != null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              const Icon(Icons.cloud_off_rounded),
+              const SizedBox(width: 12),
+              const Expanded(child: Text('Dashboard could not be loaded.')),
+              TextButton(onPressed: _load, child: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+    final dashboard = _dashboard!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Feeding operations',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Refresh dashboard',
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _SummaryCard(
+              icon: Icons.water_rounded,
+              label: 'Active tanks',
+              value: '${dashboard.totalTanks}',
+            ),
+            _SummaryCard(
+              icon: Icons.schedule_rounded,
+              label: 'Next 24 hours',
+              value: '${dashboard.upcomingCount}',
+            ),
+            _SummaryCard(
+              icon: Icons.check_circle_outline_rounded,
+              label: 'Delivered · 24h',
+              value: '${dashboard.delivered}',
+            ),
+            _SummaryCard(
+              icon: Icons.pause_circle_outline_rounded,
+              label: 'Skipped · 24h',
+              value: '${dashboard.skipped}',
+            ),
+            _SummaryCard(
+              icon: Icons.error_outline_rounded,
+              label: 'Failed · 24h',
+              value: '${dashboard.failed}',
+            ),
+            _SummaryCard(
+              icon: Icons.memory_rounded,
+              label: 'Hardware attention',
+              value: '${dashboard.unhealthyDeviceCount}',
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Upcoming sessions',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                if (dashboard.upcoming.isEmpty)
+                  const Text('No automatic sessions in the next 24 hours.')
+                else
+                  ...dashboard.upcoming
+                      .take(3)
+                      .map(
+                        (item) => ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          leading: const Icon(Icons.schedule_rounded),
+                          title: Text(item.tankName),
+                          subtitle: Text(
+                            '${item.groupName ?? 'Unassigned'} · ${_dashboardDate(item.scheduledFor)}',
+                          ),
+                        ),
+                      ),
+                const Divider(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        dashboard.unhealthyDeviceCount == 0
+                            ? 'Required hardware is reporting normally.'
+                            : '${dashboard.unhealthyDeviceCount} device(s) need attention.',
+                      ),
+                    ),
+                    FilledButton.icon(
+                      key: const Key('feeding-history-button'),
+                      onPressed: _openHistory,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 52),
+                      ),
+                      icon: const Icon(Icons.history_rounded),
+                      label: const Text('History'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _dashboardDate(DateTime value) {
+  final local = value.toLocal();
+  String two(int number) => number.toString().padLeft(2, '0');
+  return '${local.year}-${two(local.month)}-${two(local.day)} '
+      '${two(local.hour)}:${two(local.minute)}';
 }
 
 class _FacilitySwitcherSheet extends StatelessWidget {

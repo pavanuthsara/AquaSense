@@ -7,6 +7,7 @@ import '../domain/tank.dart';
 import 'tank_form_screen.dart';
 import 'tank_feeding_schedule_screen.dart';
 import 'portion_preview_screen.dart';
+import 'feeding_history_screen.dart';
 
 class TankDetailScreen extends StatefulWidget {
   const TankDetailScreen({
@@ -109,6 +110,21 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
           facility: widget.facility,
           tank: tank,
           repository: widget.repository,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openFeedingHistory() async {
+    final tank = _detail?.tank;
+    if (tank == null) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => FeedingHistoryScreen(
+          facility: widget.facility,
+          repository: widget.repository,
+          tankId: tank.id,
+          tankName: tank.name,
         ),
       ),
     );
@@ -218,6 +234,13 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
       appBar: AppBar(
         title: Text(detail?.tank.name ?? 'Tank details'),
         actions: [
+          if (detail != null)
+            IconButton(
+              key: const Key('tank-feeding-history-button'),
+              tooltip: 'Feeding history',
+              onPressed: _openFeedingHistory,
+              icon: const Icon(Icons.history_rounded),
+            ),
           if (detail != null)
             IconButton(
               key: const Key('portion-preview-button'),

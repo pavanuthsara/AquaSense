@@ -12,4 +12,6 @@ public interface TankDeviceRepository extends JpaRepository<TankDevice, UUID> {
     List<TankDevice> findByTank_Id(UUID tankId);
 
     Optional<TankDevice> findByTank_IdAndType(UUID tankId, DeviceType type);
+
+    List<TankDevice> findByTank_Facility_IdAndTank_ArchivedAtIsNull(UUID facilityId);
 }

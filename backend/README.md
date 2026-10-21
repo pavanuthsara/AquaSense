@@ -211,6 +211,23 @@ The backend records `DELIVERED` only after positive feedback from the feeder;
 negative feedback records `FAILED`. Repeated processing of the same occurrence
 returns the existing session, and repeated matching feedback is safe.
 
+## Feeding dashboard and history
+
+- `GET /api/v1/facilities/{facilityId}/feeding-dashboard` returns active-tank
+  totals, the next 24 hours of scheduled sessions, rolling 24-hour outcome
+  counts, non-online devices, and recent sessions.
+- `GET /api/v1/facilities/{facilityId}/feeding-history` returns stable,
+  cursor-paginated facility history.
+- `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/feeding-history`
+  returns the same history format scoped to one tank.
+
+History can be filtered by `tankId`, `groupId`, `source`, `outcome`, `from`,
+and `to`. Page sizes range from 1 to 100 and default to 25. The opaque cursor
+combines the scheduled timestamp and session ID so sessions with identical
+times cannot be skipped or repeated between pages. Every query verifies the
+current user's facility membership and keeps tank and group filters within
+that facility.
+
 ## Verify
 
 ```powershell

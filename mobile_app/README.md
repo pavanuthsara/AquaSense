@@ -74,6 +74,14 @@ clearly, together with whether the observation is valid for a feeding
 decision. Invalid data remains visible for review but does not replace the
 tank's trusted detected count.
 
+The aquarium home screen includes a live feeding-operations dashboard with
+active tank totals, the next 24 hours of sessions, recent delivered, skipped,
+blocked, and failed outcomes, and hardware that needs attention. Open
+**History** for cursor-paginated records filtered by group, source, outcome,
+or date. A tank's detail screen opens the same view already scoped to that
+tank. Loading, empty, retry, refresh, and additional-page states are handled
+without blocking the primary tank-navigation controls.
+
 ## Environments
 
 Configuration is supplied with compile-time Dart defines. Do not place API

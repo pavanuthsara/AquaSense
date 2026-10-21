@@ -45,4 +45,7 @@ public interface TankRepository extends JpaRepository<Tank, UUID>, JpaSpecificat
 
     @EntityGraph(attributePaths = {"facility", "group", "tags", "feedingTimes"})
     List<Tank> findByGroup_IdAndArchivedAtIsNull(UUID groupId);
+
+    @EntityGraph(attributePaths = {"facility", "group"})
+    List<Tank> findByFacility_IdAndArchivedAtIsNull(UUID facilityId);
 }

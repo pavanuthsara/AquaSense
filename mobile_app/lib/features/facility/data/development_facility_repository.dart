@@ -2,6 +2,7 @@ import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_team.dart';
 import '../domain/feeder_calibration.dart';
+import '../domain/feeding_monitoring.dart';
 import '../domain/tank_group.dart';
 import '../domain/tank.dart';
 
@@ -711,6 +712,45 @@ class DevelopmentFacilityRepository implements FacilityRepository {
       fishCount:
           fishCount ?? tank.detectedGuppyCount ?? tank.expectedGuppyCount,
     );
+  }
+
+  @override
+  Future<FeedingDashboard> getFeedingDashboard(String facilityId) async {
+    await getFacility(facilityId);
+    final active = (_tanks[facilityId] ?? const <Tank>[])
+        .where((tank) => tank.status != TankStatus.archived)
+        .toList();
+    return FeedingDashboard(
+      generatedAt: DateTime.now().toUtc(),
+      totalTanks: active.length,
+      automatedTanks: active.where((tank) => tank.automationEnabled).length,
+      upcomingCount: 0,
+      pendingCommands: 0,
+      delivered: 0,
+      skipped: 0,
+      blocked: 0,
+      failed: 0,
+      unhealthyDeviceCount: 0,
+      upcoming: const [],
+      unhealthyDevices: const [],
+      recentSessions: const [],
+    );
+  }
+
+  @override
+  Future<FeedingHistoryPage> listFeedingHistory({
+    required String facilityId,
+    String? tankId,
+    String? groupId,
+    FeedingSource? source,
+    FeedingOutcome? outcome,
+    DateTime? from,
+    DateTime? to,
+    String? cursor,
+    int size = 25,
+  }) async {
+    await getFacility(facilityId);
+    return const FeedingHistoryPage(items: []);
   }
 
   Tank _findTank(String facilityId, String tankId) {

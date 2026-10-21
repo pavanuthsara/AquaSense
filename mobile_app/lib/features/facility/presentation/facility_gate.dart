@@ -193,6 +193,7 @@ class _FacilityGateState extends State<FacilityGate> {
             onOpenTanks: _openTanks,
             onOpenInvitations: _openInvitations,
             pendingInvitationCount: controller.pendingInvitations.length,
+            repository: _repository!,
           ),
         );
       },
