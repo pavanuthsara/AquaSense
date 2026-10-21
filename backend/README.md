@@ -183,3 +183,23 @@ $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 ```
 
 Tests use an in-memory database and test-only token configuration.
+
+## Export planning endpoints
+
+Export shipment planning (component 4) calls the Python transit simulator in
+`export_simulator/` (run `uvicorn transit_sim.api:app --port 8001` there).
+
+```powershell
+$env:AQUASENSE_EXPORT_SIM_URL = 'http://localhost:8001'   # default
+$env:AQUASENSE_EXPORT_SIM_KEY = '<optional shared secret, same as EXPORT_SIM_SERVICE_KEY>'
+```
+
+- `POST /api/v1/facilities/{facilityId}/export-advisories` runs the simulator for a
+  planned shipment and stores the advisory (packing plan, chemicals and doses, oxygen
+  use, survival timeline, water chemistry, temperature limits, unpacking advice).
+- `GET /api/v1/facilities/{facilityId}/export-advisories` lists the latest 50 plans.
+- `GET /api/v1/facilities/{facilityId}/export-advisories/{advisoryId}` returns one plan.
+
+Any member of the aquarium can plan and view shipments. If the simulator is down the
+API answers `503 export_simulator_unavailable`. Tests replace the simulator with a fake,
+so `mvnw test` does not need Python running.

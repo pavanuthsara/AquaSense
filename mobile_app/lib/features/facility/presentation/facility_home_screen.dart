@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../app/routing/app_routes.dart';
 import '../../auth/presentation/authentication_controller.dart';
 import '../../auth/presentation/authentication_scope.dart';
+import '../../export/data/development_export_repository.dart';
+import '../../export/presentation/export_plans_screen.dart';
+import '../../export/presentation/export_repository_scope.dart';
 import '../domain/facility.dart';
 import 'selected_facility_scope.dart';
 
@@ -56,6 +59,18 @@ class FacilityHomeScreen extends StatelessWidget {
 
     final facility = facilities.firstWhere((item) => item.id == choice);
     await onFacilitySelected(facility);
+  }
+
+  void _openExportPlanning(BuildContext context, Facility facility) {
+    final repository =
+        ExportRepositoryScope.maybeOf(context) ??
+        DevelopmentExportRepository();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ExportPlansScreen(facility: facility, repository: repository),
+      ),
+    );
   }
 
   @override
@@ -217,6 +232,27 @@ class FacilityHomeScreen extends StatelessWidget {
                     label: const Text('View tanks'),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: ListTile(
+                key: const Key('export-planning-tile'),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
+                leading: Icon(
+                  Icons.inventory_2_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                title: const Text('Export planning'),
+                subtitle: const Text(
+                  'Packing plan, oxygen, survival and chemicals for a '
+                  'shipment',
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => _openExportPlanning(context, facility),
               ),
             ),
           ],
