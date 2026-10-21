@@ -3,6 +3,17 @@
 Spring Boot API for AquaSense. MOB-004 adds Google identity exchange and
 AquaSense-owned access and refresh sessions.
 
+## Run with Docker (recommended for local development)
+
+Follow [the developer setup guide](../docs/DEVELOPER_SETUP.md). From the
+repository root, configure `.env` from `.env.example`, then run
+`docker compose up --build -d`. Compose builds and tests the Java 21 API,
+starts PostgreSQL, waits for database readiness, and exposes the API on port
+8080. Database tables are created by Flyway and data persists in a named
+volume. No local Java, Maven, or PostgreSQL installation is needed.
+
+The instructions below are for running the backend outside Docker.
+
 ## Authentication configuration
 
 Nothing secret is committed to the repository. Set these environment variables

@@ -1,0 +1,35 @@
+name: aquasense
+
+services:
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: aquasense
+      POSTGRES_USER: aquasense
+      POSTGRES_PASSWORD: ${AQUASENSE_DB_PASSWORD:?Set AQUASENSE_DB_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      AQUASENSE_DB_URL: jdbc:postgresql://db:5432/aquasense
+      AQUASENSE_DB_USERNAME: aquasense
+      AQUASENSE_DB_PASSWORD: ${AQUASENSE_DB_PASSWORD:?Set AQUASENSE_DB_PASSWORD in .env}
+      AQUASENSE_GOOGLE_CLIENT_ID: ${AQUASENSE_GOOGLE_CLIENT_ID:?Set AQUASENSE_GOOGLE_CLIENT_ID in .env}
+      AQUASENSE_JWT_SECRET: ${AQUASENSE_JWT_SECRET:?Set AQUASENSE_JWT_SECRET in .env}
+    ports:
+      - "${AQUASENSE_API_PORT:-8080}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

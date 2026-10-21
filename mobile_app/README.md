@@ -3,6 +3,9 @@
 Flutter application for AquaSense aquarium monitoring and appetite-aware
 feeding.
 
+For a fresh checkout, start with the [developer setup guide](../docs/DEVELOPER_SETUP.md)
+to run the backend and PostgreSQL with Docker before enabling real Google sign-in.
+
 ## Current Authentication Behavior
 
 MOB-004 connects the authentication interface to Google and the AquaSense API.
