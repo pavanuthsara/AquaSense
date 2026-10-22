@@ -98,7 +98,8 @@ class AppetiteCheckApiIntegrationTests {
         next(s).andExpect(status().isOk());
         result(s, id, completed("HIGH", Instant.now().minusSeconds(120))).andExpect(status().isBadRequest());
         result(s, id, "{\"status\":\"PENDING\"}").andExpect(status().isBadRequest());
-        jdbc.update("update appetite_checks set expires_at = ? where id = ?", Instant.now().minusSeconds(1), UUID.fromString(id));
+        jdbc.update("update appetite_checks set expires_at = ? where id = ?",
+                java.sql.Timestamp.from(Instant.now().minusSeconds(1)), UUID.fromString(id));
         // Clear first-level cache so the externally modified deadline is reloaded.
         entityManager.clear();
         read(s, id).andExpect(status().isOk()).andExpect(jsonPath("$.status", is("TIMED_OUT")));

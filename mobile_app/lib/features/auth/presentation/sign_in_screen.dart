@@ -72,44 +72,63 @@ class SignInScreen extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 28),
-                  Semantics(
-                    button: true,
-                    label: 'Continue with Google',
-                    child: OutlinedButton(
-                      onPressed: isSigningIn
-                          ? null
-                          : controller.signInWithGoogle,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(56),
-                        side: BorderSide(color: theme.colorScheme.outline),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
+                  if (environment.hasGoogleSignIn ||
+                      !environment.usesRealAuthentication)
+                    Semantics(
+                      button: true,
+                      label: 'Continue with Google',
+                      child: OutlinedButton(
+                        onPressed: isSigningIn
+                            ? null
+                            : controller.signInWithGoogle,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(56),
+                          side: BorderSide(color: theme.colorScheme.outline),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
                         ),
-                      ),
-                      child: isSigningIn
-                          ? const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.2,
+                        child: isSigningIn
+                            ? const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox.square(
+                                    dimension: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                    ),
                                   ),
-                                ),
-                                SizedBox(width: 12),
-                                Text('Connecting securely…'),
-                              ],
-                            )
-                          : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                _GoogleMark(),
-                                SizedBox(width: 12),
-                                Text('Continue with Google'),
-                              ],
-                            ),
+                                  SizedBox(width: 12),
+                                  Text('Connecting securely…'),
+                                ],
+                              )
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  _GoogleMark(),
+                                  SizedBox(width: 12),
+                                  Text('Continue with Google'),
+                                ],
+                              ),
+                      ),
                     ),
-                  ),
+                  if (environment.usesRealAuthentication) ...[
+                    if (environment.hasGoogleSignIn) ...[
+                      const SizedBox(height: 20),
+                      const Row(
+                        children: [
+                          Expanded(child: Divider()),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16),
+                            child: Text('or use email'),
+                          ),
+                          Expanded(child: Divider()),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                    _EmailAuthenticationForm(controller: controller),
+                  ],
                   const SizedBox(height: 20),
                   Text(
                     'By continuing, you agree to use AquaSense responsibly '
@@ -124,6 +143,223 @@ class SignInScreen extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmailAuthenticationForm extends StatefulWidget {
+  const _EmailAuthenticationForm({required this.controller});
+
+  final AuthenticationController controller;
+
+  @override
+  State<_EmailAuthenticationForm> createState() =>
+      _EmailAuthenticationFormState();
+}
+
+class _EmailAuthenticationFormState extends State<_EmailAuthenticationForm> {
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmation = TextEditingController();
+  bool _creatingAccount = false;
+  bool _showPassword = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _password.dispose();
+    _confirmation.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (widget.controller.isBusy || !_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
+    if (_creatingAccount) {
+      await widget.controller.createAccount(
+        email: _email.text.trim(),
+        displayName: _name.text.trim(),
+        password: _password.text,
+      );
+    } else {
+      await widget.controller.signInWithEmail(
+        email: _email.text.trim(),
+        password: _password.text,
+      );
+    }
+    if (mounted && widget.controller.notice != null) {
+      final position = Scrollable.maybeOf(context)?.position;
+      position?.animateTo(
+        position.minScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = widget.controller.isBusy;
+    return AutofillGroup(
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              _creatingAccount
+                  ? 'Create an account with email'
+                  : 'Sign in with email',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 16),
+            if (_creatingAccount) ...[
+              TextFormField(
+                controller: _name,
+                enabled: !busy,
+                decoration: const InputDecoration(
+                  labelText: 'Full name',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                autofillHints: const [AutofillHints.name],
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter your name.'
+                    : value.trim().length > 255
+                    ? 'Use at most 255 characters.'
+                    : null,
+              ),
+              const SizedBox(height: 16),
+            ],
+            TextFormField(
+              controller: _email,
+              enabled: !busy,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [
+                AutofillHints.username,
+                AutofillHints.email,
+              ],
+              autocorrect: false,
+              validator: (value) {
+                final email = value?.trim() ?? '';
+                return email.length > 320 ||
+                        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)
+                    ? 'Enter a valid email address.'
+                    : null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _password,
+              enabled: !busy,
+              obscureText: !_showPassword,
+              autocorrect: false,
+              enableSuggestions: false,
+              autofillHints: [
+                _creatingAccount
+                    ? AutofillHints.newPassword
+                    : AutofillHints.password,
+              ],
+              textInputAction: _creatingAccount
+                  ? TextInputAction.next
+                  : TextInputAction.done,
+              onFieldSubmitted: (_) {
+                if (!_creatingAccount) _submit();
+              },
+              decoration: InputDecoration(
+                labelText: 'Password',
+                helperText: _creatingAccount ? 'Use 12–128 characters.' : null,
+                prefixIcon: const Icon(Icons.lock_outline),
+                suffixIcon: IconButton(
+                  tooltip: _showPassword ? 'Hide password' : 'Show password',
+                  onPressed: busy
+                      ? null
+                      : () => setState(() => _showPassword = !_showPassword),
+                  icon: Icon(
+                    _showPassword
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                  ),
+                ),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Enter your password.';
+                }
+                if (_creatingAccount && value.length < 12) {
+                  return 'Use at least 12 characters.';
+                }
+                if (value.length > 128) return 'Use at most 128 characters.';
+                return null;
+              },
+            ),
+            if (_creatingAccount) ...[
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _confirmation,
+                enabled: !busy,
+                obscureText: !_showPassword,
+                autocorrect: false,
+                enableSuggestions: false,
+                decoration: const InputDecoration(
+                  labelText: 'Confirm password',
+                  prefixIcon: Icon(Icons.lock_outline),
+                ),
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _submit(),
+                validator: (value) => value == null || value.isEmpty
+                    ? 'Confirm your password.'
+                    : value != _password.text
+                    ? 'Passwords do not match.'
+                    : null,
+              ),
+            ],
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: busy ? null : _submit,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+              ),
+              child: Text(
+                busy
+                    ? 'Please wait…'
+                    : _creatingAccount
+                    ? 'Create account'
+                    : 'Sign in',
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: busy
+                  ? null
+                  : () {
+                      widget.controller.clearNotice();
+                      _formKey.currentState!.reset();
+                      _password.clear();
+                      _confirmation.clear();
+                      setState(() {
+                        _creatingAccount = !_creatingAccount;
+                        _showPassword = false;
+                      });
+                    },
+              child: Text(
+                _creatingAccount
+                    ? 'Already have an account? Sign in'
+                    : 'New to AquaSense? Create account',
+              ),
+            ),
+          ],
         ),
       ),
     );

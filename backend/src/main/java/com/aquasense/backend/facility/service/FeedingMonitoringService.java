@@ -21,11 +21,12 @@ import com.aquasense.backend.facility.model.TankDevice;
 import com.aquasense.backend.facility.model.TankScheduleMode;
 import com.aquasense.backend.facility.repository.FacilityMembershipRepository;
 import com.aquasense.backend.facility.repository.FeedingSessionRepository;
+import com.aquasense.backend.facility.repository.FeedingSessionSpecifications;
 import com.aquasense.backend.facility.repository.GroupFeedingTimeRepository;
 import com.aquasense.backend.facility.repository.TankDeviceRepository;
 import com.aquasense.backend.facility.repository.TankFeedingTimeRepository;
 import com.aquasense.backend.facility.repository.TankRepository;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -149,7 +150,7 @@ public class FeedingMonitoringService {
             String cursor,
             int size) {
         Cursor decoded = decodeCursor(cursor);
-        List<FeedingSession> result = sessions.findHistory(
+        var specification = FeedingSessionSpecifications.history(
                 facilityId,
                 tankId,
                 groupId,
@@ -158,8 +159,12 @@ public class FeedingMonitoringService {
                 from,
                 to,
                 decoded == null ? null : decoded.scheduledFor(),
-                decoded == null ? null : decoded.id(),
-                PageRequest.of(0, size + 1));
+                decoded == null ? null : decoded.id());
+        // Fetch only one extra row to determine the cursor; no offset or count query.
+        List<FeedingSession> result = sessions.findBy(specification, query -> query
+                .sortBy(Sort.by(Sort.Order.desc("scheduledFor"), Sort.Order.desc("id")))
+                .limit(size + 1)
+                .all());
         boolean hasMore = result.size() > size;
         List<FeedingSession> page = hasMore ? result.subList(0, size) : result;
         String nextCursor = hasMore ? encodeCursor(page.get(page.size() - 1)) : null;

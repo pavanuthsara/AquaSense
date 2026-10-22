@@ -1,7 +1,7 @@
 # AquaSense Backend
 
-Spring Boot API for AquaSense. MOB-004 adds Google identity exchange and
-AquaSense-owned access and refresh sessions.
+Spring Boot API for AquaSense with email/password accounts, Google identity
+exchange, and AquaSense-owned access and refresh sessions.
 
 ## Run with Docker (recommended for local development)
 
@@ -41,9 +41,10 @@ $secretBytes = New-Object byte[] 32
 [Convert]::ToBase64String($secretBytes)
 ```
 
-The Google client ID must be the Web OAuth client ID also passed to the Flutter
-app as `AQUASENSE_GOOGLE_SERVER_CLIENT_ID`. Flyway creates the authentication
-tables when the API starts.
+The Google client ID is optional for email/password authentication. To enable
+Google login, use the Web OAuth client ID also passed to Flutter as
+`AQUASENSE_GOOGLE_SERVER_CLIENT_ID`. Flyway creates and upgrades the
+authentication tables when the API starts.
 
 ## Run
 
@@ -60,6 +61,9 @@ The API listens on port 8080 by default.
 
 ## Authentication endpoints
 
+- `POST /api/v1/auth/register` accepts `email`, `displayName`, and `password`,
+  creates an account, and returns a session with HTTP 201.
+- `POST /api/v1/auth/login` accepts `email` and `password` and returns a session.
 - `POST /api/v1/auth/google/exchange` validates a Google ID token and returns
   AquaSense access and refresh tokens.
 - `POST /api/v1/auth/refresh` rotates a valid refresh token.
@@ -69,6 +73,26 @@ The API listens on port 8080 by default.
 Every other API route is protected unless it is explicitly allowed by the
 security configuration. Raw refresh tokens are never stored in the database;
 only SHA-256 hashes are retained.
+
+Registration requires a valid email (up to 320 characters), a nonblank display
+name (up to 255 characters), and a password of 12–128 characters. Passwords are
+stored only as salted PBKDF2-HMAC-SHA256 hashes using Spring Security's v5.8
+defaults. Email addresses are trimmed and normalized to lowercase; passwords
+are preserved exactly. Duplicate email addresses return HTTP 409, including
+addresses already used for Google login. Login failures return a common HTTP
+401 message. Accounts are not automatically linked across login methods.
+
+Email registration signs the user in immediately and supports aquarium ownership.
+It does not verify mailbox ownership. Password-only accounts cannot list or
+accept email-based worker invitations; these still require a verified Google
+identity. Email verification, account linking, and password recovery are not
+implemented in this flow.
+
+Authentication requests log their arrival, route, response status, and duration
+to the container console. Passwords, request bodies, query strings, and tokens
+are excluded. Follow them from `backend/` with
+`docker compose --env-file ../.env logs -f backend`. Rebuild the backend image
+after source changes to enable the new logging in an existing container.
 
 ## Facility endpoints
 

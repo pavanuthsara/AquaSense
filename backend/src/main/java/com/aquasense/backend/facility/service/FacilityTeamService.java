@@ -123,6 +123,9 @@ public class FacilityTeamService {
     @Transactional
     public List<FacilityInvitation> listMyPendingInvitations(UUID userId) {
         AppUser user = requireUser(userId);
+        if (!user.hasVerifiedEmail()) {
+            return List.of();
+        }
         List<FacilityInvitation> results = invitations
                 .findAllByEmailIgnoreCaseAndStatusOrderByCreatedAtAsc(
                         normalizeEmail(user.getEmail()), InvitationStatus.PENDING);
@@ -136,6 +139,10 @@ public class FacilityTeamService {
     @Transactional
     public FacilityMembership accept(UUID userId, UUID invitationId) {
         AppUser user = requireUser(userId);
+        if (!user.hasVerifiedEmail()) {
+            throw new FacilityException(HttpStatus.FORBIDDEN, "verified_email_required",
+                    "A verified email is required to accept worker invitations.");
+        }
         FacilityInvitation invitation = invitations.findByIdForUpdate(invitationId)
                 .orElseThrow(() -> invitationNotFound());
 

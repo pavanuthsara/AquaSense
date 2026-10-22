@@ -23,6 +23,8 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.crypto.password.Pbkdf2PasswordEncoder;
 
 @Configuration
 @EnableConfigurationProperties(AuthProperties.class)
@@ -36,6 +38,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/api/v1/auth/google/exchange",
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
                                 "/api/v1/device-heartbeats",
@@ -46,6 +50,11 @@ public class SecurityConfig {
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer.jwt(Customizer.withDefaults()))
                 .build();
+    }
+
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8();
     }
 
     @Bean

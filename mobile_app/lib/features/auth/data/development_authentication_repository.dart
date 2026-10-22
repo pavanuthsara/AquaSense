@@ -18,6 +18,29 @@ class DevelopmentAuthenticationRepository implements AuthenticationRepository {
   final Duration signInDelay;
 
   @override
+  Future<AuthSession> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    throw const AuthenticationException(
+      'Email sign-in requires the AquaSense backend. Turn off local demo mode.',
+      code: 'demo_mode',
+    );
+  }
+
+  @override
+  Future<AuthSession> createAccount({
+    required String email,
+    required String displayName,
+    required String password,
+  }) async {
+    throw const AuthenticationException(
+      'Account creation requires the AquaSense backend. Turn off local demo mode.',
+      code: 'demo_mode',
+    );
+  }
+
+  @override
   Future<AuthSession?> restoreSession() async {
     final tokens = await _sessionStorage.readTokens();
     if (tokens == null) {

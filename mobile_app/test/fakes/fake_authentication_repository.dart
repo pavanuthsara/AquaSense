@@ -15,6 +15,40 @@ class FakeAuthenticationRepository implements AuthenticationRepository {
   Duration delay;
   int signInCalls = 0;
   int signOutCalls = 0;
+  int emailSignInCalls = 0;
+  int createAccountCalls = 0;
+  String? lastEmail;
+  String? lastPassword;
+  String? lastDisplayName;
+
+  @override
+  Future<AuthSession> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    emailSignInCalls++;
+    lastEmail = email;
+    lastPassword = password;
+    await Future<void>.delayed(delay);
+    if (behavior == FakeGoogleSignInBehavior.failure) {
+      throw const AuthenticationException(
+        'Email or password is incorrect.',
+        code: 'invalid_credentials',
+      );
+    }
+    return restoredSession = session(email: email);
+  }
+
+  @override
+  Future<AuthSession> createAccount({
+    required String email,
+    required String displayName,
+    required String password,
+  }) async {
+    createAccountCalls++;
+    lastDisplayName = displayName;
+    return signInWithEmail(email: email, password: password);
+  }
 
   static AuthSession session({
     String displayName = 'Test Owner',

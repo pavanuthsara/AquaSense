@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(RegistrationConflictException.class)
+    ResponseEntity<Map<String, Object>> registrationConflict(RegistrationConflictException exception) {
+        return error(HttpStatus.CONFLICT, "email_already_registered", exception.getMessage());
+    }
+
     @ExceptionHandler(AuthenticationFailureException.class)
     ResponseEntity<Map<String, Object>> authenticationFailure(AuthenticationFailureException exception) {
         return error(HttpStatus.UNAUTHORIZED, "authentication_failed", exception.getMessage());

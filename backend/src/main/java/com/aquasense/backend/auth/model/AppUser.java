@@ -2,6 +2,7 @@ package com.aquasense.backend.auth.model;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.Locale;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,8 +15,11 @@ public class AppUser {
     @Id
     private UUID id;
 
-    @Column(name = "google_subject", nullable = false, unique = true)
+    @Column(name = "google_subject", unique = true)
     private String googleSubject;
+
+    @Column(name = "password_hash")
+    private String passwordHash;
 
     @Column(nullable = false, unique = true, length = 320)
     private String email;
@@ -46,12 +50,26 @@ public class AppUser {
     }
 
     public void updateProfile(String email, String displayName, String photoUrl, Instant now) {
-        this.email = email;
+        this.email = email.trim().toLowerCase(Locale.ROOT);
         this.displayName = displayName;
         this.photoUrl = photoUrl;
         this.updatedAt = now;
         this.lastLoginAt = now;
     }
+
+    public static AppUser withPassword(String email, String displayName, String passwordHash, Instant now) {
+        AppUser user = new AppUser(null, email, displayName, null, now);
+        user.passwordHash = passwordHash;
+        return user;
+    }
+
+    public void recordLogin(Instant now) {
+        this.lastLoginAt = now;
+    }
+
+    // Only Google currently proves email ownership. Password registration does not.
+    public boolean hasVerifiedEmail() { return googleSubject != null; }
+    public String getPasswordHash() { return passwordHash; }
 
     public UUID getId() { return id; }
     public String getGoogleSubject() { return googleSubject; }

@@ -75,7 +75,8 @@ class AuthenticationController extends ChangeNotifier {
         case GoogleSignInCancelled():
           _status = AuthenticationStatus.signedOut;
           _setNotice(
-            'Google sign-in was cancelled.',
+            'Google sign-in did not complete. Please try again. If this keeps '
+            'happening after choosing an account, contact support.',
             AuthenticationNoticeType.information,
             notify: false,
           );
@@ -113,6 +114,51 @@ class AuthenticationController extends ChangeNotifier {
       _status = AuthenticationStatus.signedIn;
       _setNotice(
         'Could not sign out. Please try again.',
+        AuthenticationNoticeType.error,
+        notify: false,
+      );
+    }
+    notifyListeners();
+  }
+
+  Future<void> signInWithEmail({
+    required String email,
+    required String password,
+  }) => _authenticateWithEmail(
+    () => _repository.signInWithEmail(email: email, password: password),
+  );
+
+  Future<void> createAccount({
+    required String email,
+    required String displayName,
+    required String password,
+  }) => _authenticateWithEmail(
+    () => _repository.createAccount(
+      email: email,
+      displayName: displayName,
+      password: password,
+    ),
+  );
+
+  Future<void> _authenticateWithEmail(
+    Future<AuthSession> Function() authenticate,
+  ) async {
+    if (isBusy) return;
+    _status = AuthenticationStatus.signingIn;
+    _user = null;
+    _clearNotice(notify: false);
+    notifyListeners();
+    try {
+      final session = await authenticate();
+      _user = session.user;
+      _status = AuthenticationStatus.signedIn;
+    } on AuthenticationException catch (error) {
+      _status = AuthenticationStatus.signedOut;
+      _setNotice(error.message, AuthenticationNoticeType.error, notify: false);
+    } catch (_) {
+      _status = AuthenticationStatus.signedOut;
+      _setNotice(
+        'Could not sign in to AquaSense. Please try again.',
         AuthenticationNoticeType.error,
         notify: false,
       );

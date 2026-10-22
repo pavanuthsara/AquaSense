@@ -20,7 +20,6 @@ import com.aquasense.backend.facility.repository.FacilityMembershipRepository;
 import com.aquasense.backend.facility.repository.FacilityRepository;
 import com.aquasense.backend.facility.repository.TankGroupRepository;
 import com.aquasense.backend.facility.repository.TankRepository;
-import jakarta.persistence.criteria.JoinType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -289,8 +288,9 @@ public class TankService {
             if (requestedTag == null || requestedTag.isBlank()) {
                 return builder.conjunction();
             }
-            query.distinct(true);
-            return builder.equal(root.join("tags", JoinType.INNER), normalize(requestedTag.trim()));
+            // Membership uses an existence check without duplicating rows or adding DISTINCT
+            // to the case-insensitively sorted, paginated inventory query.
+            return builder.isMember(normalize(requestedTag.trim()), root.get("tags"));
         };
     }
 

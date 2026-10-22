@@ -53,11 +53,16 @@ class _TankListScreenState extends State<TankListScreen> {
   }
 
   Future<void> _initialize() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         widget.repository.listTankGroups(widget.facility.id),
         widget.repository.listTankTags(widget.facility.id),
       ]);
+      if (!mounted) return;
       _groups = results[0] as List<TankGroup>;
       _tags = results[1] as List<String>;
       await _refresh();
@@ -298,13 +303,16 @@ class _TankListScreenState extends State<TankListScreen> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('$_totalItems tanks'),
+            if (!_loading && _error == null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$_totalItems ${_totalItems == 1 ? 'tank' : 'tanks'}',
+                  ),
+                ),
               ),
-            ),
             Expanded(child: _buildResults()),
           ],
         ),

@@ -97,6 +97,20 @@ class FacilityTeamApiIntegrationTests {
     }
 
     @Test
+    void passwordRegistrationDoesNotProveOwnershipOfInvitedEmail() throws Exception {
+        TestUser owner = user("team-owner", "owner@example.com", "Owner");
+        AppUser local = users.save(AppUser.withPassword("worker@example.com", "Worker", "test-hash", Instant.now()));
+        String localToken = tokenService.issue(local).accessToken();
+        String facilityId = createFacility(owner.token(), "local-team-facility", "Blue Reef");
+        String invitationId = invite(owner.token(), facilityId, "worker@example.com", 201);
+
+        mockMvc.perform(get("/api/v1/invitations/me").header("Authorization", bearer(localToken)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
+        accept(localToken, invitationId).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code", is("verified_email_required")));
+    }
+
+    @Test
     void invitationIsHiddenFromAndCannotBeAcceptedByDifferentEmail() throws Exception {
         TestUser owner = user("hidden-owner", "owner@example.com", "Owner");
         TestUser invited = user("hidden-worker", "worker@example.com", "Worker");

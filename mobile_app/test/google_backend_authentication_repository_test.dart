@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile_app/features/auth/data/authentication_api_client.dart';
@@ -8,6 +11,106 @@ import 'package:mobile_app/features/auth/domain/auth_models.dart';
 import 'package:mobile_app/features/auth/domain/auth_session_storage.dart';
 
 void main() {
+  for (final createAccount in [false, true]) {
+    test(
+      'email ${createAccount ? 'registration' : 'login'} stores a backend session without Google',
+      () async {
+        late http.Request capturedRequest;
+        final storage = _MemorySessionStorage();
+        final repository = GoogleBackendAuthenticationRepository(
+          apiBaseUrl: 'https://api.example.com',
+          googleServerClientId: '',
+          sessionStorage: storage,
+          apiClient: AuthenticationApiClient(
+            apiBaseUrl: 'https://api.example.com',
+            client: MockClient((request) async {
+              capturedRequest = request;
+              return http.Response(_sessionJson, createAccount ? 201 : 200);
+            }),
+          ),
+        );
+        final session = createAccount
+            ? await repository.createAccount(
+                email: ' owner@example.com ',
+                displayName: ' Aqua Owner ',
+                password: '  password-123456  ',
+              )
+            : await repository.signInWithEmail(
+                email: ' owner@example.com ',
+                password: '  password-123456  ',
+              );
+        expect(
+          capturedRequest.url.path,
+          createAccount ? '/api/v1/auth/register' : '/api/v1/auth/login',
+        );
+        final body = jsonDecode(capturedRequest.body) as Map<String, dynamic>;
+        expect(body['email'], 'owner@example.com');
+        expect(body['password'], '  password-123456  ');
+        if (createAccount) expect(body['displayName'], 'Aqua Owner');
+        expect(session.user.email, 'owner@example.com');
+        expect(storage.tokens?.refreshToken, 'refresh-token');
+      },
+    );
+  }
+
+  test('failed email login keeps credentials out of session storage', () async {
+    final storage = _MemorySessionStorage();
+    final repository = GoogleBackendAuthenticationRepository(
+      apiBaseUrl: 'https://api.example.com',
+      googleServerClientId: '',
+      sessionStorage: storage,
+      apiClient: AuthenticationApiClient(
+        apiBaseUrl: 'https://api.example.com',
+        client: MockClient(
+          (_) async => http.Response(
+            '{"message":"Email or password is incorrect."}',
+            401,
+          ),
+        ),
+      ),
+    );
+    await expectLater(
+      repository.signInWithEmail(
+        email: 'owner@example.com',
+        password: 'wrong-password',
+      ),
+      throwsA(
+        isA<AuthenticationException>().having(
+          (e) => e.message,
+          'message',
+          'Email or password is incorrect.',
+        ),
+      ),
+    );
+    expect(storage.tokens, isNull);
+  });
+
+  test('email connection failures can be shown to the user', () async {
+    final repository = GoogleBackendAuthenticationRepository(
+      apiBaseUrl: 'https://api.example.com',
+      googleServerClientId: '',
+      sessionStorage: _MemorySessionStorage(),
+      apiClient: AuthenticationApiClient(
+        apiBaseUrl: 'https://api.example.com',
+        client: MockClient((_) async => throw http.ClientException('offline')),
+      ),
+    );
+    await expectLater(
+      repository.createAccount(
+        email: 'owner@example.com',
+        displayName: 'Owner',
+        password: 'long-password-123',
+      ),
+      throwsA(
+        isA<AuthenticationException>().having(
+          (e) => e.code,
+          'code',
+          'connection_error',
+        ),
+      ),
+    );
+  });
+
   test(
     'Google ID token is exchanged and AquaSense session is stored',
     () async {
@@ -50,12 +153,53 @@ void main() {
           return http.Response(_sessionJson, 200);
         }),
       ),
-      googleIdTokenProvider: _FakeGoogleIdTokenProvider(null),
+      googleIdTokenProvider: _FakeGoogleIdTokenProvider(
+        null,
+        error: const GoogleSignInException(
+          code: GoogleSignInExceptionCode.canceled,
+        ),
+      ),
     );
 
     expect(await repository.signInWithGoogle(), isA<GoogleSignInCancelled>());
     expect(backendCalls, 0);
   });
+
+  for (final token in <String?>[null, '', '   ']) {
+    test(
+      'missing Google token ($token) is a failure, not cancellation',
+      () async {
+        var backendCalls = 0;
+        final storage = _MemorySessionStorage();
+        final repository = GoogleBackendAuthenticationRepository(
+          apiBaseUrl: 'https://unused.example.com',
+          googleServerClientId: 'test-client-id',
+          sessionStorage: storage,
+          apiClient: AuthenticationApiClient(
+            apiBaseUrl: 'https://api.example.com',
+            client: MockClient((request) async {
+              backendCalls += 1;
+              return http.Response(_sessionJson, 200);
+            }),
+          ),
+          googleIdTokenProvider: _FakeGoogleIdTokenProvider(token),
+        );
+
+        await expectLater(
+          repository.signInWithGoogle(),
+          throwsA(
+            isA<AuthenticationException>().having(
+              (error) => error.code,
+              'code',
+              'missing_google_id_token',
+            ),
+          ),
+        );
+        expect(backendCalls, 0);
+        expect(storage.tokens, isNull);
+      },
+    );
+  }
 
   test('expired access token is restored through refresh rotation', () async {
     late http.Request capturedRequest;
@@ -149,12 +293,18 @@ class _MemorySessionStorage implements AuthSessionStorage {
 }
 
 class _FakeGoogleIdTokenProvider implements GoogleIdTokenProvider {
-  _FakeGoogleIdTokenProvider(this.idToken);
+  _FakeGoogleIdTokenProvider(this.idToken, {this.error});
 
   final String? idToken;
+  final GoogleSignInException? error;
 
   @override
-  Future<String?> signIn() async => idToken;
+  Future<String?> signIn() async {
+    if (error != null) {
+      throw error!;
+    }
+    return idToken;
+  }
 
   @override
   Future<void> signOut() async {}

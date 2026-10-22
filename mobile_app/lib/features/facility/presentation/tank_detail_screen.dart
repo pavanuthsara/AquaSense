@@ -322,6 +322,15 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
               _StatusChip(label: _observationStatus(detail.observationState)),
             ],
           ),
+          if (tank.status != TankStatus.archived) ...[
+            const SizedBox(height: 14),
+            AppetiteCheckCard(
+              key: ValueKey('appetite-check-${tank.id}'),
+              facilityId: widget.facility.id,
+              tankId: tank.id,
+              repository: widget.repository,
+            ),
+          ],
           const SizedBox(height: 18),
           _Section(
             title: 'Tank information',
@@ -369,15 +378,6 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
             observation: detail.appetiteObservation,
             dateLabel: _date,
           ),
-          if (tank.status != TankStatus.archived) ...[
-            const SizedBox(height: 14),
-            AppetiteCheckCard(
-              key: ValueKey('appetite-check-${tank.id}'),
-              facilityId: widget.facility.id,
-              tankId: tank.id,
-              repository: widget.repository,
-            ),
-          ],
           const SizedBox(height: 14),
           _Section(
             title: 'Feeding and hardware',

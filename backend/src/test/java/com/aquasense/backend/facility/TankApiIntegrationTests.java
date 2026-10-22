@@ -246,6 +246,36 @@ class TankApiIntegrationTests {
     }
 
     @Test
+    void groupedTankPagesAndTagFiltersSerializeAfterServiceTransactionCloses() throws Exception {
+        TestUser owner = user("inventory-owner", "inventory@example.com", "Owner");
+        String facilityId = createFacility(owner.token(), "inventory-facility", "Inventory Reef");
+        String groupId = createGroup(owner.token(), facilityId, "Nursery");
+        String alpha = createTank(owner.token(), facilityId, groupedTank("Alpha", "A-1", groupId, false), 201);
+        String beta = createTank(owner.token(), facilityId, basicTank("Beta", "B-1"), 201);
+        createTank(owner.token(), facilityId, groupedTank("Gamma", "G-1", groupId, false), 201);
+
+        // Each HTTP request has its own persistence context, as in the running app.
+        mockMvc.perform(get("/api/v1/facilities/{id}/tanks", facilityId)
+                        .header("Authorization", bearer(owner.token())).param("size", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems", is(3)))
+                .andExpect(jsonPath("$.totalPages", is(3)))
+                .andExpect(jsonPath("$.items[0].id", is(alpha)))
+                .andExpect(jsonPath("$.items[0].groupName", is("Nursery")))
+                .andExpect(jsonPath("$.items[0].tags", is(java.util.List.of("feeding"))));
+        mockMvc.perform(get("/api/v1/facilities/{id}/tanks", facilityId)
+                        .header("Authorization", bearer(owner.token())).param("page", "1").param("size", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items[0].id", is(beta)))
+                .andExpect(jsonPath("$.items[0].groupName").doesNotExist());
+        mockMvc.perform(get("/api/v1/facilities/{id}/tanks", facilityId)
+                        .header("Authorization", bearer(owner.token()))
+                        .param("tag", "Feeding").param("size", "1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.totalItems", is(2)))
+                .andExpect(jsonPath("$.totalPages", is(2)))
+                .andExpect(jsonPath("$.items[0].id", is(alpha)))
+                .andExpect(jsonPath("$.items[0].groupName", is("Nursery")));
+    }
+
+    @Test
     void ownerCanReplaceInheritedScheduleWithTankOverrideAndWorkerCannotChangeIt() throws Exception {
         TestUser owner = user("schedule-owner", "schedule-owner@example.com", "Owner");
         TestUser worker = user("schedule-worker", "schedule-worker@example.com", "Worker");

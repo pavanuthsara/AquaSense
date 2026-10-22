@@ -150,7 +150,7 @@ class _AppetiteCheckCardState extends State<AppetiteCheckCard> {
               key: const Key('check-current-appetite-button'),
               onPressed: _busy ? null : _start,
               icon: const Icon(Icons.visibility_outlined),
-              label: const Text('Check current appetite level'),
+              label: const Text('Check current appetite'),
             ),
             if (_busy) ...[
               const SizedBox(height: 12),

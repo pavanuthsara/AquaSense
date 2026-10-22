@@ -7,19 +7,23 @@ class AppEnvironment {
     required this.name,
     required this.apiBaseUrl,
     this.googleServerClientId = '',
+    this.useDevelopmentAuthentication = false,
   });
 
   const AppEnvironment.test()
     : name = AppEnvironmentName.test,
       apiBaseUrl = 'http://localhost',
-      googleServerClientId = '';
+      googleServerClientId = '',
+      useDevelopmentAuthentication = true;
 
   final AppEnvironmentName name;
   final String apiBaseUrl;
   final String googleServerClientId;
+  final bool useDevelopmentAuthentication;
 
   bool get isProduction => name == AppEnvironmentName.production;
-  bool get usesRealAuthentication => googleServerClientId.isNotEmpty;
+  bool get usesRealAuthentication => !useDevelopmentAuthentication;
+  bool get hasGoogleSignIn => googleServerClientId.isNotEmpty;
 
   factory AppEnvironment.fromDartDefines() {
     const environmentValue = String.fromEnvironment(
@@ -31,6 +35,9 @@ class AppEnvironment {
     );
     const googleServerClientId = String.fromEnvironment(
       'AQUASENSE_GOOGLE_SERVER_CLIENT_ID',
+    );
+    const useDevelopmentAuthentication = bool.fromEnvironment(
+      'AQUASENSE_USE_DEVELOPMENT_AUTH',
     );
 
     final name = switch (environmentValue.toLowerCase()) {
@@ -49,9 +56,9 @@ class AppEnvironment {
             ),
           };
 
-    if (name == AppEnvironmentName.production && googleServerClientId.isEmpty) {
+    if (name == AppEnvironmentName.production && useDevelopmentAuthentication) {
       throw StateError(
-        'AQUASENSE_GOOGLE_SERVER_CLIENT_ID is required in production.',
+        'Local demo authentication is not allowed in production.',
       );
     }
 
@@ -59,6 +66,7 @@ class AppEnvironment {
       name: name,
       apiBaseUrl: apiBaseUrl,
       googleServerClientId: googleServerClientId,
+      useDevelopmentAuthentication: useDevelopmentAuthentication,
     );
   }
 }

@@ -1,16 +1,49 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../domain/auth_models.dart';
 
 class AuthenticationApiClient {
-  AuthenticationApiClient({required String apiBaseUrl, http.Client? client})
-    : _baseUri = Uri.parse(apiBaseUrl),
-      _client = client ?? http.Client();
+  AuthenticationApiClient({
+    required String apiBaseUrl,
+    http.Client? client,
+    Duration requestTimeout = const Duration(seconds: 15),
+  }) : _baseUri = Uri.parse(apiBaseUrl),
+       _client = client ?? http.Client(),
+       _requestTimeout = requestTimeout;
 
   final Uri _baseUri;
   final http.Client _client;
+  final Duration _requestTimeout;
+
+  Future<AuthSession> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    return _sessionFromResponse(
+      await _post('/api/v1/auth/login', {
+        'email': email.trim(),
+        'password': password,
+      }),
+    );
+  }
+
+  Future<AuthSession> createAccount({
+    required String email,
+    required String displayName,
+    required String password,
+  }) async {
+    return _sessionFromResponse(
+      await _post('/api/v1/auth/register', {
+        'email': email.trim(),
+        'displayName': displayName.trim(),
+        'password': password,
+      }),
+    );
+  }
 
   Future<AuthSession> exchangeGoogleIdToken(String idToken) async {
     final response = await _post('/api/v1/auth/google/exchange', {
@@ -27,8 +60,9 @@ class AuthenticationApiClient {
   }
 
   Future<AuthUser> me(String accessToken) async {
-    final response = await _client.get(
-      _resolve('/api/v1/auth/me'),
+    final response = await _request(
+      'GET',
+      '/api/v1/auth/me',
       headers: {'Authorization': 'Bearer $accessToken'},
     );
     final body = _decode(response);
@@ -37,11 +71,9 @@ class AuthenticationApiClient {
   }
 
   Future<void> logout(String refreshToken) async {
-    final response = await _client.post(
-      _resolve('/api/v1/auth/logout'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'refreshToken': refreshToken}),
-    );
+    final response = await _post('/api/v1/auth/logout', {
+      'refreshToken': refreshToken,
+    });
     if (response.statusCode != 204) {
       final body = _decode(response);
       _requireSuccess(response, body);
@@ -49,11 +81,60 @@ class AuthenticationApiClient {
   }
 
   Future<http.Response> _post(String path, Map<String, String> body) {
-    return _client.post(
-      _resolve(path),
+    return _request(
+      'POST',
+      path,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
+  }
+
+  Future<http.Response> _request(
+    String method,
+    String path, {
+    Map<String, String>? headers,
+    String? body,
+  }) async {
+    final uri = _resolve(path);
+    final abort = Completer<void>();
+    final request = http.AbortableRequest(
+      method,
+      uri,
+      abortTrigger: abort.future,
+    );
+    if (headers != null) request.headers.addAll(headers);
+    if (body != null) request.body = body;
+    final stopwatch = Stopwatch()..start();
+    if (kDebugMode) {
+      // Never log request bodies, query strings, credentials, or response bodies.
+      debugPrint('AquaSense auth: $method ${uri.origin}${uri.path}');
+    }
+    try {
+      final response = await _client
+          .send(request)
+          .then(http.Response.fromStream)
+          .timeout(_requestTimeout);
+      if (kDebugMode) {
+        debugPrint(
+          'AquaSense auth: $method $path -> ${response.statusCode} (${stopwatch.elapsedMilliseconds} ms)',
+        );
+      }
+      return response;
+    } on TimeoutException {
+      // Cancel supported transports as well as releasing the loading state.
+      abort.complete();
+      if (kDebugMode) debugPrint('AquaSense auth: $method $path timed out');
+      throw AuthenticationException(
+        'AquaSense took too long to respond. Check your connection and try again.'
+        '${path == '/api/v1/auth/register' ? ' If you already submitted registration, try signing in first.' : ''}',
+        code: 'connection_timeout',
+      );
+    } on http.ClientException {
+      if (kDebugMode) {
+        debugPrint('AquaSense auth: $method $path connection failed');
+      }
+      rethrow;
+    }
   }
 
   Uri _resolve(String path) {

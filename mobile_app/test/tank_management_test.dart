@@ -145,7 +145,7 @@ void main() {
     await tester.tap(find.byKey(const Key('tank-search-button')));
     await tester.pumpAndSettle();
 
-    expect(find.text('1 tanks'), findsOneWidget);
+    expect(find.text('1 tank'), findsOneWidget);
     expect(find.text('Tank 0999'), findsOneWidget);
     expect(find.byKey(const Key('load-more-tanks-button')), findsNothing);
   });

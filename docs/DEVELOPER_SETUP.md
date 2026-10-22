@@ -31,7 +31,11 @@ toolchain issues reported by `flutter doctor`. Enable Windows Developer Mode
 if Flutter reports that plugin symlinks need it. Docker supplies Java 21,
 Maven, and PostgreSQL; you do not need to install those separately.
 
-## 2. Configure Google sign-in
+## 2. Configure Google sign-in (optional)
+
+Skip this step for email/password login. Google configuration is needed only
+to show **Continue with Google**. Email account creation works with the API
+and database alone.
 
 In Google Cloud Console, choose one project for both OAuth clients:
 
@@ -82,7 +86,8 @@ Open `.env` and fill in:
 
 ```dotenv
 AQUASENSE_DB_PASSWORD=replace-with-your-local-database-password
-AQUASENSE_GOOGLE_CLIENT_ID=replace-with-your-web-client-id.apps.googleusercontent.com
+# Optional: leave blank when using only email/password login.
+AQUASENSE_GOOGLE_CLIENT_ID=
 AQUASENSE_JWT_SECRET=replace-with-the-generated-base64-value
 AQUASENSE_API_PORT=8080
 ```
@@ -193,12 +198,17 @@ To launch through Android Studio's Run button, open `mobile_app`, select the
 device, and put the same three `--dart-define=...` arguments in the Flutter
 run configuration's **Additional run args** field.
 
-Stop and rerun Flutter after changing Dart defines. Without the Google client
-ID, development builds use a local test account instead of real Google sign-in.
+Stop and rerun Flutter after changing Dart defines. Omit the Google client ID
+argument for email/password login only. The API is used by default, even
+without Google configuration. To use the local demo account without the API,
+explicitly add `--dart-define=AQUASENSE_USE_DEVELOPMENT_AUTH=true`.
 
 ## 6. Verify the complete flow
 
-1. Select **Continue with Google** and choose your Google account.
+1. Select **New to AquaSense? Create account**, fill in your name, email, and a
+   password of 12–128 characters, then confirm the password. Alternatively,
+   use **Sign in** for an existing email account or **Continue with Google**
+   when Google is configured.
 2. Confirm that the app opens your aquarium or the first-aquarium setup screen.
 3. Restart the app and confirm that the saved session restores.
 

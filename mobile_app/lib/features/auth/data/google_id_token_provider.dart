@@ -17,15 +17,8 @@ class PluginGoogleIdTokenProvider implements GoogleIdTokenProvider {
   @override
   Future<String?> signIn() async {
     await _initialization;
-    try {
-      final account = await GoogleSignIn.instance.authenticate();
-      return account.authentication.idToken;
-    } on GoogleSignInException catch (error) {
-      if (error.code == GoogleSignInExceptionCode.canceled) {
-        return null;
-      }
-      rethrow;
-    }
+    final account = await GoogleSignIn.instance.authenticate();
+    return account.authentication.idToken;
   }
 
   @override

@@ -93,7 +93,7 @@ turning, visibility, tracking coverage, sample count, and prediction status.
 
 ## 4. Check appetite from the mobile app
 
-The tank detail screen has a **Check current appetite level** button. It creates
+The tank detail screen has a **Check current appetite** button. It creates
 a tank-scoped request, waits for the laptop to collect a fresh 10-second PRE
 window, and displays the returned High/Low label, model probability, and time.
 The app shows separate waiting, observing, insufficient-data, and failure states.
@@ -108,12 +108,13 @@ requests for the same tank share its active check.
    docker compose --env-file .env -f backend/compose.yaml up --build -d backend
    ```
 
-2. Run the mobile app with its real backend repository and sign in. Existing
-   configuration requires `AQUASENSE_GOOGLE_SERVER_CLIENT_ID`; without it the
-   app uses demo data, and live appetite checks explain that a backend connection
-   is required. The Google sign-in still needs internet; inference, API, and
-   database run locally. Use `http://10.0.2.2:8080` from an Android emulator,
+2. Run the mobile app and sign in with email/password or Google. The app uses
+   the backend by default; Google configuration is optional. The explicit
+   `AQUASENSE_USE_DEVELOPMENT_AUTH=true` mode uses demo data instead of live
+   appetite checks. Use `http://10.0.2.2:8080` only from an Android emulator,
    or `http://YOUR_LAPTOP_LAN_IP:8080` from a physical phone on the same LAN.
+   For a USB-connected phone, forward port 8080 using `adb reverse tcp:8080 tcp:8080`
+   and use `http://127.0.0.1:8080` instead.
    Restart the app with your existing Dart defines after updating its code.
 
 3. In that tank's hardware controls, connect/provision **Edge processor**.
@@ -133,7 +134,8 @@ requests for the same tank share its active check.
    are read from the environment and are not printed. The Python worker polls
    the API in a background thread so network delays do not block camera frames.
 
-5. Open the same tank in the app and tap **Check current appetite level**.
+5. Open **Tanks**, tap the same tank, and tap **Check current appetite** in the
+   **Current appetite** card near the top of the detail screen.
    Keep the camera steady and wait about 10–15 seconds. The request discards the
    worker's current partial behavior window and starts a new one; it never
    returns an old CSV value as a fresh model result. Keep the camera app open on

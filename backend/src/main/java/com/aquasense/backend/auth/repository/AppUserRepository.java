@@ -12,7 +12,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface AppUserRepository extends JpaRepository<AppUser, UUID> {
     Optional<AppUser> findByGoogleSubject(String googleSubject);
-    boolean existsByEmailIgnoreCaseAndGoogleSubjectNot(String email, String googleSubject);
+    Optional<AppUser> findByEmailIgnoreCase(String email);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select user from AppUser user where user.id = :id")
