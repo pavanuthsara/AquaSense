@@ -26,6 +26,8 @@ runs/
 *.pt
 *.onnx
 *.tflite
+/models/random_forest_live_pre.joblib
+/output/live_behavior_*.csv
 
 # Logs and temporary files
 *.log
