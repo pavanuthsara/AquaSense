@@ -13,6 +13,10 @@ Method
 3. The best plan is re-run over the whole temperature range (constant low/mid/high + random
    profiles) to report the median and worst-case timelines.
 4. Oxygen, mortality, chemistry, temperature and unpacking sections are derived from those runs.
+5. A species whose values are borrowed from another species is planned with its oxygen use and
+   ammonia production raised by its ``rate_uncertainty`` until enough real shipments of it are recorded.
+6. The novelty check (``novelty.py``) says whether the AI second opinion has seen shipments like the
+   chosen packing, and so whether it is shown in full, as "limited experience", or not at all.
 """
 from __future__ import annotations
 
@@ -24,6 +28,7 @@ import numpy as np
 from . import chemistry as chem
 from .config import Interventions, Shipment, Species, Unpacking, load_interventions, load_species
 from .model import SimulationResult, simulate
+from .novelty import MIN_SPECIES_RECORDS, ShipmentFeatures, ShipmentHistory, load_ai_history, load_history
 from .uncertainty import run_temperature_range
 
 # ----------------------------------------------------------------------------- add-on catalogue
@@ -131,7 +136,7 @@ def _ai_correction(req: "AdvisoryRequest", plan: "Plan", n: int) -> dict | None:
     return out
 
 
-def _method_section(req: "AdvisoryRequest", sp, n_runs: int) -> dict:
+def _method_section(req: "AdvisoryRequest", sp, n_runs: int, margin: float = 0.0) -> dict:
     steps = [
         "We follow the sealed bag hour by hour. The fish use oxygen and give off carbon dioxide (CO2) and "
         "ammonia. Oxygen moves only slowly from the gas into the water.",
@@ -151,10 +156,22 @@ def _method_section(req: "AdvisoryRequest", sp, n_runs: int) -> dict:
                      "lets you pack at least 5% more fish.")
     steps.append("Finally we simulate opening the bag: the CO2 escapes, the pH rises and ammonia becomes "
                  "toxic. That is why the plan checks survival after unpacking, not only on arrival.")
+    if margin:
+        steps.append(f"This species has too few recorded shipments yet, so its numbers are borrowed from a similar "
+                     f"species or from published values. Measured oxygen use in a sealed bag can differ a lot "
+                     f"from published values, so we plan as if the fish use {100 * margin:.0f}% more oxygen "
+                     f"and give off {100 * margin:.0f}% more ammonia, and show a wider survival range. The "
+                     f"margin is dropped once {MIN_SPECIES_RECORDS} real shipments of this species are recorded.")
+    steps.append("We then check whether past shipments look like this one: same species, sedative and "
+                 "zeolite choice, and fish size, packing density, gas-to-water ratio, trip length, hottest "
+                 "temperature and fasting time close to it. The AI second opinion is only trusted when "
+                 "enough of them exist. A new combination is not a failure: the physics makes the "
+                 "prediction, and this shipment's outcome becomes the first data point for it. The system "
+                 "fills its own gaps as it is used.")
     confidence = ["The simulator was checked against a real 48-hour shipping trial. Its oxygen, ammonia, CO2 "
                   "and survival curves matched the measurements closely."]
-    if sp.name != "tiger_barb":
-        confidence.append(f"That trial used tiger barb. Numbers for {sp.name.replace('_', ' ')} are scaled to "
+    if sp.borrowed_from:
+        confidence.append(f"That trial used {sp.borrowed_from.replace('_', ' ')}. Numbers for {sp.name.replace('_', ' ')} are scaled to "
                           "its body size and have not yet been confirmed with real shipments.")
     confidence.append("The zeolite effect is an early estimate and will be improved with more data.")
     return {"steps": steps, "confidence": confidence, "sources": SOURCES}
@@ -470,9 +487,28 @@ def _temperature_section(sp: Species, req: AdvisoryRequest, plan: Plan, n: int) 
 
 
 # ----------------------------------------------------------------------------- public API
-def advise(req: AdvisoryRequest) -> dict:
+def _cautious(sp: Species, factor: float) -> Species:
+    return sp.with_overrides(o2_rate=sp.o2_rate * factor, tan_rate=sp.tan_rate * factor)
+
+
+def advise(req: AdvisoryRequest, history: ShipmentHistory | None = None,
+           ai_history: ShipmentHistory | None = None) -> dict:
+    """Full advisory.
+
+    ``history`` = real shipment outcomes; they decide when a borrowed species' safety margin is dropped
+    (default: recorded real shipments). ``ai_history`` = the shipments the AI second opinion learned from,
+    for the novelty check (default: ``history`` if given, else the table the saved model was trained on).
+    """
     req.validate()
-    sp = load_species(req.species)
+    if ai_history is None:
+        ai_history = load_ai_history() if history is None else history
+    history = load_history() if history is None else history
+    sp_published = load_species(req.species)
+    # Borrowed values: plan against the high end of their uncertainty until real outcomes exist.
+    margin = (sp_published.rate_uncertainty
+              if sp_published.borrowed_from and history.count_species(sp_published.name) < MIN_SPECIES_RECORDS
+              else 0.0)
+    sp = _cautious(sp_published, 1 + margin) if margin else sp_published
     plans = _plans(req)
     for p in plans:
         p.max_fish, p.survival_at_max = _max_fish(sp, req, p)
@@ -487,7 +523,7 @@ def advise(req: AdvisoryRequest) -> dict:
     chem_free = max((p for p in plans if not p.addons), key=lambda p: (p.max_fish, -p.fasting_h))
 
     warnings = []
-    if sp.name != "tiger_barb":
+    if sp.borrowed_from:
         warnings.append(f"The {sp.name.replace('_', ' ')} numbers are estimated from tests on another species "
                         "and have not yet been confirmed with real shipments. Treat them as a guide.")
 
@@ -517,7 +553,8 @@ def advise(req: AdvisoryRequest) -> dict:
                             f"at {req.temp_high_c:g} C, even with one fish per bag. Shorten the journey, lower the "
                             "temperature, or use more water per bag.")}
             result["verdict"] = {**verdict, "meets_target": False, "message": result["recommendation"]["summary"]}
-            result["method"] = _method_section(req, sp, 0)
+            result["experience"] = None
+            result["method"] = _method_section(req, sp, 0, margin)
             return result
         chosen, n = best, best.max_fish
     elif req.mode == "fixed_bags":
@@ -538,7 +575,7 @@ def advise(req: AdvisoryRequest) -> dict:
     for o in result["options"]:
         o["recommended"] = o["key"] == best.key
         o["selected"] = o["key"] == chosen.key
-    if any(a in ANAESTHETICS for a in chosen.addons) and sp.name != "tiger_barb":
+    if any(a in ANAESTHETICS for a in chosen.addons) and sp.borrowed_from:
         warnings.append("The effect of the anaesthetic was measured on a different species; for this one it "
                         "is an estimate.")
     if "zeolite" in chosen.addons:
@@ -608,14 +645,45 @@ def advise(req: AdvisoryRequest) -> dict:
         "summary": summary,
     }
     result["survival_band_pct"] = {k: round(100 * v, 2) for k, v in rr.stats["survival_after_unpacking"].items()}
+    result["species_uncertainty"] = None
+    if margin:
+        # Wider range: the best case uses rates below the published values (in-bag use can be lower).
+        lean = run_temperature_range(_cautious(sp_published, 1 - margin), sh, req.temp_low_c, req.temp_high_c,
+                                     chosen.interventions, Unpacking(), samples=0, dt_out=1.0)
+        published_max = _max_fish(sp_published, req, chosen)[0]
+        band = result["survival_band_pct"]
+        band["max"] = max(band["max"], round(100 * lean.stats["survival_after_unpacking"]["max"], 2))
+        result["species_uncertainty"] = {
+            "borrowed_from": sp.borrowed_from, "rate_margin_pct": round(100 * margin),
+            "fish_per_bag_at_published_values": published_max,
+            "safe_fish_per_bag_with_margin": chosen.max_fish,
+            "real_shipments_recorded": history.count_species(sp.name),
+            "real_shipments_needed": MIN_SPECIES_RECORDS,
+        }
+        warnings.append(f"Because the {sp.name.replace('_', ' ')} numbers are borrowed, this plan assumes the fish "
+                        f"may use up to {100 * margin:.0f}% more oxygen than expected and packs more carefully: "
+                        f"at most {chosen.max_fish} fish per bag instead of {published_max}. The survival range "
+                        "shown is wider for the same reason. This extra margin is removed once enough real "
+                        "shipment results for this species are recorded.")
+    anaesthetic = next((a for a in chosen.addons if a in ANAESTHETICS), "")
+    novelty = ai_history.check(ShipmentFeatures(
+        species=sp.name, fish_mass_g=req.fish_mass_g, fish_per_bag=n, water_l=req.water_l, gas_l=req.gas_l,
+        duration_h=req.duration_h, temp_max_c=max(req.temp_low_c, req.temp_high_c), fasting_h=chosen.fasting_h,
+        zeolite_g_per_l=chosen.interventions.zeolite_g_per_l, anaesthetic=anaesthetic))
+    result["experience"] = novelty.to_dict()
+    result["verdict"]["ai_display"] = novelty.ai_display
     result["oxygen"] = _oxygen_section(med, sp, sh, worst)
     result["mortality"] = _mortality_section(med, worst, sh, req.target_survival)
     result["chemistry"] = _chemistry_section(med)
     result["unpacking"] = _unpacking_section(med, worst)
     result["temperature"] = _temperature_section(sp, req, chosen, n)
     result["timeline"] = {"median": _series(med), "worst": _series(worst), "worst_label": rr.worst_label}
-    result["method"] = _method_section(req, sp, len(rr.runs))
-    result["ai_correction"] = _ai_correction(req, chosen, n)
+    result["method"] = _method_section(req, sp, len(rr.runs), margin)
+    # The AI has only learned from what it has seen: no numbers for a shipment unlike any of them.
+    ai = _ai_correction(req, chosen, n) if novelty.ai_display != "hidden" else None
+    if ai:
+        ai["display"] = novelty.ai_display
+    result["ai_correction"] = ai
     return result
 
 
@@ -656,6 +724,11 @@ def advise_text(adv: dict) -> str:
     lines += ["\nALL OPTIONS (max fish per bag at the hot end)"]
     for o in adv["options"]:
         lines.append(f"  {o['max_fish_per_bag']:>5d}  {o['label']}")
+    if adv.get("experience"):
+        lines += ["\nAI SECOND OPINION", "  " + adv["experience"]["message"]]
+        if ai := adv.get("ai_correction"):
+            lines.append(f"  AI estimate: {ai['corrected_survival_pct']:.1f}% alive after unpacking (physics "
+                         f"{ai['physics_survival_pct']:.1f}%, {ai['adjustment_pp']:+.1f} points). {ai['note']}")
     if adv["warnings"]:
         lines += ["\nNOTES"] + [f"  ! {w}" for w in adv["warnings"]]
     return "\n".join(lines)

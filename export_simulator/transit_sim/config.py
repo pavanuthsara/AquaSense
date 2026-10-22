@@ -3,6 +3,10 @@
 Species parameters live in ``config/species/*.yaml``. A species file may name a ``base`` species
 and override only what differs (e.g. guppy inherits the tiger barb calibration and replaces body
 size, temperature and ammonia tolerance).
+
+A species with a ``base`` uses borrowed or published values that no real shipment has confirmed. Its
+``rate_uncertainty`` (default ``BORROWED_RATE_UNCERTAINTY``) says how far its oxygen use and ammonia
+production may be off; the advisor plans against the high end until real outcomes exist.
 """
 from __future__ import annotations
 
@@ -14,6 +18,7 @@ import yaml
 
 CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
 SPECIES_DIR = CONFIG_DIR / "species"
+BORROWED_RATE_UNCERTAINTY = 0.3  # +/-30 %: in-bag O2 use was far below published respirometry values
 
 
 @dataclass(frozen=True)
@@ -41,12 +46,15 @@ class Species:
     guts_b: float             # killing rate (1/h per unit damage above threshold)
     guts_z: float             # damage threshold (toxic units)
     sources: dict = field(default_factory=dict, compare=False)
+    borrowed_from: str | None = None  # species the unconfirmed values come from (None = measured)
+    rate_uncertainty: float = 0.0     # fractional uncertainty of o2_rate and tan_rate
 
     def with_overrides(self, **kw: Any) -> "Species":
         return replace(self, **kw)
 
 
-_FIELD_NAMES = {f.name for f in fields(Species)}
+_META_FIELDS = {"name", "scientific_name", "sources", "borrowed_from", "rate_uncertainty"}
+_FIELD_NAMES = {f.name for f in fields(Species)} - _META_FIELDS
 
 
 def _read_yaml(path: Path) -> dict:
@@ -64,7 +72,7 @@ def load_species(name_or_path: str | Path) -> Species:
     sources: dict[str, str] = {}
     if raw.get("base"):
         base = load_species(raw["base"])
-        params = {f: getattr(base, f) for f in _FIELD_NAMES if f != "sources"}
+        params = {f: getattr(base, f) for f in _FIELD_NAMES}
         sources = {k: f"inherited from {base.name}: {v}" for k, v in base.sources.items()}
     for key, entry in (raw.get("parameters") or {}).items():
         if key not in _FIELD_NAMES:
@@ -77,6 +85,9 @@ def load_species(name_or_path: str | Path) -> Species:
     params["name"] = raw["name"]
     params["scientific_name"] = raw.get("scientific_name", "")
     params["sources"] = sources
+    params["borrowed_from"] = raw.get("base")
+    params["rate_uncertainty"] = float(raw.get("rate_uncertainty",
+                                             BORROWED_RATE_UNCERTAINTY if raw.get("base") else 0.0))
     missing = _FIELD_NAMES - params.keys()
     if missing:
         raise KeyError(f"{path.name}: missing parameters {sorted(missing)}")

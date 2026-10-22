@@ -148,10 +148,14 @@ c[4].metric("Expected losses / bag", f"{adv['mortality']['expected_dead_per_bag'
             help=f"worst case {adv['mortality']['expected_dead_per_bag_worst']:.1f}")
 
 ai = adv.get("ai_correction")
+experience = adv.get("experience") or {}
 if ai:
-    st.caption(f"🤖 AI second opinion: {ai['corrected_survival_pct']:.1f}% alive after unpacking "
+    limited = " · ⚠️ limited experience" if ai.get("display") == "limited" else ""
+    st.caption(f"🤖 AI second opinion{limited}: {ai['corrected_survival_pct']:.1f}% alive after unpacking "
                f"(physics {ai['physics_survival_pct']:.1f}%, AI adjusts {ai['adjustment_pp']:+.1f} points). "
                f"{ai['note']}")
+elif experience.get("ai_display") == "hidden":
+    st.caption("🤖 AI second opinion not shown: " + experience["message"])
 
 tl = adv["timeline"]
 tabs = st.tabs(["What to add", "Oxygen", "How fast fish die", "Water chemistry", "Temperature", "Unpacking",
@@ -271,6 +275,11 @@ with tabs[8]:
         "The physics simulator predicts survival from how the bag works. The AI layer learns, from completed "
         "shipments, **where the physics is usually wrong** and corrects it. It predicts only the difference, so it "
         "needs little data and leaves the physics unchanged when it has seen nothing.")
+    if experience:
+        {"full": st.success, "limited": st.warning, "hidden": st.info}[experience["ai_display"]](
+            f"**Has the AI seen shipments like this?** {experience['message']}")
+        if experience["out_of_range"]:
+            st.markdown("\n".join(f"- {r}" for r in experience["out_of_range"]))
     if ai:
         a1, a2, a3 = st.columns(3)
         a1.metric("Physics estimate", f"{ai['physics_survival_pct']:.1f}%")

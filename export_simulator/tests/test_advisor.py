@@ -99,12 +99,12 @@ def test_check_overpacked_bag_shows_real_losses():
 
 
 def test_check_uses_the_exporters_addons():
-    adv = advise(AdvisoryRequest(**BASE, mode="check", fish_per_bag=40, check_fasting_h=48,
+    adv = advise(AdvisoryRequest(**BASE, mode="check", fish_per_bag=35, check_fasting_h=48,
                                  check_anaesthetic="ms222_40mgL", check_zeolite=True))
     addons = {d["addon"] for d in adv["recommendation"]["doses"]}
     assert addons == {"fasting", "zeolite", "ms222_40mgL"}
     assert adv["verdict"]["meets_target"] is True
-    assert adv["verdict"]["safe_max_with_selected_addons"] >= 40
+    assert adv["verdict"]["safe_max_with_selected_addons"] >= 35
 
 
 def test_check_and_fixed_bags_validation():

@@ -84,7 +84,8 @@ def options() -> dict:
     for name in available_species():
         sp = load_species(name)
         species.append({"key": name, "scientific_name": sp.scientific_name,
-                        "validated": name == "tiger_barb", "reference_mass_g": sp.ref_mass_g})
+                        "validated": sp.borrowed_from is None, "borrowed_from": sp.borrowed_from,
+                        "reference_mass_g": sp.ref_mass_g})
     return {"species": species, "anaesthetics": list(load_interventions()), "addons": ADDONS}
 
 
@@ -105,6 +106,7 @@ def advisory(body: AdvisoryIn, response: Response) -> dict:
             response.headers["X-Advisory-Bags-Needed"] = str(rec["bags_needed"])
         response.headers["X-Advisory-Survival-Pct"] = str(mort["survival_after_unpacking_pct"])
         response.headers["X-Advisory-Worst-Survival-Pct"] = str(mort["worst_survival_after_unpacking_pct"])
+        response.headers["X-Advisory-AI-Display"] = adv["experience"]["ai_display"]
     return adv
 
 

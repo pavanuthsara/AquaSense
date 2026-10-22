@@ -287,6 +287,33 @@ Backend endpoints (any member of the aquarium):
 | GET | `/api/v1/facilities/{facilityId}/export-advisories` — latest 50 plans |
 | GET | `/api/v1/facilities/{facilityId}/export-advisories/{id}` — one plan with the full advisory |
 
+## Novelty check and new species
+
+`transit_sim/novelty.py` decides whether the AI second opinion has seen shipments like this one.
+It reads past shipments from `data/shipments/real_shipments.csv`. Required columns are `species,
+fish_mass_g, fish_per_bag, water_l, gas_l, duration_h, temp_max_c`. Optional columns are `fasting_h`,
+`zeolite_g_per_l` and `anaesthetic`. If the file is missing, the check has no history.
+
+- **Range check:** the shipment is flagged as new if its species, sedative or zeolite choice was never
+  seen. It is also flagged if fish size, density, gas:water ratio, trip length, hottest temperature or
+  fasting time is outside the recorded min-max.
+- **Similar-shipment count:** a similar shipment has the same species, sedative and zeolite choice,
+  size, density, gas:water and trip length within 25 %, temperature within 2 C and fasting within 12 h.
+
+| Situation | `experience.level` / `ai_display` | Exporter sees |
+|---|---|---|
+| ≥ 5 similar shipments | `many` / `full` | physics + AI second opinion |
+| 1–4 similar | `few` / `limited` | physics, AI marked "limited experience" |
+| out of range or 0 similar | `new` / `hidden` | physics only, with a note that this is the first data point |
+
+**New species.** Add `config/species/<name>.yaml` with `base: <similar species>`, and override any
+parameters with published values. Such a species is marked `borrowed_from`. Until
+`MIN_SPECIES_RECORDS` (10) real shipments of it are recorded, the advisor plans with oxygen use and
+ammonia production raised by `rate_uncertainty` (default 30 %), so it packs fewer fish per bag. It
+also widens the survival range, using −30 % as the best case. The reason for this margin is that
+in-bag oxygen use was well below published respirometry values, so borrowed or literature values can
+be off. The details are in `advisory["species_uncertainty"]`.
+
 ## Roadmap
 
 1. ✅ Mechanistic bag simulator + calibration/validation (this package)

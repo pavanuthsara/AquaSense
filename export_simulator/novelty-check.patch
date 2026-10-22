@@ -1,0 +1,619 @@
+diff --git a/export_simulator/README.md b/export_simulator/README.md
+index 4fc578a..b783fbb 100644
+--- a/export_simulator/README.md
++++ b/export_simulator/README.md
+@@ -246,6 +246,33 @@ Backend endpoints (any member of the aquarium):
+ | GET | `/api/v1/facilities/{facilityId}/export-advisories` — latest 50 plans |
+ | GET | `/api/v1/facilities/{facilityId}/export-advisories/{id}` — one plan with the full advisory |
+ 
++## Novelty check and new species
++
++`transit_sim/novelty.py` decides whether the AI second opinion has seen shipments like this one.
++It reads past shipments from `data/shipments/real_shipments.csv`. Required columns are `species,
++fish_mass_g, fish_per_bag, water_l, gas_l, duration_h, temp_max_c`. Optional columns are `fasting_h`,
++`zeolite_g_per_l` and `anaesthetic`. If the file is missing, the check has no history.
++
++- **Range check:** the shipment is flagged as new if its species, sedative or zeolite choice was never
++  seen. It is also flagged if fish size, density, gas:water ratio, trip length, hottest temperature or
++  fasting time is outside the recorded min-max.
++- **Similar-shipment count:** a similar shipment has the same species, sedative and zeolite choice,
++  size, density, gas:water and trip length within 25 %, temperature within 2 C and fasting within 12 h.
++
++| Situation | `experience.level` / `ai_display` | Exporter sees |
++|---|---|---|
++| ≥ 5 similar shipments | `many` / `full` | physics + AI second opinion |
++| 1–4 similar | `few` / `limited` | physics, AI marked "limited experience" |
++| out of range or 0 similar | `new` / `hidden` | physics only, with a note that this is the first data point |
++
++**New species.** Add `config/species/<name>.yaml` with `base: <similar species>`, and override any
++parameters with published values. Such a species is marked `borrowed_from`. Until
++`MIN_SPECIES_RECORDS` (10) real shipments of it are recorded, the advisor plans with oxygen use and
++ammonia production raised by `rate_uncertainty` (default 30 %), so it packs fewer fish per bag. It
++also widens the survival range, using −30 % as the best case. The reason for this margin is that
++in-bag oxygen use was well below published respirometry values, so borrowed or literature values can
++be off. The details are in `advisory["species_uncertainty"]`.
++
+ ## Roadmap
+ 
+ 1. ✅ Mechanistic bag simulator + calibration/validation (this package)
+diff --git a/export_simulator/tests/test_advisor.py b/export_simulator/tests/test_advisor.py
+index 2baa81c..9a5d0c4 100644
+--- a/export_simulator/tests/test_advisor.py
++++ b/export_simulator/tests/test_advisor.py
+@@ -99,12 +99,12 @@ def test_check_overpacked_bag_shows_real_losses():
+ 
+ 
+ def test_check_uses_the_exporters_addons():
+-    adv = advise(AdvisoryRequest(**BASE, mode="check", fish_per_bag=40, check_fasting_h=48,
++    adv = advise(AdvisoryRequest(**BASE, mode="check", fish_per_bag=35, check_fasting_h=48,
+                                  check_anaesthetic="ms222_40mgL", check_zeolite=True))
+     addons = {d["addon"] for d in adv["recommendation"]["doses"]}
+     assert addons == {"fasting", "zeolite", "ms222_40mgL"}
+     assert adv["verdict"]["meets_target"] is True
+-    assert adv["verdict"]["safe_max_with_selected_addons"] >= 40
++    assert adv["verdict"]["safe_max_with_selected_addons"] >= 35
+ 
+ 
+ def test_check_and_fixed_bags_validation():
+diff --git a/export_simulator/tests/test_novelty.py b/export_simulator/tests/test_novelty.py
+new file mode 100644
+index 0000000..a8349dd
+--- /dev/null
++++ b/export_simulator/tests/test_novelty.py
+@@ -0,0 +1,108 @@
++from dataclasses import replace
++
++import pytest
++
++from transit_sim.advisor import AdvisoryRequest, advise, advise_text
++from transit_sim.config import load_species
++from transit_sim.novelty import MIN_SIMILAR, MIN_SPECIES_RECORDS, ShipmentFeatures, ShipmentHistory
++
++X = ShipmentFeatures(species="guppy", fish_mass_g=0.3, fish_per_bag=40, water_l=0.4, gas_l=1.2, duration_h=24,
++                     temp_max_c=28, fasting_h=24, anaesthetic="ms222_40mgL")
++
++
++def _history(n_similar: int, n_other: int = 0) -> ShipmentHistory:
++    similar = [replace(X, fish_per_bag=38 + i % 5) for i in range(n_similar)]
++    other = [replace(X, fish_per_bag=150, duration_h=12, temp_max_c=22) for _ in range(n_other)]
++    return ShipmentHistory(similar + other)
++
++
++def test_many_similar_shipments_show_the_ai():
++    r = _history(MIN_SIMILAR).check(X)
++    assert (r.level, r.ai_display, r.similar_shipments) == ("many", "full", MIN_SIMILAR)
++
++
++def test_few_similar_shipments_are_limited_experience():
++    r = _history(2, n_other=20).check(X)
++    assert (r.level, r.ai_display, r.similar_shipments) == ("few", "limited", 2)
++    assert "Limited experience" in r.message
++
++
++def test_in_range_but_nothing_close_is_new():
++    r = _history(1, n_other=1).check(replace(X, fish_per_bag=90, duration_h=18, temp_max_c=25))
++    assert r.level == "new" and r.similar_shipments == 0 and not r.out_of_range
++
++
++@pytest.mark.parametrize("change, phrase", [
++    (dict(species="neon_tetra"), "has not been shipped before"),
++    (dict(duration_h=48), "trip length 48 h is higher than any recorded"),
++    (dict(temp_max_c=33), "hottest temperature"),
++    (dict(anaesthetic="benzocaine_20mgL"), "sedative"),
++    (dict(zeolite_g_per_l=20), "zeolite"),
++])
++def test_range_check_flags_anything_never_seen(change, phrase):
++    r = _history(10).check(replace(X, **change))
++    assert (r.level, r.ai_display) == ("new", "hidden")
++    assert any(phrase in reason for reason in r.out_of_range), r.out_of_range
++    assert "first data point" in r.message
++
++
++def test_no_records_means_physics_only():
++    r = ShipmentHistory().check(X)
++    assert r.ai_display == "hidden" and r.records == 0
++
++
++def test_history_reads_csv(tmp_path):
++    p = tmp_path / "real.csv"
++    p.write_text("species,fish_mass_g,fish_per_bag,water_l,gas_l,duration_h,temp_max_c,anaesthetic\n"
++                 "guppy,0.3,40,0.4,1.2,24,28,ms222_40mgL\n"
++                 "guppy,0.3,40,0.4,1.2,24,28,none\n", encoding="utf-8")
++    h = ShipmentHistory.from_csv(p)
++    assert len(h) == 2 and h.count_species("guppy") == 2
++    assert h.records[1].anaesthetic == "" and h.records[0].fasting_h == 24.0
++    bad = tmp_path / "bad.csv"
++    bad.write_text("species,fish_mass_g\nguppy,0.3\n", encoding="utf-8")
++    with pytest.raises(ValueError):
++        ShipmentHistory.from_csv(bad)
++
++
++def test_borrowed_species_are_marked():
++    assert load_species("guppy").borrowed_from == "tiger_barb"
++    assert load_species("guppy").rate_uncertainty > 0
++    assert load_species("tiger_barb").borrowed_from is None
++    assert load_species("tiger_barb").rate_uncertainty == 0
++
++
++REQ = dict(species="guppy", fish_mass_g=0.3, total_fish=1000, water_l=0.4, gas_l=1.2, duration_h=24,
++           temp_low_c=24, temp_high_c=26, samples=0, allow_anaesthetic=False, allow_zeolite=False, max_fasting_h=24)
++
++
++@pytest.fixture(scope="module")
++def cautious():
++    return advise(AdvisoryRequest(**REQ), history=ShipmentHistory())
++
++
++def test_borrowed_species_is_packed_more_conservatively(cautious):
++    su = cautious["species_uncertainty"]
++    assert su["safe_fish_per_bag_with_margin"] < su["fish_per_bag_at_published_values"]
++    assert cautious["recommendation"]["fish_per_bag"] == su["safe_fish_per_bag_with_margin"]
++    assert any("packs more carefully" in w for w in cautious["warnings"])
++    assert cautious["experience"]["ai_display"] == "hidden"
++    assert cautious["verdict"]["ai_display"] == "hidden"
++    assert "AI SECOND OPINION" in advise_text(cautious)
++
++
++def test_margin_is_dropped_once_real_shipments_exist(cautious):
++    su = cautious["species_uncertainty"]
++    n = su["fish_per_bag_at_published_values"]
++    records = [ShipmentFeatures(species="guppy", fish_mass_g=0.3, fish_per_bag=n + i % 3 - 1, water_l=0.4,
++                                gas_l=1.2, duration_h=24, temp_max_c=26) for i in range(MIN_SPECIES_RECORDS)]
++    adv = advise(AdvisoryRequest(**REQ), history=ShipmentHistory(records))
++    assert adv["species_uncertainty"] is None
++    assert adv["recommendation"]["fish_per_bag"] == n
++    assert adv["experience"]["level"] == "many"
++
++
++def test_measured_species_has_no_margin():
++    adv = advise(AdvisoryRequest(**{**REQ, "species": "tiger_barb", "fish_mass_g": 12, "total_fish": 50,
++                                    "water_l": 1.0, "gas_l": 3.0}), history=ShipmentHistory())
++    assert adv["species_uncertainty"] is None
+diff --git a/export_simulator/transit_sim/advisor.py b/export_simulator/transit_sim/advisor.py
+index 4ed445c..148bc5f 100644
+--- a/export_simulator/transit_sim/advisor.py
++++ b/export_simulator/transit_sim/advisor.py
+@@ -13,6 +13,10 @@ Method
+ 3. The best plan is re-run over the whole temperature range (constant low/mid/high + random
+    profiles) to report the median and worst-case timelines.
+ 4. Oxygen, mortality, chemistry, temperature and unpacking sections are derived from those runs.
++5. A species whose values are borrowed from another species is planned with its oxygen use and
++   ammonia production raised by its ``rate_uncertainty`` until enough real shipments of it are recorded.
++6. The novelty check (``novelty.py``) says whether the AI second opinion has seen shipments like the
++   chosen packing, and so whether it is shown in full, as "limited experience", or not at all.
+ """
+ from __future__ import annotations
+ 
+@@ -24,6 +28,7 @@ import numpy as np
+ from . import chemistry as chem
+ from .config import Interventions, Shipment, Species, Unpacking, load_interventions, load_species
+ from .model import SimulationResult, simulate
++from .novelty import MIN_SPECIES_RECORDS, ShipmentFeatures, ShipmentHistory, load_history
+ from .uncertainty import run_temperature_range
+ 
+ # ----------------------------------------------------------------------------- add-on catalogue
+@@ -109,7 +114,7 @@ SOURCES = [
+ ]
+ 
+ 
+-def _method_section(req: "AdvisoryRequest", sp, n_runs: int) -> dict:
++def _method_section(req: "AdvisoryRequest", sp, n_runs: int, margin: float = 0.0) -> dict:
+     steps = [
+         "We follow the sealed bag hour by hour. The fish use oxygen and give off carbon dioxide (CO2) and "
+         "ammonia. Oxygen moves only slowly from the gas into the water.",
+@@ -129,10 +134,22 @@ def _method_section(req: "AdvisoryRequest", sp, n_runs: int) -> dict:
+                      "lets you pack at least 5% more fish.")
+     steps.append("Finally we simulate opening the bag: the CO2 escapes, the pH rises and ammonia becomes "
+                  "toxic. That is why the plan checks survival after unpacking, not only on arrival.")
++    if margin:
++        steps.append(f"This species has no recorded shipments yet, so its numbers are borrowed from a similar "
++                     f"species or from published values. Measured oxygen use in a sealed bag can differ a lot "
++                     f"from published values, so we plan as if the fish use {100 * margin:.0f}% more oxygen "
++                     f"and give off {100 * margin:.0f}% more ammonia, and show a wider survival range. The "
++                     f"margin is dropped once {MIN_SPECIES_RECORDS} real shipments of this species are recorded.")
++    steps.append("We then check whether past shipments look like this one: same species, sedative and "
++                 "zeolite choice, and fish size, packing density, gas-to-water ratio, trip length, hottest "
++                 "temperature and fasting time close to it. The AI second opinion is only trusted when "
++                 "enough of them exist. A new combination is not a failure: the physics makes the "
++                 "prediction, and this shipment's outcome becomes the first data point for it. The system "
++                 "fills its own gaps as it is used.")
+     confidence = ["The simulator was checked against a real 48-hour shipping trial. Its oxygen, ammonia, CO2 "
+                   "and survival curves matched the measurements closely."]
+-    if sp.name != "tiger_barb":
+-        confidence.append(f"That trial used tiger barb. Numbers for {sp.name.replace('_', ' ')} are scaled to "
++    if sp.borrowed_from:
++        confidence.append(f"That trial used {sp.borrowed_from.replace('_', ' ')}. Numbers for {sp.name.replace('_', ' ')} are scaled to "
+                           "its body size and have not yet been confirmed with real shipments.")
+     confidence.append("The zeolite effect is an early estimate and will be improved with more data.")
+     return {"steps": steps, "confidence": confidence, "sources": SOURCES}
+@@ -448,9 +465,20 @@ def _temperature_section(sp: Species, req: AdvisoryRequest, plan: Plan, n: int)
+ 
+ 
+ # ----------------------------------------------------------------------------- public API
+-def advise(req: AdvisoryRequest) -> dict:
++def _cautious(sp: Species, factor: float) -> Species:
++    return sp.with_overrides(o2_rate=sp.o2_rate * factor, tan_rate=sp.tan_rate * factor)
++
++
++def advise(req: AdvisoryRequest, history: ShipmentHistory | None = None) -> dict:
++    """Full advisory. ``history`` = past shipments for the novelty check (default: recorded real shipments)."""
+     req.validate()
+-    sp = load_species(req.species)
++    history = load_history() if history is None else history
++    sp_published = load_species(req.species)
++    # Borrowed values: plan against the high end of their uncertainty until real outcomes exist.
++    margin = (sp_published.rate_uncertainty
++              if sp_published.borrowed_from and history.count_species(sp_published.name) < MIN_SPECIES_RECORDS
++              else 0.0)
++    sp = _cautious(sp_published, 1 + margin) if margin else sp_published
+     plans = _plans(req)
+     for p in plans:
+         p.max_fish, p.survival_at_max = _max_fish(sp, req, p)
+@@ -465,7 +493,7 @@ def advise(req: AdvisoryRequest) -> dict:
+     chem_free = max((p for p in plans if not p.addons), key=lambda p: (p.max_fish, -p.fasting_h))
+ 
+     warnings = []
+-    if sp.name != "tiger_barb":
++    if sp.borrowed_from:
+         warnings.append(f"The {sp.name.replace('_', ' ')} numbers are estimated from tests on another species "
+                         "and have not yet been confirmed with real shipments. Treat them as a guide.")
+ 
+@@ -495,7 +523,8 @@ def advise(req: AdvisoryRequest) -> dict:
+                             f"at {req.temp_high_c:g} C, even with one fish per bag. Shorten the journey, lower the "
+                             "temperature, or use more water per bag.")}
+             result["verdict"] = {**verdict, "meets_target": False, "message": result["recommendation"]["summary"]}
+-            result["method"] = _method_section(req, sp, 0)
++            result["experience"] = None
++            result["method"] = _method_section(req, sp, 0, margin)
+             return result
+         chosen, n = best, best.max_fish
+     elif req.mode == "fixed_bags":
+@@ -516,7 +545,7 @@ def advise(req: AdvisoryRequest) -> dict:
+     for o in result["options"]:
+         o["recommended"] = o["key"] == best.key
+         o["selected"] = o["key"] == chosen.key
+-    if any(a in ANAESTHETICS for a in chosen.addons) and sp.name != "tiger_barb":
++    if any(a in ANAESTHETICS for a in chosen.addons) and sp.borrowed_from:
+         warnings.append("The effect of the anaesthetic was measured on a different species; for this one it "
+                         "is an estimate.")
+     if "zeolite" in chosen.addons:
+@@ -586,13 +615,40 @@ def advise(req: AdvisoryRequest) -> dict:
+         "summary": summary,
+     }
+     result["survival_band_pct"] = {k: round(100 * v, 2) for k, v in rr.stats["survival_after_unpacking"].items()}
++    result["species_uncertainty"] = None
++    if margin:
++        # Wider range: the best case uses rates below the published values (in-bag use can be lower).
++        lean = run_temperature_range(_cautious(sp_published, 1 - margin), sh, req.temp_low_c, req.temp_high_c,
++                                     chosen.interventions, Unpacking(), samples=0, dt_out=1.0)
++        published_max = _max_fish(sp_published, req, chosen)[0]
++        band = result["survival_band_pct"]
++        band["max"] = max(band["max"], round(100 * lean.stats["survival_after_unpacking"]["max"], 2))
++        result["species_uncertainty"] = {
++            "borrowed_from": sp.borrowed_from, "rate_margin_pct": round(100 * margin),
++            "fish_per_bag_at_published_values": published_max,
++            "safe_fish_per_bag_with_margin": chosen.max_fish,
++            "real_shipments_recorded": history.count_species(sp.name),
++            "real_shipments_needed": MIN_SPECIES_RECORDS,
++        }
++        warnings.append(f"Because the {sp.name.replace('_', ' ')} numbers are borrowed, this plan assumes the fish "
++                        f"may use up to {100 * margin:.0f}% more oxygen than expected and packs more carefully: "
++                        f"at most {chosen.max_fish} fish per bag instead of {published_max}. The survival range "
++                        "shown is wider for the same reason. This extra margin is removed once enough real "
++                        "shipment results for this species are recorded.")
++    anaesthetic = next((a for a in chosen.addons if a in ANAESTHETICS), "")
++    novelty = history.check(ShipmentFeatures(
++        species=sp.name, fish_mass_g=req.fish_mass_g, fish_per_bag=n, water_l=req.water_l, gas_l=req.gas_l,
++        duration_h=req.duration_h, temp_max_c=max(req.temp_low_c, req.temp_high_c), fasting_h=chosen.fasting_h,
++        zeolite_g_per_l=chosen.interventions.zeolite_g_per_l, anaesthetic=anaesthetic))
++    result["experience"] = novelty.to_dict()
++    result["verdict"]["ai_display"] = novelty.ai_display
+     result["oxygen"] = _oxygen_section(med, sp, sh, worst)
+     result["mortality"] = _mortality_section(med, worst, sh, req.target_survival)
+     result["chemistry"] = _chemistry_section(med)
+     result["unpacking"] = _unpacking_section(med, worst)
+     result["temperature"] = _temperature_section(sp, req, chosen, n)
+     result["timeline"] = {"median": _series(med), "worst": _series(worst), "worst_label": rr.worst_label}
+-    result["method"] = _method_section(req, sp, len(rr.runs))
++    result["method"] = _method_section(req, sp, len(rr.runs), margin)
+     return result
+ 
+ 
+@@ -633,6 +689,8 @@ def advise_text(adv: dict) -> str:
+     lines += ["\nALL OPTIONS (max fish per bag at the hot end)"]
+     for o in adv["options"]:
+         lines.append(f"  {o['max_fish_per_bag']:>5d}  {o['label']}")
++    if adv.get("experience"):
++        lines += ["\nAI SECOND OPINION", "  " + adv["experience"]["message"]]
+     if adv["warnings"]:
+         lines += ["\nNOTES"] + [f"  ! {w}" for w in adv["warnings"]]
+     return "\n".join(lines)
+diff --git a/export_simulator/transit_sim/api.py b/export_simulator/transit_sim/api.py
+index 108e00b..4f5df5f 100644
+--- a/export_simulator/transit_sim/api.py
++++ b/export_simulator/transit_sim/api.py
+@@ -84,7 +84,8 @@ def options() -> dict:
+     for name in available_species():
+         sp = load_species(name)
+         species.append({"key": name, "scientific_name": sp.scientific_name,
+-                        "validated": name == "tiger_barb", "reference_mass_g": sp.ref_mass_g})
++                        "validated": sp.borrowed_from is None, "borrowed_from": sp.borrowed_from,
++                        "reference_mass_g": sp.ref_mass_g})
+     return {"species": species, "anaesthetics": list(load_interventions()), "addons": ADDONS}
+ 
+ 
+@@ -105,6 +106,7 @@ def advisory(body: AdvisoryIn, response: Response) -> dict:
+             response.headers["X-Advisory-Bags-Needed"] = str(rec["bags_needed"])
+         response.headers["X-Advisory-Survival-Pct"] = str(mort["survival_after_unpacking_pct"])
+         response.headers["X-Advisory-Worst-Survival-Pct"] = str(mort["worst_survival_after_unpacking_pct"])
++        response.headers["X-Advisory-AI-Display"] = adv["experience"]["ai_display"]
+     return adv
+ 
+ 
+diff --git a/export_simulator/transit_sim/config.py b/export_simulator/transit_sim/config.py
+index b1ebe39..137ddca 100644
+--- a/export_simulator/transit_sim/config.py
++++ b/export_simulator/transit_sim/config.py
+@@ -3,6 +3,10 @@
+ Species parameters live in ``config/species/*.yaml``. A species file may name a ``base`` species
+ and override only what differs (e.g. guppy inherits the tiger barb calibration and replaces body
+ size, temperature and ammonia tolerance).
++
++A species with a ``base`` uses borrowed or published values that no real shipment has confirmed. Its
++``rate_uncertainty`` (default ``BORROWED_RATE_UNCERTAINTY``) says how far its oxygen use and ammonia
++production may be off; the advisor plans against the high end until real outcomes exist.
+ """
+ from __future__ import annotations
+ 
+@@ -14,6 +18,7 @@ import yaml
+ 
+ CONFIG_DIR = Path(__file__).resolve().parent.parent / "config"
+ SPECIES_DIR = CONFIG_DIR / "species"
++BORROWED_RATE_UNCERTAINTY = 0.3  # +/-30 %: in-bag O2 use was far below published respirometry values
+ 
+ 
+ @dataclass(frozen=True)
+@@ -41,12 +46,15 @@ class Species:
+     guts_b: float             # killing rate (1/h per unit damage above threshold)
+     guts_z: float             # damage threshold (toxic units)
+     sources: dict = field(default_factory=dict, compare=False)
++    borrowed_from: str | None = None  # species the unconfirmed values come from (None = measured)
++    rate_uncertainty: float = 0.0     # fractional uncertainty of o2_rate and tan_rate
+ 
+     def with_overrides(self, **kw: Any) -> "Species":
+         return replace(self, **kw)
+ 
+ 
+-_FIELD_NAMES = {f.name for f in fields(Species)}
++_META_FIELDS = {"name", "scientific_name", "sources", "borrowed_from", "rate_uncertainty"}
++_FIELD_NAMES = {f.name for f in fields(Species)} - _META_FIELDS
+ 
+ 
+ def _read_yaml(path: Path) -> dict:
+@@ -64,7 +72,7 @@ def load_species(name_or_path: str | Path) -> Species:
+     sources: dict[str, str] = {}
+     if raw.get("base"):
+         base = load_species(raw["base"])
+-        params = {f: getattr(base, f) for f in _FIELD_NAMES if f != "sources"}
++        params = {f: getattr(base, f) for f in _FIELD_NAMES}
+         sources = {k: f"inherited from {base.name}: {v}" for k, v in base.sources.items()}
+     for key, entry in (raw.get("parameters") or {}).items():
+         if key not in _FIELD_NAMES:
+@@ -77,6 +85,9 @@ def load_species(name_or_path: str | Path) -> Species:
+     params["name"] = raw["name"]
+     params["scientific_name"] = raw.get("scientific_name", "")
+     params["sources"] = sources
++    params["borrowed_from"] = raw.get("base")
++    params["rate_uncertainty"] = float(raw.get("rate_uncertainty",
++                                             BORROWED_RATE_UNCERTAINTY if raw.get("base") else 0.0))
+     missing = _FIELD_NAMES - params.keys()
+     if missing:
+         raise KeyError(f"{path.name}: missing parameters {sorted(missing)}")
+diff --git a/export_simulator/transit_sim/novelty.py b/export_simulator/transit_sim/novelty.py
+new file mode 100644
+index 0000000..7efe492
+--- /dev/null
++++ b/export_simulator/transit_sim/novelty.py
+@@ -0,0 +1,202 @@
++"""Novelty check: has the AI second opinion seen shipments like this one?
++
++The AI correction only learns from past shipments, so it is only trustworthy for shipments that look
++like ones it has seen. Two simple checks decide what the exporter is shown:
++
++* range check: every number (fish size, packing density, gas-to-water ratio, trip length, hottest
++  temperature, fasting time) must lie inside the lowest-highest seen in the records, and the species,
++  sedative and zeolite choice must all have been seen before;
++* similar-shipment count: how many records are close to this shipment on ALL inputs at once.
++
++=========================  ===============================================================
++level / ai_display         what the exporter sees
++=========================  ===============================================================
++``many`` / ``full``        physics prediction plus the AI second opinion
++``few`` / ``limited``      physics prediction, AI shown but marked "limited experience"
++``new`` / ``hidden``       physics only, with a note that no comparable shipments exist yet
++=========================  ===============================================================
++
++A new combination is not a failure case: the physics makes the prediction, and the shipment's
++recorded outcome becomes the first data point for that combination.
++
++Features are unit-free ratios or fixed units (g, h, C) so that records from different bag sizes compare
++directly. Records are read from ``data/shipments/real_shipments.csv`` (columns: see ``REQUIRED`` and
++``OPTIONAL``). When the ML layer is trained on other data, pass that table instead so the check
++describes what the AI has actually seen.
++"""
++from __future__ import annotations
++
++import csv
++from dataclasses import asdict, dataclass, field
++from functools import lru_cache
++from pathlib import Path
++
++REAL_SHIPMENTS_CSV = Path(__file__).resolve().parent.parent / "data" / "shipments" / "real_shipments.csv"
++
++MIN_SIMILAR = 5             # fewer similar past shipments than this -> "limited experience"
++MIN_SPECIES_RECORDS = 10    # real shipments of a species before its borrowed-value safety margin is dropped
++RELATIVE_TOL = 0.25         # "similar": fish size, density, gas:water and trip length within 25 %
++TEMP_TOL_C = 2.0            # ... hottest temperature within 2 C
++FASTING_TOL_H = 12.0        # ... fasting within 12 h
++
++REQUIRED = ("species", "fish_mass_g", "fish_per_bag", "water_l", "gas_l", "duration_h", "temp_max_c")
++OPTIONAL = {"fasting_h": 24.0, "zeolite_g_per_l": 0.0, "anaesthetic": ""}
++
++# (attribute, plain-language name, unit, ("rel", fraction) or ("abs", amount))
++NUMERIC = [
++    ("fish_mass_g", "fish size", "g", ("rel", RELATIVE_TOL)),
++    ("density_g_per_l", "packing density", "g/L", ("rel", RELATIVE_TOL)),
++    ("gas_to_water", "gas-to-water ratio", "", ("rel", RELATIVE_TOL)),
++    ("duration_h", "trip length", "h", ("rel", RELATIVE_TOL)),
++    ("temp_max_c", "hottest temperature", "C", ("abs", TEMP_TOL_C)),
++    ("fasting_h", "fasting time", "h", ("abs", FASTING_TOL_H)),
++]
++CATEGORICAL = ["species", "anaesthetic", "uses_zeolite"]
++
++
++@dataclass(frozen=True)
++class ShipmentFeatures:
++    """One shipment as the novelty check sees it (one bag type, hot end of the temperature range)."""
++
++    species: str
++    fish_mass_g: float
++    fish_per_bag: int
++    water_l: float
++    gas_l: float
++    duration_h: float
++    temp_max_c: float
++    fasting_h: float = 24.0
++    zeolite_g_per_l: float = 0.0
++    anaesthetic: str = ""  # "" = none
++
++    @property
++    def density_g_per_l(self) -> float:
++        return self.fish_per_bag * self.fish_mass_g / self.water_l
++
++    @property
++    def gas_to_water(self) -> float:
++        return self.gas_l / self.water_l
++
++    @property
++    def uses_zeolite(self) -> bool:
++        return self.zeolite_g_per_l > 0
++
++
++@dataclass
++class NoveltyResult:
++    level: str                  # many | few | new
++    ai_display: str             # full | limited | hidden
++    similar_shipments: int
++    records: int
++    out_of_range: list[str] = field(default_factory=list)
++    message: str = ""
++
++    def to_dict(self) -> dict:
++        return asdict(self)
++
++
++def _fmt(v: float) -> str:
++    return f"{v:.3g}" if abs(v) < 100 else f"{v:.0f}"
++
++
++def _close(a: float, b: float, tol: tuple[str, float]) -> bool:
++    kind, amount = tol
++    if kind == "abs":
++        return abs(a - b) <= amount
++    return abs(a - b) <= amount * max(abs(a), abs(b), 1e-12)
++
++
++class ShipmentHistory:
++    """Past shipments the AI layer has learned from."""
++
++    def __init__(self, records: list[ShipmentFeatures] | None = None):
++        self.records = list(records or [])
++
++    def __len__(self) -> int:
++        return len(self.records)
++
++    @classmethod
++    def from_csv(cls, path: str | Path) -> "ShipmentHistory":
++        with open(path, newline="", encoding="utf-8") as fh:
++            reader = csv.DictReader(fh)
++            missing = [c for c in REQUIRED if c not in (reader.fieldnames or [])]
++            if missing:
++                raise ValueError(f"{Path(path).name}: missing columns {missing}")
++            records = []
++            for row in reader:
++                get = lambda k: (row.get(k) or "").strip()  # noqa: E731
++                anaesthetic = get("anaesthetic")
++                records.append(ShipmentFeatures(
++                    species=get("species"), fish_mass_g=float(get("fish_mass_g")),
++                    fish_per_bag=int(float(get("fish_per_bag"))), water_l=float(get("water_l")),
++                    gas_l=float(get("gas_l")), duration_h=float(get("duration_h")),
++                    temp_max_c=float(get("temp_max_c")),
++                    fasting_h=float(get("fasting_h") or OPTIONAL["fasting_h"]),
++                    zeolite_g_per_l=float(get("zeolite_g_per_l") or OPTIONAL["zeolite_g_per_l"]),
++                    anaesthetic="" if anaesthetic.lower() in ("", "none") else anaesthetic))
++        return cls(records)
++
++    def count_species(self, species: str) -> int:
++        return sum(r.species == species for r in self.records)
++
++    def out_of_range(self, x: ShipmentFeatures) -> list[str]:
++        """Plain-language reasons why ``x`` lies outside anything recorded (empty = inside)."""
++        if not self.records:
++            return ["no shipments have been recorded yet"]
++        reasons = []
++        if x.species not in {r.species for r in self.records}:
++            reasons.append(f"{x.species.replace('_', ' ')} has not been shipped before")
++        if x.anaesthetic not in {r.anaesthetic for r in self.records}:
++            reasons.append("no recorded shipment used this sedative" if x.anaesthetic
++                           else "every recorded shipment used a sedative")
++        if x.uses_zeolite not in {r.uses_zeolite for r in self.records}:
++            reasons.append("no recorded shipment used zeolite" if x.uses_zeolite
++                           else "every recorded shipment used zeolite")
++        for attr, name, unit, _ in NUMERIC:
++            seen = [getattr(r, attr) for r in self.records]
++            v, lo, hi = getattr(x, attr), min(seen), max(seen)
++            u = f" {unit}" if unit else ""
++            if v > hi:
++                reasons.append(f"{name} {_fmt(v)}{u} is higher than any recorded ({_fmt(hi)}{u})")
++            elif v < lo:
++                reasons.append(f"{name} {_fmt(v)}{u} is lower than any recorded ({_fmt(lo)}{u})")
++        return reasons
++
++    def similar(self, x: ShipmentFeatures) -> int:
++        """Records with the same species, sedative and zeolite choice, and every number within tolerance."""
++        return sum(all(getattr(r, c) == getattr(x, c) for c in CATEGORICAL)
++                   and all(_close(getattr(r, a), getattr(x, a), tol) for a, _, _, tol in NUMERIC)
++                   for r in self.records)
++
++    def check(self, x: ShipmentFeatures) -> NoveltyResult:
++        reasons = self.out_of_range(x)
++        k = self.similar(x) if not reasons else 0
++        if reasons or k == 0:
++            why = "; ".join(reasons) if reasons else "no recorded shipment is close to this one"
++            return NoveltyResult(
++                "new", "hidden", k, len(self), reasons,
++                f"No comparable shipments exist yet ({why}). This plan is based on the physics only. "
++                "Record how this shipment arrives: it becomes the first data point for this combination.")
++        if k < MIN_SIMILAR:
++            return NoveltyResult(
++                "few", "limited", k, len(self), [],
++                f"Limited experience: only {k} past shipment{'s' if k != 1 else ''} "
++                f"{'are' if k != 1 else 'is'} similar to this one. The AI second opinion is shown for "
++                "interest only; the plan follows the physics.")
++        return NoveltyResult(
++            "many", "full", k, len(self), [],
++            f"{k} past shipments are similar to this one, so the AI second opinion has enough experience "
++            "to correct the physics estimate.")
++
++
++@lru_cache(maxsize=4)
++def _load_cached(path: str, mtime: float) -> ShipmentHistory:
++    return ShipmentHistory.from_csv(path)
++
++
++def load_history(path: str | Path = REAL_SHIPMENTS_CSV) -> ShipmentHistory:
++    """Recorded shipments; empty if the file does not exist yet."""
++    p = Path(path)
++    if not p.exists():
++        return ShipmentHistory()
++    return _load_cached(str(p), p.stat().st_mtime)
