@@ -60,7 +60,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-011 | Video check: models and setup | DIS-009 | Done |
 | DIS-012 | Python reference fixtures | DIS-011 | Done |
 | DIS-013 | Fish finder in Dart | DIS-012 | Done |
-| DIS-014 | Fish crop classifier in Dart | DIS-012 | Not started |
+| DIS-014 | Fish crop classifier in Dart | DIS-012 | Done |
 | DIS-015 | Tracker, per-fish vote, video answer | DIS-013, DIS-014 | Not started |
 | DIS-016 | Video source and frame extraction | DIS-011 | Not started |
 | DIS-017 | Video check UI | DIS-015, DIS-016 | Not started |
@@ -291,6 +291,28 @@ the phone means the check works offline at a farm, and the same model file can
 run on a Raspberry Pi later.
 
 ## Work log
+
+### 2026-10-22 — DIS-014: Fish crop classifier in Dart — Done
+
+- `domain/fish_crop_classifier.dart`: `FishCropResult` (whiteSpotScore,
+  isNotFish, probs) and the `FishCropClassifier` interface.
+- `data/crop_preprocessor.dart`: `cropBoxWithMargin` (12% margin, truncate +
+  clamp), `cropRegion`, `prepareCropInput` (AREA/average resize, BLACK pad,
+  floor centring, float 0..255, NHWC), `whiteSpotScoreFrom` (renormalised over
+  healthy+white_spot), `isNotFishFrom` (argmax == not_fish).
+- `data/tflite_fish_crop_classifier.dart`: loads `guppy_video_model.tflite` +
+  labels, checks 3 outputs == 3 labels, preprocess in an isolate, returns the
+  renormalised score and not_fish flag.
+- Tests `test/video/fish_crop_parity_test.dart`:
+  - `cropBoxWithMargin` == Python `crop_box` for every fixture box, plus a
+    border clamp/truncate case.
+  - `prepareCropInput` vs `crop_input_k_j.png` mean abs diff **0.91 / 0.95 /
+    0.79** (budget 2.0).
+  - `whiteSpotScoreFrom(probs)` == saved score within 1e-6; `isNotFishFrom`
+    matches; argmax rule unit test.
+- Photo mode untouched. `dart format`/`analyze` clean, `flutter test` 104
+  passed. Next: DIS-015 (tracker, per-fish vote, video answer).
+
 
 ### 2026-10-22 — DIS-013: Fish finder in Dart — Done
 
