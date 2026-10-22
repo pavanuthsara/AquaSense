@@ -40,6 +40,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/logout",
                                 "/api/v1/device-heartbeats",
                                 "/api/v1/device-observations",
+                                "/api/v1/device-appetite-checks/**",
                                 "/api/v1/feeder-commands/**")
                         .permitAll()
                         .anyRequest().authenticated())

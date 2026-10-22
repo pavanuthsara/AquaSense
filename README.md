@@ -16,9 +16,14 @@ Docker setup, from the repository root:
 ```powershell
 Copy-Item .env.example .env
 # Fill in .env using the setup guide before starting.
-docker compose up --build -d
-docker compose logs -f backend
+cd backend
+docker compose --env-file ../.env up --build -d
+docker compose --env-file ../.env logs -f backend
 ```
+
+Compose lives in `backend/compose.yaml` and starts only the API and PostgreSQL.
+Flutter runs from `mobile_app/`; camera tracking and ML run from the repository
+root. The explicit `--env-file` keeps the existing root configuration in use.
 
 ## Research dependencies
 

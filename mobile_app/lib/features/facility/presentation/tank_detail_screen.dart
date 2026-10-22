@@ -5,6 +5,7 @@ import '../domain/facility.dart';
 import '../domain/facility_repository.dart';
 import '../domain/tank.dart';
 import 'tank_form_screen.dart';
+import 'appetite_check_card.dart';
 import 'tank_feeding_schedule_screen.dart';
 import 'portion_preview_screen.dart';
 import 'feeding_history_screen.dart';
@@ -151,6 +152,13 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
                 'Copy this token now. For security, AquaSense will not show it again.',
               ),
               const SizedBox(height: 12),
+              const Text('Device ID'),
+              SelectableText(
+                provisioned.deviceId,
+                key: const Key('provisioned-device-id'),
+              ),
+              const SizedBox(height: 12),
+              const Text('Device token'),
               SelectableText(
                 provisioned.heartbeatToken,
                 key: const Key('device-heartbeat-token'),
@@ -158,6 +166,19 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
             ],
           ),
           actions: [
+            TextButton(
+              onPressed: () async {
+                await Clipboard.setData(
+                  ClipboardData(text: provisioned.deviceId),
+                );
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Device ID copied')),
+                  );
+                }
+              },
+              child: const Text('Copy ID'),
+            ),
             TextButton.icon(
               onPressed: () async {
                 await Clipboard.setData(
@@ -170,7 +191,7 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
                 }
               },
               icon: const Icon(Icons.copy_rounded),
-              label: const Text('Copy'),
+              label: const Text('Copy token'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -348,6 +369,15 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
             observation: detail.appetiteObservation,
             dateLabel: _date,
           ),
+          if (tank.status != TankStatus.archived) ...[
+            const SizedBox(height: 14),
+            AppetiteCheckCard(
+              key: ValueKey('appetite-check-${tank.id}'),
+              facilityId: widget.facility.id,
+              tankId: tank.id,
+              repository: widget.repository,
+            ),
+          ],
           const SizedBox(height: 14),
           _Section(
             title: 'Feeding and hardware',

@@ -1,4 +1,5 @@
 import '../domain/facility.dart';
+import '../domain/appetite_check.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_team.dart';
 import '../domain/feeder_calibration.dart';
@@ -7,6 +8,27 @@ import '../domain/tank_group.dart';
 import '../domain/tank.dart';
 
 class DevelopmentFacilityRepository implements FacilityRepository {
+  @override
+  Future<AppetiteCheck> requestAppetiteCheck({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    throw const FacilityException(
+      'Live appetite checks require a backend connection. Sign in with Google and connect your laptop camera process.',
+    );
+  }
+
+  @override
+  Future<AppetiteCheck> getAppetiteCheck({
+    required String facilityId,
+    required String tankId,
+    required String checkId,
+  }) async {
+    throw const FacilityException(
+      'Live appetite checks require a backend connection.',
+    );
+  }
+
   final List<Facility> _facilities = [];
   final Map<String, Facility> _creationRequests = {};
   final Map<String, List<FacilityMember>> _members = {};

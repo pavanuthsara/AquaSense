@@ -1,8 +1,13 @@
 name: aquasense
 
+# From backend/: docker compose --env-file ../.env up --build -d
+# Only the API and PostgreSQL run here; Flutter and camera/ML run on the host.
+
 services:
   db:
     image: postgres:17-bookworm
+    ports:
+      - "15432:5432"
     environment:
       POSTGRES_DB: aquasense
       POSTGRES_USER: aquasense
@@ -18,7 +23,7 @@ services:
 
   backend:
     build:
-      context: ./backend
+      context: .
     environment:
       AQUASENSE_DB_URL: jdbc:postgresql://db:5432/aquasense
       AQUASENSE_DB_USERNAME: aquasense

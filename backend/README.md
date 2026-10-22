@@ -5,12 +5,18 @@ AquaSense-owned access and refresh sessions.
 
 ## Run with Docker (recommended for local development)
 
-Follow [the developer setup guide](../docs/DEVELOPER_SETUP.md). From the
-repository root, configure `.env` from `.env.example`, then run
-`docker compose up --build -d`. Compose builds and tests the Java 21 API,
+Follow [the developer setup guide](../docs/DEVELOPER_SETUP.md). Configure the
+repository-root `.env` from the root `.env.example`, then from `backend/` run
+`docker compose --env-file ../.env up --build -d`. The Compose file is
+`backend/compose.yaml`; the explicit environment-file path selects the existing
+root credentials even if `backend/.env` also exists. Compose builds and tests the Java 21 API,
 starts PostgreSQL, waits for database readiness, and exposes the API on port
 8080. Database tables are created by Flyway and data persists in a named
 volume. No local Java, Maven, or PostgreSQL installation is needed.
+
+Flutter and the Python camera/ML process run locally outside Docker and connect
+to the published API port. From the repository root, the equivalent command is
+`docker compose --env-file .env -f backend/compose.yaml up --build -d`.
 
 The instructions below are for running the backend outside Docker.
 
@@ -186,6 +192,11 @@ feeder are all configured, online, and healthy. Device tokens are stored as
 SHA-256 hashes and are never returned after provisioning.
 
 ## Appetite observations
+
+For on-demand research predictions, the mobile tank screen can request a fresh
+10-second check. See the [local appetite guide](../docs/LIVE_APPETITE.md#4-check-appetite-from-the-mobile-app)
+for camera-worker setup and endpoints. Check results are displayed separately
+from trusted observations and do not trigger feeding.
 
 - `POST /api/v1/device-observations` accepts a tank ID, detected guppy count,
   confidence, `HIGH` or `LOW` appetite result, model version, and observation

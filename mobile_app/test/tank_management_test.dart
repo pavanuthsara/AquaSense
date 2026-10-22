@@ -319,6 +319,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Feeder credential'), findsOneWidget);
     expect(find.byKey(const Key('device-heartbeat-token')), findsOneWidget);
+    expect(find.byKey(const Key('provisioned-device-id')), findsOneWidget);
     expect(find.text('test-heartbeat-token'), findsOneWidget);
   });
 

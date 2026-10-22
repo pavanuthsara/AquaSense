@@ -2,8 +2,9 @@
 
 This guide runs the Spring Boot API and PostgreSQL in Docker, with Flutter
 running locally through Android Studio or a terminal. Run Compose commands
-from the repository root (the folder containing `compose.yaml`). Commands
-below use PowerShell on Windows.
+from `backend/` (the folder containing `compose.yaml`), explicitly selecting
+the repository-root `.env` with `--env-file ../.env`. Flutter and Python ML
+run outside Docker. Commands below use PowerShell on Windows.
 
 ## 1. Install the tools
 
@@ -92,18 +93,27 @@ Keep the JWT secret stable between restarts so existing access tokens remain
 valid. Compose rejects empty required settings; the backend also validates
 that its JWT secret decodes to at least 32 bytes.
 
-Compose reads this root `.env` automatically. Flutter does **not** read it;
+The Compose commands explicitly select this root `.env`. Any existing
+`backend/.env` is left intact and is not selected by these commands. Flutter does **not** read it;
 pass its configuration explicitly in step 5. Environment variables already
 set in your terminal override matching `.env` values.
 
 ## 4. Build and start the backend and database
 
+From the repository root:
+
 ```powershell
-docker compose config --quiet
-docker compose up --build -d
-docker compose ps
-docker compose logs -f backend
+cd backend
+docker compose --env-file ../.env config --quiet
+docker compose --env-file ../.env up --build -d
+docker compose --env-file ../.env ps
+docker compose --env-file ../.env logs -f backend
 ```
+
+The project name remains `aquasense` and its `postgres_data` volume keeps the
+same name after this move. Existing data is reused; no reset is needed. To run
+Compose from the repository root instead, use
+`docker compose --env-file .env -f backend/compose.yaml up --build -d`.
 
 The first build downloads dependencies and runs the backend test suite.
 PostgreSQL creates the `aquasense` database and user. Once PostgreSQL is
@@ -122,16 +132,18 @@ is responding. A connection failure means it is not reachable yet. Container
 status `running` alone does not confirm that Spring Boot has finished starting.
 If you changed `AQUASENSE_API_PORT`, use that port in URLs throughout this guide.
 
-PostgreSQL is available to the backend at `db:5432` inside Docker and is not
-published to the laptop. To open its SQL console:
+PostgreSQL is available to the backend at `db:5432` inside Docker. The current
+local configuration also publishes port 5432 on the laptop for database tools;
+the app and Python worker use the API, not a direct database connection. To
+open its SQL console from `backend/`:
 
 ```powershell
-docker compose exec db psql -U aquasense -d aquasense
+docker compose --env-file ../.env exec db psql -U aquasense -d aquasense
 ```
 
 ## 5. Connect the mobile app
 
-In a second terminal:
+In a second terminal, starting from the repository root:
 
 ```powershell
 cd mobile_app
@@ -196,28 +208,30 @@ backend connection errors are separate parts of the login flow.
 
 ## Everyday commands
 
-Run these from the repository root:
+Run these from `backend/`:
 
 ```powershell
 # Start existing services.
-docker compose up -d
+docker compose --env-file ../.env up -d
 
 # Rebuild and run tests after backend source changes.
-docker compose up --build -d backend
+docker compose --env-file ../.env up --build -d backend
 
 # Follow both services' logs.
-docker compose logs -f
+docker compose --env-file ../.env logs -f
 
 # Stop and remove containers, retaining database data.
-docker compose down
+docker compose --env-file ../.env down
 ```
 
 Source changes require a backend image rebuild; there is no source bind mount
-or automatic Java reload. Re-run `docker compose up -d` after changing `.env`;
-`docker compose restart` does not apply updated container environment values.
+or automatic Java reload. Re-run `docker compose --env-file ../.env up -d`
+after changing the root `.env`; restarting alone does not apply updated
+container environment values.
 
-Database data survives rebuilds and `docker compose down`. To deliberately
-delete **all local Docker database data**, run `docker compose down --volumes`,
+Database data survives rebuilds and `docker compose --env-file ../.env down`.
+To deliberately delete **all local Docker database data**, run
+`docker compose --env-file ../.env down --volumes`,
 then start again. This removes users, aquariums, and other stored records;
 sign out or clear the app's storage afterward to discard old session tokens.
 Changing `AQUASENSE_DB_PASSWORD` does not change an existing volume's database
@@ -226,7 +240,7 @@ password: alter it through PostgreSQL or deliberately reset disposable data.
 To run backend tests without starting the services (also runs during builds):
 
 ```powershell
-docker build --target build -t aquasense-backend-tests ./backend
+docker build --target build -t aquasense-backend-tests .
 ```
 
 Docker may reuse a successful cached test layer when sources are unchanged.
@@ -247,7 +261,7 @@ flutter test
 | Compose reports a required variable is missing | Create `.env` in the repository root and fill in every required setting. |
 | Port 8080 is already allocated | Stop the conflicting service or change `AQUASENSE_API_PORT` and the mobile API URL. |
 | Database authentication fails after editing `.env` | The existing database volume still uses its original password; see the data notes above. |
-| Backend exits during startup | Read `docker compose logs backend` and `docker compose logs db`; check JWT encoding and database credentials. |
+| Backend exits during startup | From `backend/`, read `docker compose --env-file ../.env logs backend db`; check JWT encoding and database credentials. |
 | App says it cannot connect to AquaSense | Verify API startup, the phone's API URL, Wi-Fi/firewall or USB forwarding, and the published port. |
 | Google chooser closes and reports cancelled without you cancelling | Check Android OAuth package/SHA-1 and the Web client ID's project. Android can report some configuration errors as cancellation. |
 | Google token is rejected by the backend | Check that mobile and backend use exactly the same Web OAuth client ID. |
@@ -258,3 +272,12 @@ and [Docker Compose startup-order documentation](https://docs.docker.com/compose
 
 This Compose setup is for local development. Deployment requires separate
 HTTPS, secret management, database backup, and distribution signing configuration.
+
+## Camera / ML connection
+
+Keep the iPhone webcam bridge and Python worker on the laptop so OpenCV can use
+the working camera driver. Python connects to `http://localhost:8080` through
+Docker's published backend port. The backend uses `db:5432` on the Compose
+network. Flutter uses `http://10.0.2.2:8080` on an Android emulator or the laptop's
+LAN address on a physical phone. Docker service names such as `backend` and
+`db` are not host/phone addresses. See [live appetite setup](LIVE_APPETITE.md).

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../auth/domain/auth_session_storage.dart';
 import '../domain/facility.dart';
+import '../domain/appetite_check.dart';
 import '../domain/facility_repository.dart';
 import '../domain/facility_team.dart';
 import '../domain/feeder_calibration.dart';
@@ -23,6 +24,33 @@ class HttpFacilityRepository implements FacilityRepository {
   final Uri _baseUri;
   final AuthSessionStorage _sessionStorage;
   final http.Client _client;
+
+  @override
+  Future<AppetiteCheck> requestAppetiteCheck({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    final response = await _authorizedPost(
+      '/api/v1/facilities/$facilityId/tanks/$tankId/appetite-checks',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return AppetiteCheck.fromJson(body as Map<String, dynamic>);
+  }
+
+  @override
+  Future<AppetiteCheck> getAppetiteCheck({
+    required String facilityId,
+    required String tankId,
+    required String checkId,
+  }) async {
+    final response = await _authorizedGet(
+      '/api/v1/facilities/$facilityId/tanks/$tankId/appetite-checks/$checkId',
+    );
+    final body = _decode(response);
+    _requireSuccess(response, body);
+    return AppetiteCheck.fromJson(body as Map<String, dynamic>);
+  }
 
   @override
   Future<List<Facility>> listFacilities() async {

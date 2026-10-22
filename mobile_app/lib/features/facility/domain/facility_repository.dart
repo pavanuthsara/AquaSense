@@ -1,4 +1,5 @@
 import 'facility.dart';
+import 'appetite_check.dart';
 import 'facility_team.dart';
 import 'feeder_calibration.dart';
 import 'feeding_monitoring.dart';
@@ -6,6 +7,17 @@ import 'tank_group.dart';
 import 'tank.dart';
 
 abstract interface class FacilityRepository {
+  Future<AppetiteCheck> requestAppetiteCheck({
+    required String facilityId,
+    required String tankId,
+  });
+
+  Future<AppetiteCheck> getAppetiteCheck({
+    required String facilityId,
+    required String tankId,
+    required String checkId,
+  });
+
   Future<List<Facility>> listFacilities();
 
   Future<Facility> getFacility(String facilityId);

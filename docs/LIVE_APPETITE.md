@@ -91,9 +91,71 @@ To select another output file, pass `--feature-output output/my_live_test.csv`;
 an existing file is not overwritten. The CSV includes speed, zones, spacing,
 turning, visibility, tracking coverage, sample count, and prediction status.
 
-This stage runs on the laptop. It does not post observations to Spring Boot,
-update the mobile app, or operate a feeder. Backend integration can consume
-the completed-window output once the model is suitable for the intended use.
+## 4. Check appetite from the mobile app
+
+The tank detail screen has a **Check current appetite level** button. It creates
+a tank-scoped request, waits for the laptop to collect a fresh 10-second PRE
+window, and displays the returned High/Low label, model probability, and time.
+The app shows separate waiting, observing, insufficient-data, and failure states.
+An unanswered request expires after 60 seconds. Repeated taps or simultaneous
+requests for the same tank share its active check.
+
+1. Rebuild/start the local backend so the appetite-check endpoints and database
+   migration are applied. With the root `.env` already configured, run from
+   the repository root:
+
+   ```powershell
+   docker compose --env-file .env -f backend/compose.yaml up --build -d backend
+   ```
+
+2. Run the mobile app with its real backend repository and sign in. Existing
+   configuration requires `AQUASENSE_GOOGLE_SERVER_CLIENT_ID`; without it the
+   app uses demo data, and live appetite checks explain that a backend connection
+   is required. The Google sign-in still needs internet; inference, API, and
+   database run locally. Use `http://10.0.2.2:8080` from an Android emulator,
+   or `http://YOUR_LAPTOP_LAN_IP:8080` from a physical phone on the same LAN.
+   Restart the app with your existing Dart defines after updating its code.
+
+3. In that tank's hardware controls, connect/provision **Edge processor**.
+   Copy the device ID and one-time token. The laptop is the edge processor for
+   this prototype. Each camera process serves only its assigned tank. Do not
+   rotate credentials on each check; keep the same provisioned credentials.
+
+4. Set the credentials in the same PowerShell terminal that runs Python:
+
+   ```powershell
+   $env:AQUASENSE_EDGE_DEVICE_ID = 'YOUR_PROVISIONED_EDGE_DEVICE_ID'
+   $env:AQUASENSE_EDGE_DEVICE_TOKEN = 'YOUR_ONE_TIME_DEVICE_TOKEN'
+   python byteTrack.py --source 1 --backend msmf --rf-model models/random_forest_live_pre.joblib --serve-appetite-checks --api-base-url http://localhost:8080
+   ```
+
+   Keep your working camera source/backend and training crop options. Tokens
+   are read from the environment and are not printed. The Python worker polls
+   the API in a background thread so network delays do not block camera frames.
+
+5. Open the same tank in the app and tap **Check current appetite level**.
+   Keep the camera steady and wait about 10–15 seconds. The request discards the
+   worker's current partial behavior window and starts a new one; it never
+   returns an old CSV value as a fresh model result. Keep the camera app open on
+   the iPhone; view AquaSense on your emulator/another device in this setup.
+
+These research check results do not create trusted feeding observations or
+trigger feeding. The existing automatic feeding observation API is separate.
+The current model's weak evaluation is disclosed alongside results in the app.
+
+The authenticated mobile API is:
+
+- `POST /api/v1/facilities/{facilityId}/tanks/{tankId}/appetite-checks`
+- `GET /api/v1/facilities/{facilityId}/tanks/{tankId}/appetite-checks/{checkId}`
+
+The worker API uses the provisioned `X-Device-Id` / `X-Device-Token` headers:
+
+- `GET /api/v1/device-appetite-checks/next` (204 if no check is pending)
+- `POST /api/v1/device-appetite-checks/{checkId}/result`
+
+Only facility members can request/read checks. Only the tank's authenticated
+edge processor can submit its result. Missing camera data returns no appetite
+label; old/expired checks cannot be revived by a delayed response.
 
 ## Verify without a camera
 

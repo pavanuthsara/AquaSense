@@ -5,6 +5,7 @@ import 'package:mobile_app/features/auth/domain/auth_models.dart';
 import 'package:mobile_app/features/auth/domain/auth_session_storage.dart';
 import 'package:mobile_app/features/facility/data/http_facility_repository.dart';
 import 'package:mobile_app/features/facility/domain/facility.dart';
+import 'package:mobile_app/features/facility/domain/appetite_check.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
 import 'package:mobile_app/features/facility/domain/feeder_calibration.dart';
 import 'package:mobile_app/features/facility/domain/feeding_monitoring.dart';
@@ -12,6 +13,57 @@ import 'package:mobile_app/features/facility/domain/tank_group.dart';
 import 'package:mobile_app/features/facility/domain/tank.dart';
 
 void main() {
+  test(
+    'requests a fresh appetite check and reads the model result with authentication',
+    () async {
+      final requests = <http.Request>[];
+      final repository = HttpFacilityRepository(
+        apiBaseUrl: 'http://localhost:8080',
+        sessionStorage: _MemorySessionStorage(),
+        client: MockClient((request) async {
+          requests.add(request);
+          final completed = request.method == 'GET';
+          return http.Response('''{
+          "id":"check-1","tankId":"tank-1","status":"${completed ? 'COMPLETED' : 'PENDING'}",
+          "requestedAt":"2026-10-22T10:00:00Z","expiresAt":"2026-10-22T10:01:00Z",
+          "appetiteResult":${completed ? '"LOW"' : 'null'},
+          "confidence":${completed ? '0.82' : 'null'},
+          "observedAt":${completed ? '"2026-10-22T10:00:12Z"' : 'null'},
+          "modelVersion":"random_forest_live_pre-v1"
+        }''', completed ? 200 : 202);
+        }),
+      );
+      final pending = await repository.requestAppetiteCheck(
+        facilityId: 'facility-1',
+        tankId: 'tank-1',
+      );
+      final result = await repository.getAppetiteCheck(
+        facilityId: 'facility-1',
+        tankId: 'tank-1',
+        checkId: pending.id,
+      );
+      expect(pending.status, AppetiteCheckStatus.pending);
+      expect(result.appetiteResult, AppetiteResult.low);
+      expect(result.confidence, 0.82);
+      expect(requests.first.method, 'POST');
+      expect(
+        requests.first.url.path,
+        '/api/v1/facilities/facility-1/tanks/tank-1/appetite-checks',
+      );
+      expect(
+        requests.last.url.path,
+        '/api/v1/facilities/facility-1/tanks/tank-1/appetite-checks/check-1',
+      );
+      expect(
+        requests.every(
+          (request) =>
+              request.headers['authorization'] == 'Bearer access-token',
+        ),
+        isTrue,
+      );
+    },
+  );
+
   test('loads dashboard and filtered cursor feeding history', () async {
     final requests = <http.Request>[];
     final repository = HttpFacilityRepository(
