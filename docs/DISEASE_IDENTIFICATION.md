@@ -61,7 +61,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-012 | Python reference fixtures | DIS-011 | Done |
 | DIS-013 | Fish finder in Dart | DIS-012 | Done |
 | DIS-014 | Fish crop classifier in Dart | DIS-012 | Done |
-| DIS-015 | Tracker, per-fish vote, video answer | DIS-013, DIS-014 | Not started |
+| DIS-015 | Tracker, per-fish vote, video answer | DIS-013, DIS-014 | Done |
 | DIS-016 | Video source and frame extraction | DIS-011 | Not started |
 | DIS-017 | Video check UI | DIS-015, DIS-016 | Not started |
 | DIS-018 | On-device parity check, performance, docs | DIS-017 | Not started |
@@ -291,6 +291,31 @@ the phone means the check works offline at a farm, and the same model file can
 run on a Raspberry Pi later.
 
 ## Work log
+
+### 2026-10-22 — DIS-015: Tracker, per-fish vote and video answer — Done
+
+- `domain/video_check_result.dart`: `VideoAnswer`, `VideoFishResult`,
+  `VideoCheckResult` (overall answer, per-fish list with id/answer/mean/frames/
+  thumbnail, counts, noFishSeen).
+- `domain/video_check_analyzer.dart`: `verdict`, `fishAnswer` (0.6 average AND
+  >=50% of frames at 0.6), `videoAnswer`, `sameFish` (IoU>0.2 or centres within
+  0.75x the larger side), and `VideoCheckAnalyzer` that follows each fish across
+  frames exactly as the main loop of check_video.py (first track with
+  `n-last<=3 and last!=n and sameFish`, else new id). Keeps the best-scoring
+  crop thumbnail per fish.
+- Tests `test/video/video_check_analyzer_test.dart`:
+  - hand-made: one confident frame cannot decide, 3-frame minimum, gap of 4
+    starts a new track, same-frame boxes never merge, too-small joins without a
+    score, verdict/video-answer rules.
+  - **replay**: reads `checked.csv`, reconstructs the true frame number from
+    `time_s` (frames with no detections are omitted from the CSV, so
+    `n = round(t/0.5)+1` and empty frames are fed as `[]`), and reproduces the
+    SAME fish id for every row and the SAME 8 per-fish answers and video answer
+    as `expected_answers.json` (WHITE SPOT FOUND; fish 1/4/5/8/14 white spot,
+    9/13 not sure, 16 healthy).
+- Photo mode untouched. `dart format`/`analyze` clean, `flutter test` 114
+  passed. Next: DIS-016 (video source and frame extraction).
+
 
 ### 2026-10-22 — DIS-014: Fish crop classifier in Dart — Done
 
