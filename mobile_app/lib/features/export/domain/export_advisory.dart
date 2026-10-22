@@ -31,6 +31,40 @@ enum ExportSpecies {
   );
 }
 
+/// How the exporter wants to plan.
+enum PlanningMode {
+  /// The simulator chooses fish per bag (and so the number of bags).
+  suggest('suggest', 'Suggest'),
+
+  /// The exporter fixes the number of bags.
+  fixedBags('fixed_bags', 'Set bags'),
+
+  /// The exporter enters their own fish per bag and add-ons.
+  check('check', 'Check mine');
+
+  const PlanningMode(this.key, this.label);
+
+  final String key;
+  final String label;
+
+  static PlanningMode fromKey(String? key) => PlanningMode.values.firstWhere(
+    (mode) => mode.key == key,
+    orElse: () => PlanningMode.suggest,
+  );
+}
+
+/// Anaesthetic the exporter puts in their own bags (check mode).
+enum BagAnaesthetic {
+  none(null, 'None'),
+  ms222('ms222_40mgL', 'MS-222'),
+  benzocaine('benzocaine_20mgL', 'Benzocaine');
+
+  const BagAnaesthetic(this.key, this.label);
+
+  final String? key;
+  final String label;
+}
+
 class ExportShipmentRequest {
   const ExportShipmentRequest({
     required this.species,
@@ -46,6 +80,12 @@ class ExportShipmentRequest {
     this.allowAnaesthetic = true,
     this.allowZeolite = true,
     this.maxFastingH = 48,
+    this.mode = PlanningMode.suggest,
+    this.bags,
+    this.fishPerBag,
+    this.checkFastingH = 24,
+    this.checkZeolite = false,
+    this.checkAnaesthetic = BagAnaesthetic.none,
   });
 
   final String? label;
@@ -61,6 +101,12 @@ class ExportShipmentRequest {
   final bool allowAnaesthetic;
   final bool allowZeolite;
   final double maxFastingH;
+  final PlanningMode mode;
+  final int? bags;
+  final int? fishPerBag;
+  final double checkFastingH;
+  final bool checkZeolite;
+  final BagAnaesthetic checkAnaesthetic;
 
   Map<String, dynamic> toJson() => {
     if (label != null && label!.trim().isNotEmpty) 'label': label!.trim(),
@@ -76,6 +122,15 @@ class ExportShipmentRequest {
     'allowAnaesthetic': allowAnaesthetic,
     'allowZeolite': allowZeolite,
     'maxFastingH': maxFastingH,
+    'mode': mode.key,
+    if (mode == PlanningMode.fixedBags && bags != null) 'bags': bags,
+    if (mode == PlanningMode.check) ...{
+      'fishPerBag': fishPerBag,
+      'checkFastingH': checkFastingH,
+      'checkZeolite': checkZeolite,
+      if (checkAnaesthetic.key != null)
+        'checkAnaesthetic': checkAnaesthetic.key,
+    },
   };
 }
 
@@ -87,6 +142,8 @@ class ExportAdvisorySummary {
     required this.feasible,
     required this.createdAt,
     this.label,
+    this.mode = PlanningMode.suggest,
+    this.meetsTarget = true,
     this.fishPerBag,
     this.bagsNeeded,
     this.survivalPct,
@@ -100,6 +157,8 @@ class ExportAdvisorySummary {
       species: ExportSpecies.fromKey(json['species'] as String?),
       durationHours: _double(json['durationHours']) ?? 0,
       feasible: json['feasible'] as bool? ?? false,
+      mode: PlanningMode.fromKey(json['mode'] as String?),
+      meetsTarget: json['meetsTarget'] as bool? ?? true,
       fishPerBag: _int(json['fishPerBag']),
       bagsNeeded: _int(json['bagsNeeded']),
       survivalPct: _double(json['survivalPct']),
@@ -113,6 +172,8 @@ class ExportAdvisorySummary {
   final ExportSpecies species;
   final double durationHours;
   final bool feasible;
+  final PlanningMode mode;
+  final bool meetsTarget;
   final int? fishPerBag;
   final int? bagsNeeded;
   final double? survivalPct;
@@ -163,6 +224,8 @@ class TransitAdvisory {
     this.durationH = 0,
     this.tempLowC = 0,
     this.tempHighC = 0,
+    this.verdict,
+    this.method,
   });
 
   factory TransitAdvisory.fromJson(Map<String, dynamic> json) {
@@ -203,6 +266,12 @@ class TransitAdvisory {
       durationH: _double(request['duration_h']) ?? 0,
       tempLowC: _double(request['temp_low_c']) ?? 0,
       tempHighC: _double(request['temp_high_c']) ?? 0,
+      verdict: json['verdict'] == null
+          ? null
+          : PackingVerdict.fromJson(_map(json['verdict'])),
+      method: json['method'] == null
+          ? null
+          : MethodSection.fromJson(_map(json['method'])),
     );
   }
 
@@ -222,6 +291,83 @@ class TransitAdvisory {
   final double durationH;
   final double tempLowC;
   final double tempHighC;
+  final PackingVerdict? verdict;
+  final MethodSection? method;
+
+  PlanningMode get mode => verdict?.mode ?? PlanningMode.suggest;
+}
+
+/// How the advisory is worked out, in plain words, with the studies behind
+/// it. Kept apart from the advice itself.
+class MethodSection {
+  const MethodSection({
+    required this.steps,
+    required this.confidence,
+    required this.sources,
+  });
+
+  factory MethodSection.fromJson(Map<String, dynamic> json) => MethodSection(
+    steps: _strings(json['steps']),
+    confidence: _strings(json['confidence']),
+    sources: _list(json['sources'])
+        .map(_map)
+        .map(
+          (source) => MethodSource(
+            title: source['title'] as String? ?? '',
+            usedFor: source['used_for'] as String? ?? '',
+          ),
+        )
+        .toList(),
+  );
+
+  final List<String> steps;
+  final List<String> confidence;
+  final List<MethodSource> sources;
+}
+
+class MethodSource {
+  const MethodSource({required this.title, required this.usedFor});
+
+  final String title;
+  final String usedFor;
+}
+
+/// Whether the shown packing reaches the survival target, plus the
+/// recommended plan for comparison.
+class PackingVerdict {
+  const PackingVerdict({
+    required this.mode,
+    required this.meetsTarget,
+    required this.message,
+    this.survivalMedianPct,
+    this.survivalWorstPct,
+    this.expectedDeadTotal,
+    this.recommendedFishPerBag,
+    this.recommendedBags,
+    this.recommendedPlanLabel,
+  });
+
+  factory PackingVerdict.fromJson(Map<String, dynamic> json) => PackingVerdict(
+    mode: PlanningMode.fromKey(json['mode'] as String?),
+    meetsTarget: json['meets_target'] as bool? ?? false,
+    message: json['message'] as String? ?? '',
+    survivalMedianPct: _double(json['survival_median_pct']),
+    survivalWorstPct: _double(json['survival_worst_pct']),
+    expectedDeadTotal: _int(json['expected_dead_total']),
+    recommendedFishPerBag: _int(json['recommended_fish_per_bag']),
+    recommendedBags: _int(json['recommended_bags']),
+    recommendedPlanLabel: json['recommended_plan_label'] as String?,
+  );
+
+  final PlanningMode mode;
+  final bool meetsTarget;
+  final String message;
+  final double? survivalMedianPct;
+  final double? survivalWorstPct;
+  final int? expectedDeadTotal;
+  final int? recommendedFishPerBag;
+  final int? recommendedBags;
+  final String? recommendedPlanLabel;
 }
 
 class PackingRecommendation {
@@ -275,6 +421,8 @@ class AddonDose {
     required this.caution,
     this.perBag,
     this.simulated = true,
+    this.why = '',
+    this.source,
   });
 
   factory AddonDose.fromJson(Map<String, dynamic> json) {
@@ -286,6 +434,8 @@ class AddonDose {
       simulated: json['simulated'] as bool? ?? false,
       evidence: json['evidence'] as String? ?? '',
       caution: json['caution'] as String? ?? '',
+      why: json['why'] as String? ?? json['evidence'] as String? ?? '',
+      source: json['source'] as String?,
     );
   }
 
@@ -296,6 +446,12 @@ class AddonDose {
   final bool simulated;
   final String evidence;
   final String caution;
+
+  /// Plain-language reason, shown to the exporter.
+  final String why;
+
+  /// The studies behind it, shown only in "How we work this out".
+  final String? source;
 }
 
 class PackingOption {
@@ -304,6 +460,7 @@ class PackingOption {
     required this.label,
     required this.maxFishPerBag,
     required this.recommended,
+    this.selected = false,
     this.gainVsBasicPct,
   });
 
@@ -313,6 +470,7 @@ class PackingOption {
       label: json['label'] as String? ?? '',
       maxFishPerBag: _int(json['max_fish_per_bag']) ?? 0,
       recommended: json['recommended'] as bool? ?? false,
+      selected: json['selected'] as bool? ?? false,
       gainVsBasicPct: _double(json['gain_vs_basic_pct']),
     );
   }
@@ -321,6 +479,7 @@ class PackingOption {
   final String label;
   final int maxFishPerBag;
   final bool recommended;
+  final bool selected;
   final double? gainVsBasicPct;
 }
 

@@ -27,62 +27,126 @@ from .model import SimulationResult, simulate
 from .uncertainty import run_temperature_range
 
 # ----------------------------------------------------------------------------- add-on catalogue
-# Doses and evidence come from the literature collected in the project handoff. "simulated" means
-# the bag model includes the add-on's effect; "evidence only" means it is listed but not modelled.
+# Add-on catalogue. What the exporter sees ("why", "caution") is plain language with no citations;
+# the studies behind each item ("source") are only shown in the separate "How we calculate" section.
+# "simulated" means the bag model includes the add-on's effect.
 ADDONS = {
     "fasting": {
         "name": "Fasting before packing",
         "simulated": True,
-        "evidence": "Pramod et al. 2010 fasted fish 24 h (model reference). Fed fish use ~35 % more O2 "
-                    "(Ruiz-Jarabo & de Pedro 2024) and excrete up to ~3x more ammonia (tench data).",
-        "caution": "Do not fast longer than 48 h without species-specific advice; weak fish handle transport worse.",
+        "why": "Fed fish use more oxygen and release much more ammonia into the bag. Not feeding them "
+               "before packing keeps the water cleaner for longer.",
+        "caution": "Do not fast for more than 48 hours unless you know the species can take it; weak fish "
+                   "travel badly.",
+        "source": "Pramod et al. 2010; Ruiz-Jarabo & de Pedro 2024; tench feeding data",
     },
     "zeolite": {
         "name": "Zeolite (clinoptilolite)",
         "dose_g_per_l": 20.0,
         "simulated": True,
-        "evidence": "Teo, Chen & Lee 1989 (guppy): 20 g/L optimal; higher doses caused turbidity and more deaths. "
-                    "Uptake kinetics in the model are PROVISIONAL.",
-        "caution": "Rinse before use to limit turbidity. Salt in the water reduces zeolite effectiveness.",
+        "why": "Zeolite soaks up ammonia from the water, so less of it can turn toxic when the bag is opened.",
+        "caution": "Rinse it before use or the water turns cloudy. More than this amount does not help. "
+                   "Salt in the water makes it work less well.",
+        "source": "Teo, Chen & Lee 1989",
     },
     "ms222_40mgL": {
         "name": "MS-222 (tricaine methanesulfonate)",
         "dose_mg_per_l": 40.0,
         "simulated": True,
-        "evidence": "Pramod et al. 2010 (tiger barb, light sedation): ammonia -54 %, mortality 15.3 % -> 8.4 %. "
-                    "Effect calibrated on tiger barb only.",
-        "caution": "MS-222 is acidic; follow label/buffering guidance. Check the importing country's rules "
-                   "on anaesthetics. Overdose kills - the dose effect is not monotonic.",
+        "why": "A light sedative. Calm fish breathe more slowly and release about half as much ammonia, "
+               "so the bag stays safe for longer.",
+        "caution": "It makes the water more acidic; follow the label on buffering. Too much kills fish. "
+                   "Check that the importing country allows anaesthetics.",
+        "source": "Pramod et al. 2010",
     },
     "benzocaine_20mgL": {
         "name": "Benzocaine",
         "dose_mg_per_l": 20.0,
         "simulated": True,
-        "evidence": "Pramod et al. 2010 (tiger barb): ammonia -50 %, mortality 15.3 % -> 9.0 %. "
-                    "Effect calibrated on tiger barb only.",
-        "caution": "Not water-soluble: dissolve in ethanol/acetone first. Narrower safety margin than MS-222 "
-                   "(Kiessling et al. 2009). Check the importing country's rules.",
+        "why": "A light sedative. Calm fish release about half as much ammonia and use less oxygen.",
+        "caution": "It does not dissolve in water: dissolve it in a little ethanol first. The gap between a "
+                   "safe and a harmful dose is small. Check that the importing country allows anaesthetics.",
+        "source": "Pramod et al. 2010; Kiessling et al. 2009",
     },
     "phenoxyethanol": {
         "name": "2-Phenoxyethanol",
         "dose_text": "0.11-0.22 g/L",
         "simulated": False,
-        "evidence": "Teo, Chen & Lee 1989 (guppy): zero mortality in packing trials; suppresses O2 use "
-                    "(Teo & Chen 1993). Not yet in the model.",
-        "caution": "Evidence only - not simulated. Confirm dose for the species before use.",
+        "why": "A sedative that has given very good survival in guppy shipping trials.",
+        "caution": "Not included in this simulation yet. Confirm the dose for your species before using it.",
+        "source": "Teo, Chen & Lee 1989; Teo & Chen 1993",
     },
     "tris_buffer": {
         "name": "Tris buffer",
         "dose_text": "0.02 M, pH 8",
         "simulated": False,
-        "evidence": "Teo, Chen & Lee 1989 (guppy) reported lowest mortality with 0.02 M Tris at pH 8.",
-        "caution": "Not recommended by the model: holding pH high keeps more ammonia in the toxic NH3 form "
-                   "during transit. Use only with zeolite and short trips.",
+        "why": "Keeps the pH from dropping during the trip.",
+        "caution": "Not recommended: keeping the pH high also keeps more of the ammonia toxic. If used, "
+                   "only together with zeolite and on short trips.",
+        "source": "Teo, Chen & Lee 1989",
     },
 }
 
+# The studies the simulator is built on, in plain words. Shown only in "How we calculate".
+SOURCES = [
+    {"title": "Pramod et al. (2010), North American Journal of Aquaculture 72:290-297",
+     "used_for": "A 48-hour shipping trial with tiger barb. The simulator was tuned and checked against its "
+                 "oxygen, ammonia, CO2 and death measurements, and it gives the effect of MS-222 and benzocaine."},
+    {"title": "Teo, Chen & Lee (1989), Aquaculture 78:321-332",
+     "used_for": "Guppy packing trials: zeolite, Tris buffer and 2-phenoxyethanol doses."},
+    {"title": "Teo & Chen (1993), Aquaculture and Fisheries Management 24:109-117",
+     "used_for": "How guppy oxygen use changes with conditions in a closed bag."},
+    {"title": "Emerson et al. (1975), J. Fisheries Research Board of Canada 32:2379-2383",
+     "used_for": "How much ammonia is in its toxic form at a given pH and temperature."},
+    {"title": "Jager et al. (2011), Environmental Science & Technology 45:2529-2540",
+     "used_for": "The method that turns build-up of harmful conditions over time into a survival curve."},
+    {"title": "Lim, Dhert & Sorgeloos (2003), Aquaculture Research 34:923-935",
+     "used_for": "The usual 5% dead-on-arrival warranty used as the default target."},
+    {"title": "Silva et al. (2023)",
+     "used_for": "How much toxic ammonia guppies can tolerate."},
+    {"title": "Ruiz-Jarabo & de Pedro (2024); Kiessling et al. (2009)",
+     "used_for": "Extra oxygen use of fed fish; safety margin of benzocaine."},
+]
+
+
+def _method_section(req: "AdvisoryRequest", sp, n_runs: int) -> dict:
+    steps = [
+        "We follow the sealed bag hour by hour. The fish use oxygen and give off carbon dioxide (CO2) and "
+        "ammonia. Oxygen moves only slowly from the gas into the water.",
+        "From the CO2 and the water's buffering we work out the pH. From the pH and temperature we work out "
+        "how much of the ammonia is in its toxic form.",
+        "Fish are harmed by CO2, toxic ammonia and low oxygen. The harm adds up over the hours, and that "
+        "gives how fast fish start to die.",
+        f"We run the trip {n_runs} times: at the coolest, middle and warmest temperature you gave, and along "
+        "random temperature changes in between. We show the typical trip and the worst one.",
+    ]
+    if req.mode == "check":
+        steps.append("We use exactly your fish per bag and what you put in the bag, then compare it with the "
+                     "best plan we can find.")
+    else:
+        steps.append("We try every combination of fasting, zeolite and anaesthetic and find the most fish per "
+                     "bag that stays above your target on the warmest trip. An add-on is only suggested if it "
+                     "lets you pack at least 5% more fish.")
+    steps.append("Finally we simulate opening the bag: the CO2 escapes, the pH rises and ammonia becomes "
+                 "toxic. That is why the plan checks survival after unpacking, not only on arrival.")
+    confidence = ["The simulator was checked against a real 48-hour shipping trial. Its oxygen, ammonia, CO2 "
+                  "and survival curves matched the measurements closely."]
+    if sp.name != "tiger_barb":
+        confidence.append(f"That trial used tiger barb. Numbers for {sp.name.replace('_', ' ')} are scaled to "
+                          "its body size and have not yet been confirmed with real shipments.")
+    confidence.append("The zeolite effect is an early estimate and will be improved with more data.")
+    return {"steps": steps, "confidence": confidence, "sources": SOURCES}
+
 
 MIN_GAIN_SHARE = 0.95  # add-ons that gain < 5 % more fish per bag are not recommended
+
+# How the exporter wants to plan:
+#   suggest     the simulator chooses fish per bag (and so the number of bags) and the add-ons
+#   fixed_bags  the exporter fixes the number of bags; the simulator says if that is safe and which
+#               add-ons are needed, or how many bags are really needed
+#   check       the exporter enters their own fish per bag and add-ons; the simulator shows what happens
+MODES = ("suggest", "fixed_bags", "check")
+ANAESTHETICS = ("ms222_40mgL", "benzocaine_20mgL")
 
 
 @dataclass
@@ -105,6 +169,12 @@ class AdvisoryRequest:
     kla_per_h: float | None = None
     samples: int = 10                      # random temperature profiles for the final check
     seed: int = 0
+    mode: str = "suggest"
+    bags: int | None = None                # fixed_bags mode: bags available
+    fish_per_bag: int | None = None        # check mode: exporter's own packing
+    check_fasting_h: float = 24.0          # check mode add-ons
+    check_zeolite: bool = False
+    check_anaesthetic: str | None = None
 
     def validate(self) -> None:
         checks = [
@@ -116,7 +186,23 @@ class AdvisoryRequest:
             (0.5 <= self.target_survival < 1.0, "target_survival must be in [0.5, 1)"),
             (self.total_fish is None or self.total_fish > 0, "total_fish must be > 0"),
             (0 <= self.samples <= 50, "samples must be 0-50"),
+            (self.mode in MODES, f"mode must be one of {', '.join(MODES)}"),
         ]
+        if self.mode == "fixed_bags":
+            checks += [
+                (self.total_fish is not None, "fixed_bags mode needs total_fish"),
+                (self.bags is not None and self.bags > 0, "fixed_bags mode needs bags > 0"),
+                (self.bags is None or self.total_fish is None or self.bags <= self.total_fish,
+                 "there are more bags than fish"),
+            ]
+        if self.mode == "check":
+            checks += [
+                (self.fish_per_bag is not None and 0 < self.fish_per_bag <= 1_000_000,
+                 "check mode needs fish_per_bag > 0"),
+                (self.check_anaesthetic in (None, *ANAESTHETICS),
+                 f"check_anaesthetic must be one of {', '.join(ANAESTHETICS)} or empty"),
+                (0 <= self.check_fasting_h <= 96, "check_fasting_h must be 0-96"),
+            ]
         for ok, msg in checks:
             if not ok:
                 raise ValueError(msg)
@@ -166,34 +252,34 @@ def _max_fish(sp: Species, req: AdvisoryRequest, plan: Plan) -> tuple[int, float
     return lo, _survival(sp, req, plan, lo, t)
 
 
+def _make_plan(fasting_h: float, zeolite: bool, anaesthetic: str | None) -> Plan:
+    kw = {}
+    if anaesthetic:
+        e = load_interventions()[anaesthetic]
+        kw = {k: e[k] for k in ("metabolic_factor", "excretion_factor", "stress_factor") if k in e}
+    z = ADDONS["zeolite"]["dose_g_per_l"] if zeolite else 0.0
+    iv = Interventions(starvation_h=fasting_h, zeolite_g_per_l=z, **kw)
+    addons = (["zeolite"] if zeolite else []) + ([anaesthetic] if anaesthetic else [])
+    parts = [f"fast {fasting_h:g} h"] + [ADDONS[a]["name"].split(" (")[0] for a in addons]
+    key = "|".join([f"fast{fasting_h:g}"] + addons)
+    return Plan(key=key, label=" + ".join(parts), interventions=iv, addons=addons, fasting_h=fasting_h)
+
+
 def _plans(req: AdvisoryRequest) -> list[Plan]:
     table = load_interventions()
     fast = [24.0] + ([48.0] if req.max_fasting_h >= 48 else [])
-    fast = [f for f in fast if f <= max(req.max_fasting_h, 24.0)]
     sed_opts: list[str | None] = [None]
     if req.allow_anaesthetic:
-        sed_opts += [k for k in ("ms222_40mgL", "benzocaine_20mgL") if k in table]
-    zeo_opts = [0.0] + ([ADDONS["zeolite"]["dose_g_per_l"]] if req.allow_zeolite else [])
-    plans = []
-    for f in fast:
-        for sed in sed_opts:
-            for z in zeo_opts:
-                kw = {}
-                if sed:
-                    e = table[sed]
-                    kw = {k: e[k] for k in ("metabolic_factor", "excretion_factor", "stress_factor") if k in e}
-                iv = Interventions(starvation_h=f, zeolite_g_per_l=z, **kw)
-                addons = (["zeolite"] if z else []) + ([sed] if sed else [])
-                parts = [f"fast {f:g} h"] + [ADDONS[a]["name"].split(" (")[0] for a in addons]
-                key = "|".join([f"fast{f:g}"] + addons)
-                plans.append(Plan(key=key, label=" + ".join(parts), interventions=iv, addons=addons, fasting_h=f))
-    return plans
+        sed_opts += [k for k in ANAESTHETICS if k in table]
+    zeo_opts = [False] + ([True] if req.allow_zeolite else [])
+    return [_make_plan(f, z, sed) for f in fast for sed in sed_opts for z in zeo_opts]
 
 
 def _doses(plan: Plan, req: AdvisoryRequest) -> list[dict]:
-    out = [{"addon": "fasting", "name": ADDONS["fasting"]["name"], "amount": f"{plan.fasting_h:g} h before packing",
-            "per_bag": None, "simulated": True, "evidence": ADDONS["fasting"]["evidence"],
-            "caution": ADDONS["fasting"]["caution"]}]
+    f = ADDONS["fasting"]
+    out = [{"addon": "fasting", "name": f["name"], "amount": f"{plan.fasting_h:g} h before packing",
+            "per_bag": None, "simulated": True, "why": f["why"], "evidence": f["why"],
+            "caution": f["caution"], "source": f["source"]}]
     for a in plan.addons:
         info = ADDONS[a]
         if "dose_mg_per_l" in info:
@@ -203,7 +289,8 @@ def _doses(plan: Plan, req: AdvisoryRequest) -> list[dict]:
             amount = f"{info['dose_g_per_l']:g} g/L"
             per_bag = f"{info['dose_g_per_l'] * req.water_l:.1f} g per bag ({req.water_l:g} L)"
         out.append({"addon": a, "name": info["name"], "amount": amount, "per_bag": per_bag, "simulated": True,
-                    "evidence": info["evidence"], "caution": info["caution"]})
+                    "why": info["why"], "evidence": info["why"], "caution": info["caution"],
+                    "source": info["source"]})
     return out
 
 
@@ -379,12 +466,8 @@ def advise(req: AdvisoryRequest) -> dict:
 
     warnings = []
     if sp.name != "tiger_barb":
-        warnings.append(f"{sp.name}: parameters are scaled from the tiger barb calibration (Pramod 2010) and "
-                        "not yet validated for this species. Treat numbers as provisional.")
-    if any(a in ("ms222_40mgL", "benzocaine_20mgL") for a in best.addons) and sp.name != "tiger_barb":
-        warnings.append("Anaesthetic effects were calibrated on tiger barb; the effect on this species is assumed.")
-    if "zeolite" in best.addons:
-        warnings.append("Zeolite uptake kinetics are provisional (to be calibrated from Teo et al. 1989).")
+        warnings.append(f"The {sp.name.replace('_', ' ')} numbers are estimated from tests on another species "
+                        "and have not yet been confirmed with real shipments. Treat them as a guide.")
 
     result: dict = {
         "request": asdict(req),
@@ -398,51 +481,118 @@ def advise(req: AdvisoryRequest) -> dict:
                                            if basic.max_fish else None),
                      "addons": p.addons, "doses": p.doses} for p in plans],
     }
-    if best.max_fish == 0:
-        result["feasible"] = False
-        result["recommendation"] = {
-            "summary": (f"No plan keeps {100 * req.target_survival:.0f}% of fish alive for {req.duration_h:g} h at "
-                        f"{req.temp_high_c:g} C, even with one fish per bag. Shorten the journey, lower the "
-                        "temperature, or use more water per bag.")}
-        return result
+    # ---- choose what to show, depending on the mode
+    total = req.total_fish
+    rec_bags = math.ceil(total / best.max_fish) if total and best.max_fish else None
+    verdict: dict = {"mode": req.mode, "recommended_plan_label": best.label,
+                     "recommended_fish_per_bag": best.max_fish, "recommended_bags": rec_bags}
+
+    if req.mode == "suggest":
+        if best.max_fish == 0:
+            result["feasible"] = False
+            result["recommendation"] = {
+                "summary": (f"No plan keeps {100 * req.target_survival:.0f}% of fish alive for {req.duration_h:g} h "
+                            f"at {req.temp_high_c:g} C, even with one fish per bag. Shorten the journey, lower the "
+                            "temperature, or use more water per bag.")}
+            result["verdict"] = {**verdict, "meets_target": False, "message": result["recommendation"]["summary"]}
+            result["method"] = _method_section(req, sp, 0)
+            return result
+        chosen, n = best, best.max_fish
+    elif req.mode == "fixed_bags":
+        n = math.ceil(total / req.bags)
+        safe = [p for p in plans if p.max_fish >= n]
+        if safe:
+            chosen = min(safe, key=lambda p: (len(p.addons), p.fasting_h))
+        else:  # not safe with any add-on: show the strongest plan and how many bags are really needed
+            chosen = max(plans, key=lambda p: (p.max_fish, -len(p.addons)))
+    else:  # check
+        chosen = _make_plan(req.check_fasting_h, req.check_zeolite, req.check_anaesthetic)
+        chosen.doses = _doses(chosen, req)
+        known = next((p for p in plans if p.key == chosen.key), None)
+        chosen.max_fish = known.max_fish if known else _max_fish(sp, req, chosen)[0]
+        n = int(req.fish_per_bag)
 
     result["feasible"] = True
     for o in result["options"]:
         o["recommended"] = o["key"] == best.key
-    n = best.max_fish
+        o["selected"] = o["key"] == chosen.key
+    if any(a in ANAESTHETICS for a in chosen.addons) and sp.name != "tiger_barb":
+        warnings.append("The effect of the anaesthetic was measured on a different species; for this one it "
+                        "is an estimate.")
+    if "zeolite" in chosen.addons:
+        warnings.append("The zeolite effect is an early estimate.")
+
     rr = run_temperature_range(sp, _shipment(req, n, req.temp_high_c), req.temp_low_c, req.temp_high_c,
-                               best.interventions, Unpacking(), samples=req.samples, seed=req.seed, dt_out=0.25)
+                               chosen.interventions, Unpacking(), samples=req.samples, seed=req.seed, dt_out=0.25)
     med_i = int(np.argsort([r.summary["survival_after_unpacking"] for r in rr.runs])[len(rr.runs) // 2])
     med, worst = rr.runs[med_i], rr.worst
     sh = _shipment(req, n, req.temp_high_c)
+    surv_med = 100 * med.summary["survival_after_unpacking"]
+    surv_worst = 100 * worst.summary["survival_after_unpacking"]
+    # Same rule as the optimiser: safe if this count is within the hot-end maximum for these add-ons.
+    meets = 0 < n <= chosen.max_fish
+    bags = (req.bags if req.mode == "fixed_bags" else math.ceil(total / n) if total else None)
+    dead_total = round((total or n * (bags or 1)) * (1 - surv_med / 100))
+    target_txt = f"{100 * req.target_survival:.0f}%"
+    survival_txt = (f"Expected survival after unpacking: {surv_med:.1f}% (worst case {surv_worst:.1f}%) over "
+                    f"{req.temp_low_c:g}-{req.temp_high_c:g} C.")
 
-    bags = math.ceil(req.total_fish / n) if req.total_fish else None
+    if req.mode == "suggest":
+        summary = (f"Pack {n} fish per bag ({n * req.fish_mass_g / req.water_l:.0f} g/L) with: {chosen.label}. "
+                   + (f"{bags} bags for {total} fish. " if bags else "") + survival_txt)
+        message = f"Recommended plan meets the {target_txt} target."
+    elif req.mode == "fixed_bags":
+        if meets:
+            message = (f"{req.bags} bags is enough: {n} fish per bag stays above {target_txt} with {chosen.label}.")
+        elif best.max_fish == 0:
+            message = (f"Not safe: no packing reaches {target_txt} for this trip, even with one fish per bag.")
+        else:
+            message = (f"Too few bags: {n} fish per bag is more than the safe maximum of {best.max_fish} "
+                       f"(with {best.label}). You need at least {rec_bags} bags.")
+        summary = (f"{req.bags} bags for {total} fish = {n} fish per bag "
+                   f"({n * req.fish_mass_g / req.water_l:.0f} g/L) with: {chosen.label}. " + survival_txt)
+    else:
+        if meets:
+            message = f"Your packing is safe: survival stays above {target_txt} even in the hottest case."
+        else:
+            message = (f"Your packing is NOT safe: survival can fall to {surv_worst:.1f}% "
+                       f"(target {target_txt}). About {dead_total} fish could die"
+                       + (f" across {bags} bags." if bags else " per bag.")
+                       + (f" With your add-ons the safe maximum is {chosen.max_fish} fish per bag"
+                          if chosen.max_fish else " Your add-ons cannot make this trip safe")
+                       + (f"; the best plan allows {best.max_fish} ({best.label})."
+                          if best.max_fish else "; no packing is safe for this trip."))
+        summary = (f"Your packing: {n} fish per bag ({n * req.fish_mass_g / req.water_l:.0f} g/L) with: "
+                   f"{chosen.label}. " + (f"{bags} bags for {total} fish. " if bags else "") + survival_txt)
+
+    result["verdict"] = {**verdict, "meets_target": bool(meets), "survival_median_pct": round(surv_med, 2),
+                         "survival_worst_pct": round(surv_worst, 2), "expected_dead_total": dead_total,
+                         "safe_max_with_selected_addons": chosen.max_fish,
+                         "message": message}
     result["recommendation"] = {
-        "plan_key": best.key,
-        "plan_label": best.label,
+        "plan_key": chosen.key,
+        "plan_label": chosen.label,
         "fish_per_bag": n,
         "density_g_per_l": round(n * req.fish_mass_g / req.water_l, 1),
         "bags_needed": bags,
         "fish_per_bag_without_chemicals": chem_free.max_fish,
-        "bags_needed_without_chemicals": (math.ceil(req.total_fish / chem_free.max_fish)
-                                          if req.total_fish and chem_free.max_fish else None),
-        "doses": best.doses,
+        "bags_needed_without_chemicals": (math.ceil(total / chem_free.max_fish)
+                                          if total and chem_free.max_fish else None),
+        "doses": chosen.doses,
         "not_simulated_options": [{"addon": k, "name": v["name"], "amount": v["dose_text"],
-                                   "evidence": v["evidence"], "caution": v["caution"]}
+                                   "why": v["why"], "evidence": v["why"], "caution": v["caution"],
+                                   "source": v["source"]}
                                   for k, v in ADDONS.items() if not v["simulated"]],
-        "summary": (f"Pack {n} fish per bag ({n * req.fish_mass_g / req.water_l:.0f} g/L) with: {best.label}. "
-                    + (f"{bags} bags for {req.total_fish} fish. " if bags else "")
-                    + f"Expected survival after unpacking: {100 * med.summary['survival_after_unpacking']:.1f}% "
-                      f"(worst case {100 * worst.summary['survival_after_unpacking']:.1f}%) over "
-                      f"{req.temp_low_c:g}-{req.temp_high_c:g} C."),
+        "summary": summary,
     }
     result["survival_band_pct"] = {k: round(100 * v, 2) for k, v in rr.stats["survival_after_unpacking"].items()}
     result["oxygen"] = _oxygen_section(med, sp, sh, worst)
     result["mortality"] = _mortality_section(med, worst, sh, req.target_survival)
     result["chemistry"] = _chemistry_section(med)
     result["unpacking"] = _unpacking_section(med, worst)
-    result["temperature"] = _temperature_section(sp, req, best, n)
+    result["temperature"] = _temperature_section(sp, req, chosen, n)
     result["timeline"] = {"median": _series(med), "worst": _series(worst), "worst_label": rr.worst_label}
+    result["method"] = _method_section(req, sp, len(rr.runs))
     return result
 
 
@@ -451,14 +601,23 @@ def advise_text(adv: dict) -> str:
     if not adv["feasible"]:
         return adv["recommendation"]["summary"]
     rec = adv["recommendation"]
-    lines = ["PACKING PLAN", "  " + rec["summary"]]
-    if rec.get("bags_needed_without_chemicals"):
+    verdict = adv.get("verdict", {})
+    title = {"suggest": "PACKING PLAN", "fixed_bags": "YOUR BAGS", "check": "YOUR PACKING"}.get(
+        verdict.get("mode", "suggest"), "PACKING PLAN")
+    lines = [title, "  " + rec["summary"]]
+    if verdict.get("mode", "suggest") != "suggest":
+        lines.append(("  OK: " if verdict["meets_target"] else "  WARNING: ") + verdict["message"])
+    if verdict.get("mode", "suggest") != "suggest" and verdict.get("recommended_fish_per_bag"):
+        lines.append(f"  Recommended instead: {verdict['recommended_fish_per_bag']} fish/bag with "
+                     f"{verdict['recommended_plan_label']}"
+                     + (f" -> {verdict['recommended_bags']} bags." if verdict.get("recommended_bags") else "."))
+    elif rec.get("bags_needed_without_chemicals"):
         lines.append(f"  Without chemicals: {rec['fish_per_bag_without_chemicals']} fish/bag -> "
                      f"{rec['bags_needed_without_chemicals']} bags.")
     lines.append("\nWHAT TO ADD")
     for d in rec["doses"]:
         lines.append(f"  - {d['name']}: {d['amount']}" + (f" = {d['per_bag']}" if d["per_bag"] else ""))
-        lines.append(f"      why: {d['evidence']}")
+        lines.append(f"      why: {d['why']}")
         lines.append(f"      caution: {d['caution']}")
     lines += ["\nOXYGEN", "  " + adv["oxygen"]["explanation"]]
     if adv["oxygen"]["hours_to_critical_do"] is not None:

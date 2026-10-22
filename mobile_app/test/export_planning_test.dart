@@ -43,6 +43,23 @@ void main() {
       expect(median.openedAtHour, isNotNull);
     });
 
+    test('advice is plain language; studies stay in the method section', () {
+      final advisory = DevelopmentExportRepository.sampleAdvisory();
+      final citation = RegExp(r'et al|\(\d{4}\)|\b(19|20)\d{2}\b');
+
+      for (final dose in [
+        ...advisory.recommendation.doses,
+        ...advisory.recommendation.notSimulated,
+      ]) {
+        expect(dose.why, isNotEmpty);
+        expect(citation.hasMatch(dose.why), isFalse, reason: dose.why);
+        expect(citation.hasMatch(dose.caution), isFalse, reason: dose.caution);
+      }
+      final method = advisory.method!;
+      expect(method.steps, isNotEmpty);
+      expect(method.sources.first.title, contains('Pramod'));
+    });
+
     test('keeps gaps in series as null', () {
       final json = jsonDecode(sampleAdvisoryJson) as Map<String, dynamic>;
       final gas = json['timeline']['median']['gas_o2_pct'] as List<dynamic>;
@@ -80,7 +97,46 @@ void main() {
         'allowAnaesthetic': true,
         'allowZeolite': false,
         'maxFastingH': 48.0,
+        'mode': 'suggest',
       });
+    });
+
+    test('check mode sends the exporter\'s own packing', () {
+      const request = ExportShipmentRequest(
+        species: ExportSpecies.guppy,
+        fishMassG: 0.3,
+        waterL: 0.4,
+        gasL: 1.2,
+        durationH: 36,
+        tempLowC: 24,
+        tempHighC: 28,
+        mode: PlanningMode.check,
+        fishPerBag: 150,
+        checkAnaesthetic: BagAnaesthetic.ms222,
+      );
+
+      final json = request.toJson();
+      expect(json['mode'], 'check');
+      expect(json['fishPerBag'], 150);
+      expect(json['checkAnaesthetic'], 'ms222_40mgL');
+      expect(json['checkZeolite'], false);
+      expect(json.containsKey('bags'), isFalse);
+    });
+
+    test('parses a failed verdict', () {
+      final json = jsonDecode(sampleAdvisoryJson) as Map<String, dynamic>
+        ..['verdict'] = {
+          'mode': 'check',
+          'meets_target': false,
+          'message': 'Your packing is NOT safe',
+          'recommended_fish_per_bag': 48,
+          'recommended_bags': 21,
+        };
+      final advisory = TransitAdvisory.fromJson(json);
+
+      expect(advisory.mode, PlanningMode.check);
+      expect(advisory.verdict!.meetsTarget, isFalse);
+      expect(advisory.verdict!.recommendedBags, 21);
     });
   });
 
@@ -185,32 +241,61 @@ void main() {
         find.byKey(const Key('export-label-field')),
         'Dubai order',
       );
-      final submit = find.byKey(const Key('export-submit-button'));
-      await tester.scrollUntilVisible(
-        submit,
-        300,
-        scrollable: find.descendant(
-          of: find.byKey(const Key('export-form-scroll')),
-          matching: find.byType(Scrollable),
-        ),
-      );
-      await tester.tap(submit);
+      // The submit button is pinned below the form, so no scrolling needed.
+      await tester.tap(find.byKey(const Key('export-submit-button')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('export-plan-summary')), findsOneWidget);
-      expect(find.text('What to add — and how much'), findsOneWidget);
+      expect(find.byKey(const Key('export-fish-per-bag')), findsOneWidget);
+      expect(find.text('Before you pack'), findsOneWidget);
+      // The sample advisory flags unpacking as dangerous.
+      expect(find.text('Take care when opening the bags'), findsOneWidget);
 
-      await tester.tap(find.text('Oxygen'));
+      await tester.tap(find.text('Journey'));
+      await tester.pumpAndSettle();
+      expect(find.text('Fish alive'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('export-journey-oxygen')));
       await tester.pumpAndSettle();
       expect(find.text('Oxygen dissolved in the water'), findsOneWidget);
 
-      await tester.tap(find.text('Survival'));
+      await tester.tap(find.text('Unpacking').first);
       await tester.pumpAndSettle();
-      expect(find.text('Fish alive'), findsOneWidget);
+      expect(find.text('How to unpack'), findsOneWidget);
 
       await tester.pageBack();
       await tester.pumpAndSettle();
       expect(find.text('Dubai order'), findsOneWidget);
+    });
+
+    testWidgets('check mode shows the safety verdict', (tester) async {
+      final json = jsonDecode(sampleAdvisoryJson) as Map<String, dynamic>
+        ..['verdict'] = {
+          'mode': 'check',
+          'meets_target': false,
+          'message': 'Your packing is NOT safe: survival can fall to 56%.',
+          'recommended_fish_per_bag': 48,
+          'recommended_plan_label': 'fast 48 h + MS-222',
+          'recommended_bags': 21,
+        };
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ExportAdvisoryScreen(
+            detail: ExportAdvisoryDetail(
+              id: 'plan-check',
+              createdAt: DateTime.utc(2026, 10, 22),
+              advisory: TransitAdvisory.fromJson(json),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('export-plan-verdict')), findsOneWidget);
+      expect(
+        find.text('Your packing is NOT safe: survival can fall to 56%.'),
+        findsOneWidget,
+      );
+      expect(find.text('What is in your bag'), findsOneWidget);
     });
 
     testWidgets('shows an infeasible plan without the tabs', (tester) async {

@@ -11,6 +11,7 @@ public interface ExportSimulator {
     record AdvisoryResult(
             String json,
             boolean feasible,
+            boolean meetsTarget,
             Integer fishPerBag,
             Integer bagsNeeded,
             Double survivalPct,

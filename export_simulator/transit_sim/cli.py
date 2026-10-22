@@ -85,11 +85,14 @@ def cmd_advise(a: argparse.Namespace) -> int:
     from .advisor import AdvisoryRequest, advise, advise_text
 
     lo, hi = a.temp_range
+    if a.mode is None:
+        a.mode = "check" if a.fish_per_bag else "fixed_bags" if a.bags else "suggest"
     req = AdvisoryRequest(species=a.species, fish_mass_g=a.mass, total_fish=a.total, water_l=a.water, gas_l=a.gas,
                           duration_h=a.hours, temp_low_c=lo, temp_high_c=hi, target_survival=a.target / 100.0,
                           allow_anaesthetic=not a.no_anaesthetic, allow_zeolite=not a.no_zeolite,
                           max_fasting_h=a.max_fasting, initial_ph=a.ph0, alkalinity_mgL_caco3=a.alkalinity,
-                          kla_per_h=a.kla)
+                          kla_per_h=a.kla, mode=a.mode, bags=a.bags, fish_per_bag=a.fish_per_bag,
+                          check_fasting_h=a.fasting, check_zeolite=a.zeolite, check_anaesthetic=a.anaesthetic)
     try:
         adv = advise(req)
     except ValueError as exc:
@@ -165,6 +168,14 @@ def build_parser() -> argparse.ArgumentParser:
     ad.add_argument("--ph0", type=float, default=7.4)
     ad.add_argument("--alkalinity", type=float, default=65.0)
     ad.add_argument("--kla", type=float, default=None)
+    ad.add_argument("--mode", choices=["suggest", "fixed_bags", "check"], default=None,
+                    help="default: check if --fish-per-bag is given, fixed_bags if --bags, else suggest")
+    ad.add_argument("--bags", type=int, default=None, help="fixed_bags: number of bags you have")
+    ad.add_argument("--fish-per-bag", type=int, default=None, help="check: your own fish per bag")
+    ad.add_argument("--fasting", type=float, default=24.0, help="check: hours fasted before packing")
+    ad.add_argument("--zeolite", action="store_true", help="check: zeolite 20 g/L in your bags")
+    ad.add_argument("--anaesthetic", choices=["ms222_40mgL", "benzocaine_20mgL"], default=None,
+                    help="check: anaesthetic in your bags")
     ad.add_argument("--json", action="store_true")
     ad.set_defaults(func=cmd_advise)
 

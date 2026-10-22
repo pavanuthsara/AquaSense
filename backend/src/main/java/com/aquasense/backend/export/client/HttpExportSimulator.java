@@ -45,6 +45,7 @@ public class HttpExportSimulator implements ExportSimulator {
             return new AdvisoryResult(
                     body,
                     Boolean.parseBoolean(headers.getFirst("X-Advisory-Feasible")),
+                    Boolean.parseBoolean(headers.getFirst("X-Advisory-Meets-Target")),
                     integer(headers.getFirst("X-Advisory-Fish-Per-Bag")),
                     integer(headers.getFirst("X-Advisory-Bags-Needed")),
                     decimal(headers.getFirst("X-Advisory-Survival-Pct")),

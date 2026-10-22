@@ -97,12 +97,53 @@ class ExportAdvisoryApiIntegrationTests {
                 .andExpect(jsonPath("$[0].fishPerBag", is(48)))
                 .andExpect(jsonPath("$[0].bagsNeeded", is(21)))
                 .andExpect(jsonPath("$[0].survivalPct", is(96.3)))
-                .andExpect(jsonPath("$[0].feasible", is(true)));
+                .andExpect(jsonPath("$[0].feasible", is(true)))
+                .andExpect(jsonPath("$[0].mode", is("suggest")))
+                .andExpect(jsonPath("$[0].meetsTarget", is(true)));
 
         mockMvc.perform(get("/api/v1/facilities/{facilityId}/export-advisories/{id}", facilityId, id)
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.advisory.oxygen.explanation", is("O2 story")));
+    }
+
+    @Test
+    void exporterCanCheckTheirOwnPackingOrFixTheNumberOfBags() throws Exception {
+        String token = token("export-owner5", "owner5@example.com");
+        String facilityId = createFacility(token, "export-facility-5", "Check Reef");
+
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/export-advisories", facilityId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"species\":\"guppy\",\"fishMassG\":0.3,\"totalFish\":1000,\"waterL\":0.4,"
+                                + "\"gasL\":1.2,\"durationH\":36,\"tempLowC\":24,\"tempHighC\":28,"
+                                + "\"mode\":\"check\",\"fishPerBag\":150,\"checkAnaesthetic\":\"ms222_40mgL\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.request.mode", is("check")))
+                .andExpect(jsonPath("$.request.fish_per_bag", is(150)))
+                .andExpect(jsonPath("$.request.check_anaesthetic", is("ms222_40mgL")));
+
+        mockMvc.perform(get("/api/v1/facilities/{facilityId}/export-advisories", facilityId)
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$[0].mode", is("check")))
+                .andExpect(jsonPath("$[0].meetsTarget", is(false)));
+
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/export-advisories", facilityId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"species\":\"guppy\",\"fishMassG\":0.3,\"waterL\":0.4,\"gasL\":1.2,"
+                                + "\"durationH\":36,\"tempLowC\":24,\"tempHighC\":28,\"mode\":\"fixed_bags\","
+                                + "\"bags\":20}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code", is("bags_required")));
+
+        mockMvc.perform(post("/api/v1/facilities/{facilityId}/export-advisories", facilityId)
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"species\":\"guppy\",\"fishMassG\":0.3,\"waterL\":0.4,\"gasL\":1.2,"
+                                + "\"durationH\":36,\"tempLowC\":24,\"tempHighC\":28,\"mode\":\"check\","
+                                + "\"fishPerBag\":50,\"checkAnaesthetic\":\"vodka\"}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -190,7 +231,8 @@ class ExportAdvisoryApiIntegrationTests {
             }
             String json = "{\"feasible\":true,\"recommendation\":{\"fish_per_bag\":48,\"bags_needed\":21},"
                     + "\"oxygen\":{\"explanation\":\"O2 story\"}}";
-            return new AdvisoryResult(json, true, 48, 21, 96.3, 95.2);
+            boolean check = requestJson.contains("\"mode\":\"check\"");
+            return new AdvisoryResult(json, true, !check, 48, 21, 96.3, 95.2);
         }
     }
 

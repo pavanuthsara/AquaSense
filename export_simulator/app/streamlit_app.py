@@ -54,19 +54,41 @@ def line_chart(title: str, unit: str, tl: dict, key: str, ref: float | None = No
 
 
 # ----------------------------------------------------------------------------- inputs
+MODE_LABELS = {
+    "suggest": "Suggest the number of bags",
+    "fixed_bags": "I'll set the number of bags",
+    "check": "Check my own packing",
+}
+
 with st.sidebar:
+    st.header("How do you want to plan?")
+    mode = st.radio("Planning mode", list(MODE_LABELS), format_func=MODE_LABELS.get, label_visibility="collapsed")
     st.header("Shipment")
     species = st.selectbox("Species", available_species(), index=available_species().index("guppy"))
     mass = st.number_input("Average fish weight (g)", 0.05, 200.0, 0.3 if species == "guppy" else 12.0, step=0.05)
-    total = st.number_input("Total fish to ship (0 = not set)", 0, 1_000_000, 1000, step=100)
+    total = st.number_input("Total fish to ship" + (" (0 = not set)" if mode != "fixed_bags" else ""),
+                            0, 1_000_000, 1000, step=100)
+    bags = fish_per_bag = None
+    if mode == "fixed_bags":
+        bags = st.number_input("Number of bags you have", 1, 100_000, 20, step=1)
+    if mode == "check":
+        fish_per_bag = st.number_input("Fish per bag (your packing)", 1, 100_000, 60, step=5)
     hours = st.slider("Door-to-door time (h)", 6, 96, 36, step=2)
     t_lo, t_hi = st.slider("Expected temperature range (°C)", 15.0, 35.0, (24.0, 28.0), step=0.5)
     st.header("Bag")
     water = st.number_input("Water per bag (L)", 0.05, 20.0, 0.4, step=0.05)
     gas = st.number_input("Oxygen per bag (L)", 0.05, 40.0, 1.2, step=0.1)
     target = st.slider("Minimum survival after unpacking (%)", 80.0, 99.5, 95.0, step=0.5,
-                       help="5 % dead-on-arrival is the usual industry warranty threshold (Lim et al. 2003).")
-    st.header("Allowed add-ons")
+                       help="5% dead on arrival is the usual industry warranty limit.")
+    check_fast, check_zeo, check_anaes = 24.0, False, None
+    if mode == "check":
+        st.header("What you put in the bag")
+        check_fast = st.select_slider("Fasting before packing (h)", [0, 12, 24, 48], 24)
+        check_zeo = st.checkbox("Zeolite 20 g/L", False)
+        check_anaes = st.selectbox("Anaesthetic", [None, "ms222_40mgL", "benzocaine_20mgL"],
+                                   format_func=lambda k: {None: "None", "ms222_40mgL": "MS-222 40 mg/L",
+                                                          "benzocaine_20mgL": "Benzocaine 20 mg/L"}[k])
+    st.header("Allowed add-ons" if mode != "check" else "Add-ons allowed for the recommendation")
     allow_anaes = st.checkbox("Anaesthetics (MS-222 / benzocaine)", True)
     allow_zeo = st.checkbox("Zeolite", True)
     max_fast = st.select_slider("Longest fasting allowed (h)", [24, 48], 48)
@@ -80,7 +102,9 @@ req = dict(species=species, fish_mass_g=float(mass), total_fish=int(total) or No
            gas_l=float(gas), duration_h=float(hours), temp_low_c=float(t_lo), temp_high_c=float(t_hi),
            target_survival=float(target) / 100.0, allow_anaesthetic=allow_anaes, allow_zeolite=allow_zeo,
            max_fasting_h=float(max_fast), initial_ph=float(ph0), alkalinity_mgL_caco3=float(alk),
-           kla_per_h=float(kla) or None, samples=int(samples))
+           kla_per_h=float(kla) or None, samples=int(samples), mode=mode,
+           bags=int(bags) if bags else None, fish_per_bag=int(fish_per_bag) if fish_per_bag else None,
+           check_fasting_h=float(check_fast), check_zeolite=bool(check_zeo), check_anaesthetic=check_anaes)
 
 st.title("Export transit advisor")
 st.caption("AquaSense · Export management — predicts what happens inside the sealed bag and how to pack it.")
@@ -101,12 +125,23 @@ if not adv["feasible"]:
     st.stop()
 
 # ----------------------------------------------------------------------------- headline
-st.success("**Packing plan:** " + rec["summary"])
+verdict = adv.get("verdict", {})
+if mode == "suggest":
+    st.success("**Packing plan:** " + rec["summary"])
+else:
+    (st.success if verdict.get("meets_target") else st.error)(
+        ("✅ " if verdict.get("meets_target") else "❌ ") + "**" + verdict.get("message", "") + "**")
+    st.info(rec["summary"])
+    if verdict.get("recommended_fish_per_bag"):
+        st.caption(f"Recommended plan for comparison: {verdict['recommended_fish_per_bag']} fish per bag with "
+                   f"{verdict['recommended_plan_label']}"
+                   + (f" → {verdict['recommended_bags']} bags." if verdict.get("recommended_bags") else "."))
 c = st.columns(5)
 c[0].metric("Fish per bag", rec["fish_per_bag"], help=f"{rec['density_g_per_l']} g/L")
-c[1].metric("Bags needed", rec["bags_needed"] if rec["bags_needed"] else "—",
+c[1].metric("Bags" if mode != "suggest" else "Bags needed", rec["bags_needed"] if rec["bags_needed"] else "—",
             delta=(f"{rec['bags_needed'] - rec['bags_needed_without_chemicals']} vs no chemicals"
-                   if rec["bags_needed"] and rec["bags_needed_without_chemicals"] else None), delta_color="inverse")
+                   if mode == "suggest" and rec["bags_needed"] and rec["bags_needed_without_chemicals"] else None),
+            delta_color="inverse")
 c[2].metric("Survival (median)", f"{adv['mortality']['survival_after_unpacking_pct']:.1f}%")
 c[3].metric("Survival (worst case)", f"{adv['mortality']['worst_survival_after_unpacking_pct']:.1f}%")
 c[4].metric("Expected losses / bag", f"{adv['mortality']['expected_dead_per_bag']:.1f}",
@@ -114,18 +149,18 @@ c[4].metric("Expected losses / bag", f"{adv['mortality']['expected_dead_per_bag'
 
 tl = adv["timeline"]
 tabs = st.tabs(["What to add", "Oxygen", "How fast fish die", "Water chemistry", "Temperature", "Unpacking",
-                "All options"])
+                "How we calculate", "All options"])
 
 with tabs[0]:
-    st.subheader("Chemicals and preparation — how much")
+    st.subheader("Chemicals and preparation — how much" if mode != "check" else "What is in your bag")
     for d in rec["doses"]:
         with st.container(border=True):
             st.markdown(f"**{d['name']}** — {d['amount']}" + (f" → **{d['per_bag']}**" if d["per_bag"] else ""))
-            st.markdown(f"*Why:* {d['evidence']}")
-            st.markdown(f"*Caution:* {d['caution']}")
+            st.markdown(f"**Why:** {d.get('why', d['evidence'])}")
+            st.markdown(f"**Take care:** {d['caution']}")
     st.subheader("Other options (not simulated)")
     for d in rec["not_simulated_options"]:
-        st.markdown(f"- **{d['name']}** ({d['amount']}): {d['evidence']} _{d['caution']}_")
+        st.markdown(f"- **{d['name']}** ({d['amount']}): {d.get('why', d['evidence'])} _{d['caution']}_")
 
 with tabs[1]:
     ox = adv["oxygen"]
@@ -192,11 +227,28 @@ with tabs[5]:
         st.markdown(f"{i}. {s}")
 
 with tabs[6]:
+    method = adv.get("method", {})
+    st.subheader("How AquaSense works this out")
+    for i, step in enumerate(method.get("steps", []), 1):
+        st.markdown(f"{i}. {step}")
+    st.subheader("How sure we are")
+    for note in method.get("confidence", []):
+        st.markdown(f"- {note}")
+    with st.expander("Studies the simulator is built on"):
+        for src in method.get("sources", []):
+            st.markdown(f"**{src['title']}**  \n{src['used_for']}")
+        st.caption("Each add-on is based on: " + "; ".join(
+            f"{d['name']}: {d['source']}" for d in rec["doses"] if d.get("source")))
+
+with tabs[7]:
     opts = sorted(adv["options"], key=lambda o: o["max_fish_per_bag"])
     fig = go.Figure(go.Bar(y=[o["label"] for o in opts], x=[o["max_fish_per_bag"] for o in opts], orientation="h",
                            marker=dict(color=[ORANGE if o["recommended"] else BLUE for o in opts]),
                            text=[o["max_fish_per_bag"] for o in opts], textposition="outside",
                            hovertemplate="%{y}: %{x} fish per bag<extra></extra>"))
+    if mode != "suggest":
+        fig.add_vline(x=rec["fish_per_bag"], line=dict(color=CRIT, dash="dash", width=2),
+                      annotation_text=f"your {rec['fish_per_bag']} fish/bag", annotation_position="top")
     fig.update_layout(title="Maximum fish per bag at the hot end of the range (orange = recommended)",
                       height=60 + 32 * len(opts), margin=dict(l=10, r=10, t=45, b=10),
                       xaxis=dict(title="fish per bag", gridcolor=GRID))
@@ -205,5 +257,5 @@ with tabs[6]:
                    "vs basic %": o["gain_vs_basic_pct"], "Recommended": "✓" if o["recommended"] else ""}
                   for o in opts[::-1]], hide_index=True, width="stretch")
 
-st.caption("Model: mechanistic bag simulator calibrated on Pramod et al. (2010). Add-ons must gain ≥5 % more fish "
-           "to be recommended. Not a substitute for species-specific veterinary advice.")
+st.caption("Estimates from a simulation. See 'How we calculate' for how they are worked out. "
+           "Not a substitute for species-specific veterinary advice.")

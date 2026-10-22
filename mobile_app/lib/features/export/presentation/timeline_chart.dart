@@ -10,7 +10,7 @@ abstract final class ExportChartColors {
   static const opened = Color(0xFFEDA100);
 }
 
-/// A small dependency-free line chart: median journey (solid), worst case
+/// A small dependency-free line chart: typical (median) journey (solid), worst case
 /// (dashed), an optional threshold and the unpacking period shaded.
 /// Touch or drag to read the values at a given hour.
 class TimelineChart extends StatefulWidget {
@@ -86,7 +86,7 @@ class _TimelineChartState extends State<TimelineChart> {
             );
       final parts = <String>['${selected.toStringAsFixed(0)} ${widget.xLabel}'];
       if (median != null) {
-        parts.add('median ${median.toStringAsFixed(widget.decimals)}');
+        parts.add('typical ${median.toStringAsFixed(widget.decimals)}');
       }
       if (worst != null) {
         parts.add('worst ${worst.toStringAsFixed(widget.decimals)}');
@@ -129,6 +129,7 @@ class _TimelineChartState extends State<TimelineChart> {
                       chart: widget,
                       selectedX: _selectedX,
                       textColor: theme.colorScheme.onSurfaceVariant,
+                      labelStyle: theme.textTheme.labelSmall,
                       gridColor: theme.colorScheme.outlineVariant,
                     ),
                   ),
@@ -143,7 +144,7 @@ class _TimelineChartState extends State<TimelineChart> {
             children: [
               const _LegendItem(
                 color: ExportChartColors.median,
-                label: 'Median journey',
+                label: 'Typical journey',
               ),
               if (widget.worst != null)
                 const _LegendItem(
@@ -274,12 +275,14 @@ class _TimelinePainter extends CustomPainter {
     required this.selectedX,
     required this.textColor,
     required this.gridColor,
+    this.labelStyle,
   });
 
   final TimelineChart chart;
   final double? selectedX;
   final Color textColor;
   final Color gridColor;
+  final TextStyle? labelStyle;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -426,7 +429,10 @@ class _TimelinePainter extends CustomPainter {
     final painter = TextPainter(
       text: TextSpan(
         text: text,
-        style: TextStyle(color: textColor, fontSize: 10),
+        style: (labelStyle ?? const TextStyle()).copyWith(
+          color: textColor,
+          fontSize: 10,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();

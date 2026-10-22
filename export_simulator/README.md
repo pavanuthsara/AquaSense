@@ -60,6 +60,23 @@ UNPACKING         pH rebound + NH3 spike, step-by-step unpacking
 ALL OPTIONS       max fish/bag for every add-on combination
 ```
 
+Three planning modes (CLI flags / API `mode` / the radio buttons in the demo / the selector in the app):
+
+| Mode | The exporter gives | The simulator answers |
+|---|---|---|
+| `suggest` (default) | shipment + bag size | fish per bag, number of bags, add-ons and doses |
+| `fixed_bags` (`--bags 20`) | total fish + number of bags | is that safe? which add-ons make it safe? if not, how many bags are needed |
+| `check` (`--fish-per-bag 60 [--fasting 24] [--zeolite] [--anaesthetic ms222_40mgL]`) | their own packing | what happens to their fish (survival really drops when overpacked), compared with the safe plan |
+
+```bash
+python -m transit_sim advise --mass 0.3 --total 1000 --water 0.4 --gas 1.2 --hours 36 --temp-range 24 28 --fish-per-bag 60
+# YOUR PACKING ... Expected survival after unpacking: 87.1% (worst case 80.2%)
+# WARNING: Your packing is NOT safe ... With your add-ons the safe maximum is 37 fish per bag
+```
+
+A packing counts as safe when its fish per bag is within the hot-end maximum for its add-ons (the
+same rule the optimiser uses), so all three modes agree with each other.
+
 How the plan is chosen: every combination of fasting (24/48 h), zeolite and anaesthetic is tested;
 for each, the largest fish count whose survival **after unpacking** stays above the target at the
 **hot end** of the temperature range is found. An add-on is only recommended if it gains at least

@@ -49,6 +49,8 @@ class DevelopmentExportRepository implements ExportRepository {
             species: plan.request.species,
             durationHours: plan.request.durationH,
             feasible: advisory.feasible,
+            mode: plan.request.mode,
+            meetsTarget: advisory.verdict?.meetsTarget ?? true,
             fishPerBag: advisory.recommendation.fishPerBag,
             bagsNeeded: advisory.recommendation.bagsNeeded,
             survivalPct: advisory.mortality?.survivalAfterUnpackingPct,

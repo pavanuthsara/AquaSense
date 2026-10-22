@@ -126,7 +126,13 @@ public class ExportAdvisoryController {
             @DecimalMin("50") @DecimalMax("99.5") Double targetSurvivalPct,
             Boolean allowAnaesthetic,
             Boolean allowZeolite,
-            @DecimalMin("0") @DecimalMax("96") Double maxFastingH) {
+            @DecimalMin("0") @DecimalMax("96") Double maxFastingH,
+            @Pattern(regexp = "suggest|fixed_bags|check") String mode,
+            @Min(1) @Max(1_000_000) Integer bags,
+            @Min(1) @Max(1_000_000) Integer fishPerBag,
+            @DecimalMin("0") @DecimalMax("96") Double checkFastingH,
+            Boolean checkZeolite,
+            @Pattern(regexp = "ms222_40mgL|benzocaine_20mgL") String checkAnaesthetic) {
 
         AdvisoryInput toInput() {
             return new AdvisoryInput(
@@ -142,7 +148,13 @@ public class ExportAdvisoryController {
                     targetSurvivalPct == null ? 95.0 : targetSurvivalPct,
                     allowAnaesthetic == null || allowAnaesthetic,
                     allowZeolite == null || allowZeolite,
-                    maxFastingH == null ? 48.0 : maxFastingH);
+                    maxFastingH == null ? 48.0 : maxFastingH,
+                    mode == null ? "suggest" : mode,
+                    bags,
+                    fishPerBag,
+                    checkFastingH == null ? 24.0 : checkFastingH,
+                    checkZeolite != null && checkZeolite,
+                    checkAnaesthetic);
         }
     }
 
@@ -151,7 +163,9 @@ public class ExportAdvisoryController {
             String label,
             String species,
             double durationHours,
+            String mode,
             boolean feasible,
+            boolean meetsTarget,
             Integer fishPerBag,
             Integer bagsNeeded,
             Double survivalPct,
@@ -163,7 +177,9 @@ public class ExportAdvisoryController {
                     advisory.getLabel(),
                     advisory.getSpecies(),
                     advisory.getDurationHours(),
+                    advisory.getPlanMode(),
                     advisory.isFeasible(),
+                    advisory.isMeetsTarget(),
                     advisory.getFishPerBag(),
                     advisory.getBagsNeeded(),
                     advisory.getSurvivalPct(),

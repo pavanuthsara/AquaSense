@@ -47,3 +47,14 @@ def test_service_key(monkeypatch):
     assert client.get("/v1/options").status_code == 401
     assert client.get("/v1/options", headers={"X-Service-Key": "s3cret"}).status_code == 200
     assert client.get("/health").status_code == 200
+
+
+def test_check_mode_endpoint():
+    r = client.post("/v1/advisory", json={"total_fish": 1000, "water_l": 0.4, "gas_l": 1.2, "duration_h": 36,
+                                          "temp_low_c": 24, "temp_high_c": 28, "samples": 0,
+                                          "mode": "check", "fish_per_bag": 150})
+    assert r.status_code == 200
+    assert r.json()["verdict"]["meets_target"] is False
+    assert r.headers["X-Advisory-Meets-Target"] == "false"
+    bad = client.post("/v1/advisory", json={"mode": "check", "fish_per_bag": 10, "check_anaesthetic": "x"})
+    assert bad.status_code == 422

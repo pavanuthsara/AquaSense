@@ -38,6 +38,24 @@ public class ExportAdvisoryService {
     /** Not transactional on purpose: the simulator call takes seconds and must not hold a DB connection. */
     public ExportAdvisory create(UUID userId, UUID facilityId, AdvisoryInput input) {
         requireMembership(userId, facilityId);
+        if ("fixed_bags".equals(input.mode()) && (input.bags() == null || input.totalFish() == null)) {
+            throw new FacilityException(
+                    HttpStatus.BAD_REQUEST,
+                    "bags_required",
+                    "Enter the total number of fish and the number of bags");
+        }
+        if ("fixed_bags".equals(input.mode()) && input.bags() > input.totalFish()) {
+            throw new FacilityException(
+                    HttpStatus.BAD_REQUEST,
+                    "too_many_bags",
+                    "There are more bags than fish");
+        }
+        if ("check".equals(input.mode()) && input.fishPerBag() == null) {
+            throw new FacilityException(
+                    HttpStatus.BAD_REQUEST,
+                    "fish_per_bag_required",
+                    "Enter how many fish you pack per bag");
+        }
         if (input.tempHighC() < input.tempLowC()) {
             throw new FacilityException(
                     HttpStatus.BAD_REQUEST,
@@ -63,7 +81,9 @@ public class ExportAdvisoryService {
                 cleanLabel(input.label()),
                 input.species(),
                 input.durationH(),
+                input.mode(),
                 result.feasible(),
+                result.meetsTarget(),
                 result.fishPerBag(),
                 result.bagsNeeded(),
                 result.survivalPct(),
@@ -119,9 +139,15 @@ public class ExportAdvisoryService {
             double targetSurvivalPct,
             boolean allowAnaesthetic,
             boolean allowZeolite,
-            double maxFastingH) {
+            double maxFastingH,
+            String mode,
+            Integer bags,
+            Integer fishPerBag,
+            double checkFastingH,
+            boolean checkZeolite,
+            String checkAnaesthetic) {
 
-        /** JSON for the Python simulator. Only numbers, booleans and a pattern-validated species key. */
+        /** JSON for the Python simulator. Only numbers, booleans and pattern-validated keys. */
         String toSimulatorJson() {
             StringBuilder json = new StringBuilder("{");
             json.append("\"species\":\"").append(species).append('"');
@@ -136,6 +162,13 @@ public class ExportAdvisoryService {
             json.append(",\"allow_anaesthetic\":").append(allowAnaesthetic);
             json.append(",\"allow_zeolite\":").append(allowZeolite);
             json.append(",\"max_fasting_h\":").append(number(maxFastingH));
+            json.append(",\"mode\":\"").append(mode).append('"');
+            json.append(",\"bags\":").append(bags == null ? "null" : bags.toString());
+            json.append(",\"fish_per_bag\":").append(fishPerBag == null ? "null" : fishPerBag.toString());
+            json.append(",\"check_fasting_h\":").append(number(checkFastingH));
+            json.append(",\"check_zeolite\":").append(checkZeolite);
+            json.append(",\"check_anaesthetic\":")
+                    .append(checkAnaesthetic == null ? "null" : "\"" + checkAnaesthetic + "\"");
             return json.append('}').toString();
         }
 

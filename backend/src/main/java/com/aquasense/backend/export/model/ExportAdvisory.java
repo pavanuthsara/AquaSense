@@ -30,8 +30,14 @@ public class ExportAdvisory {
     @Column(name = "duration_hours", nullable = false)
     private double durationHours;
 
+    @Column(name = "plan_mode", nullable = false, length = 16)
+    private String planMode;
+
     @Column(nullable = false)
     private boolean feasible;
+
+    @Column(name = "meets_target", nullable = false)
+    private boolean meetsTarget;
 
     @Column(name = "fish_per_bag")
     private Integer fishPerBag;
@@ -63,7 +69,9 @@ public class ExportAdvisory {
             String label,
             String species,
             double durationHours,
+            String planMode,
             boolean feasible,
+            boolean meetsTarget,
             Integer fishPerBag,
             Integer bagsNeeded,
             Double survivalPct,
@@ -77,7 +85,9 @@ public class ExportAdvisory {
         this.label = label;
         this.species = species;
         this.durationHours = durationHours;
+        this.planMode = planMode;
         this.feasible = feasible;
+        this.meetsTarget = meetsTarget;
         this.fishPerBag = fishPerBag;
         this.bagsNeeded = bagsNeeded;
         this.survivalPct = survivalPct;
@@ -93,7 +103,9 @@ public class ExportAdvisory {
     public String getLabel() { return label; }
     public String getSpecies() { return species; }
     public double getDurationHours() { return durationHours; }
+    public String getPlanMode() { return planMode; }
     public boolean isFeasible() { return feasible; }
+    public boolean isMeetsTarget() { return meetsTarget; }
     public Integer getFishPerBag() { return fishPerBag; }
     public Integer getBagsNeeded() { return bagsNeeded; }
     public Double getSurvivalPct() { return survivalPct; }

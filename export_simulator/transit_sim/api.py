@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import asdict
+from typing import Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from pydantic import BaseModel, Field
@@ -45,6 +46,12 @@ class AdvisoryIn(BaseModel):
     kla_per_h: float | None = Field(None, gt=0, le=10)
     samples: int = Field(10, ge=0, le=30)
     seed: int = 0
+    mode: Literal["suggest", "fixed_bags", "check"] = "suggest"
+    bags: int | None = Field(None, gt=0, le=1_000_000)
+    fish_per_bag: int | None = Field(None, gt=0, le=1_000_000)
+    check_fasting_h: float = Field(24.0, ge=0, le=96)
+    check_zeolite: bool = False
+    check_anaesthetic: Literal["ms222_40mgL", "benzocaine_20mgL"] | None = None
 
 
 class SimulateIn(BaseModel):
@@ -90,6 +97,7 @@ def advisory(body: AdvisoryIn, response: Response) -> dict:
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     response.headers["X-Advisory-Feasible"] = "true" if adv["feasible"] else "false"
+    response.headers["X-Advisory-Meets-Target"] = "true" if adv.get("verdict", {}).get("meets_target") else "false"
     if adv["feasible"]:
         rec, mort = adv["recommendation"], adv["mortality"]
         response.headers["X-Advisory-Fish-Per-Bag"] = str(rec["fish_per_bag"])
