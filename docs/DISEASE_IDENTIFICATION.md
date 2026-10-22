@@ -58,7 +58,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-009 | Home screen entry and app wiring | DIS-007, DIS-008 | Done |
 | DIS-010 | Real-phone test with own fish | DIS-009 | Not started |
 | DIS-011 | Video check: models and setup | DIS-009 | Done |
-| DIS-012 | Python reference fixtures | DIS-011 | Not started |
+| DIS-012 | Python reference fixtures | DIS-011 | Done |
 | DIS-013 | Fish finder in Dart | DIS-012 | Not started |
 | DIS-014 | Fish crop classifier in Dart | DIS-012 | Not started |
 | DIS-015 | Tracker, per-fish vote, video answer | DIS-013, DIS-014 | Not started |
@@ -291,6 +291,34 @@ the phone means the check works offline at a farm, and the same model file can
 run on a Raspberry Pi later.
 
 ## Work log
+
+### 2026-10-22 — DIS-012: Python reference fixtures — Done
+
+- `tools/make_video_fixtures.py` imports the real `FishFinder` and `SpotModel`
+  from `video_check/check_video.py` and the v5 models from the `1_models`
+  folders, and writes parity fixtures to
+  `mobile_app/test/fixtures/video_parity/`.
+- Installed `ai-edge-litert`, `opencv-python-headless`, `numpy` locally to run
+  the reference (not committed).
+- Clip used: the owner's own tank video `WhatsApp Video 2026-10-16 at
+  11.34.27.mp4` (no white-spot TikTok clip was on this machine; a healthy clip
+  would work for pixel parity too, but this one exercises white-spot paths). No
+  video file is committed.
+- Fixtures (2.63 MB total, under the 3 MB budget): `frame_{1..3}.png`
+  (720x1280), `det_input_{k}.png` (512x512), `det_output_{k}.bin`
+  (5x5376 float32 LE), `boxes_{k}.json`, `crop_input_{k}_{j}.png` (224x224),
+  `crops_{k}.json` (probs, white-spot score, not_fish), `checked.csv`,
+  `expected_answers.json`, `manifest.json`.
+- The three sampled frames have 1 box each (pixel parity); the full-run
+  `checked.csv` has 80 frames and 8 tracked fish for the DIS-015 replay test.
+- **Reference per-fish answers** (from check_video.py, the targets Dart must
+  reproduce): fish 1 white spot (0.94/30), 4 white spot (0.99/3), 5 white spot
+  (0.73/5), 8 white spot (0.70/6), 9 not sure (0.64/3), 13 not sure (0.48/3),
+  14 white spot (0.96/7), 16 healthy (0.38/6). **Video answer: WHITE SPOT
+  FOUND** (5 white spot, 1 healthy, 2 not sure). Reference speed: 179 ms/frame
+  on the laptop CPU.
+- Next: DIS-013 (fish finder in Dart).
+
 
 ### 2026-10-22 — DIS-011: Video check models and setup — Done
 

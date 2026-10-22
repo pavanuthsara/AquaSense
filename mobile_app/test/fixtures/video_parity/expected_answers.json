@@ -1,0 +1,37 @@
+{
+ "video_answer": "WHITE SPOT FOUND   (5 white spot, 1 healthy, 2 not sure)",
+ "fish": [
+  {
+   "fish": 1,
+   "answer": "white spot"
+  },
+  {
+   "fish": 4,
+   "answer": "white spot"
+  },
+  {
+   "fish": 5,
+   "answer": "white spot"
+  },
+  {
+   "fish": 8,
+   "answer": "white spot"
+  },
+  {
+   "fish": 9,
+   "answer": "not sure"
+  },
+  {
+   "fish": 13,
+   "answer": "not sure"
+  },
+  {
+   "fish": 14,
+   "answer": "white spot"
+  },
+  {
+   "fish": 16,
+   "answer": "healthy"
+  }
+ ]
+}
