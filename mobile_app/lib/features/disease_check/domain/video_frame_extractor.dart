@@ -10,4 +10,10 @@ abstract interface class VideoFrameExtractor {
     PickedVideo video, {
     double fps = videoFramesPerSecond,
   });
+
+  /// How many frames [frames] will emit for this video, for progress display.
+  Future<int> frameCount(
+    PickedVideo video, {
+    double fps = videoFramesPerSecond,
+  });
 }

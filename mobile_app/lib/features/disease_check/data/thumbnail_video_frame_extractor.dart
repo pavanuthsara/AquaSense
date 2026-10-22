@@ -33,6 +33,17 @@ class ThumbnailVideoFrameExtractor implements VideoFrameExtractor {
       if (frame != null) yield frame;
     }
   }
+
+  @override
+  Future<int> frameCount(
+    PickedVideo video, {
+    double fps = videoFramesPerSecond,
+  }) async {
+    final durationMs = await grabber.durationMs(video.path);
+    final capMs = math.min(durationMs, videoMaxDuration.inMilliseconds);
+    final stepMs = (1000 / fps).round();
+    return capMs <= 0 ? 0 : ((capMs - 1) ~/ stepMs) + 1;
+  }
 }
 
 /// Decodes encoded frame [bytes] (PNG/JPEG) to a [DecodedFrame]. Top-level so

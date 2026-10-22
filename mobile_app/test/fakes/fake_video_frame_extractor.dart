@@ -11,4 +11,8 @@ class FakeVideoFrameExtractor implements VideoFrameExtractor {
   @override
   Stream<DecodedFrame> frames(PickedVideo video, {double fps = 2.0}) =>
       Stream.fromIterable(framesToEmit);
+
+  @override
+  Future<int> frameCount(PickedVideo video, {double fps = 2.0}) async =>
+      framesToEmit.length;
 }

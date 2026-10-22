@@ -192,6 +192,27 @@ class _HistoryTile extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Text('${(record.confidence * 100).round()}%'),
+                if (record.modelVersion.startsWith('guppy-video')) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    key: const Key('video-chip'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: colors.secondaryContainer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      'Video',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.onSecondaryContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 Text(
                   _formatTime(record.checkedAt.toLocal()),

@@ -1,27 +1,46 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../data/video_check_runner.dart';
 import '../domain/disease_classifier.dart';
 import '../domain/disease_info.dart';
 import '../domain/disease_prediction.dart';
 import '../domain/fish_photo_source.dart';
+import '../domain/fish_video_source.dart';
+import '../domain/video_check_result.dart';
 import 'disease_check_controller.dart';
+import 'video_check_controller.dart';
+import 'video_check_section.dart';
 
-/// Take or pick a photo of one fish and see what the model thinks.
+enum _CheckMode { photo, video }
+
+/// Take or pick a photo of one fish, or a video of a tank, and see what the
+/// model thinks. Video mode is only shown when its parts are supplied.
 class DiseaseCheckScreen extends StatefulWidget {
   const DiseaseCheckScreen({
     required this.classifier,
     required this.photoSource,
     this.resultActionsBuilder,
+    this.videoRunner,
+    this.videoSource,
+    this.videoResultActionsBuilder,
     super.key,
   });
 
   final DiseaseClassifier classifier;
   final FishPhotoSource photoSource;
 
-  /// Extra widgets under a result, such as saving it to history.
+  /// Extra widgets under a photo result, such as saving it to history.
   final Widget Function(BuildContext context, DiseasePrediction prediction)?
   resultActionsBuilder;
+
+  /// Supplying both of these turns on video mode.
+  final VideoCheckRunner? videoRunner;
+  final FishVideoSource? videoSource;
+
+  /// Extra widgets under a video result, such as saving it to history.
+  final Widget Function(BuildContext context, VideoCheckResult result)?
+  videoResultActionsBuilder;
 
   @override
   State<DiseaseCheckScreen> createState() => _DiseaseCheckScreenState();
@@ -29,6 +48,10 @@ class DiseaseCheckScreen extends StatefulWidget {
 
 class _DiseaseCheckScreenState extends State<DiseaseCheckScreen> {
   late final DiseaseCheckController _controller;
+  VideoCheckController? _videoController;
+  _CheckMode _mode = _CheckMode.photo;
+
+  bool get _videoEnabled => _videoController != null;
 
   @override
   void initState() {
@@ -37,11 +60,18 @@ class _DiseaseCheckScreenState extends State<DiseaseCheckScreen> {
       classifier: widget.classifier,
       photoSource: widget.photoSource,
     );
+    if (widget.videoRunner != null && widget.videoSource != null) {
+      _videoController = VideoCheckController(
+        runner: widget.videoRunner!,
+        videoSource: widget.videoSource!,
+      );
+    }
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _videoController?.dispose();
     super.dispose();
   }
 
@@ -50,67 +80,100 @@ class _DiseaseCheckScreenState extends State<DiseaseCheckScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Check fish health')),
       body: SafeArea(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) => SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ...switch (_controller.stage) {
-                  DiseaseCheckStage.start => [
-                    const _PhotoTips(),
-                    const SizedBox(height: 20),
-                    _PhotoButtons(controller: _controller),
-                  ],
-                  DiseaseCheckStage.checking => [
-                    _PhotoPreview(photo: _controller.photo),
-                    const SizedBox(height: 24),
-                    const _CheckingIndicator(),
-                  ],
-                  DiseaseCheckStage.result => [
-                    _PhotoPreview(photo: _controller.photo),
-                    const SizedBox(height: 16),
-                    _ResultCard(prediction: _controller.prediction!),
-                    if (_controller.prediction!.isUncertain) ...[
-                      const SizedBox(height: 16),
-                      const _PhotoTips(compact: true),
-                    ],
-                    if (widget.resultActionsBuilder != null) ...[
-                      const SizedBox(height: 16),
-                      widget.resultActionsBuilder!(
-                        context,
-                        _controller.prediction!,
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    OutlinedButton.icon(
-                      key: const Key('disease-check-another'),
-                      onPressed: _controller.reset,
-                      icon: const Icon(Icons.add_a_photo_outlined),
-                      label: const Text('Check another fish'),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_videoEnabled) ...[
+                SegmentedButton<_CheckMode>(
+                  key: const Key('disease-mode-toggle'),
+                  segments: const [
+                    ButtonSegment(
+                      value: _CheckMode.photo,
+                      icon: Icon(Icons.photo_camera_rounded),
+                      label: Text('Photo'),
+                    ),
+                    ButtonSegment(
+                      value: _CheckMode.video,
+                      icon: Icon(Icons.videocam_rounded),
+                      label: Text('Video'),
                     ),
                   ],
-                  DiseaseCheckStage.error => [
-                    if (_controller.photo != null) ...[
-                      _PhotoPreview(photo: _controller.photo),
-                      const SizedBox(height: 16),
-                    ],
-                    _ErrorCard(
-                      message: _controller.errorMessage!,
-                      onRetry: _controller.photo == null
-                          ? _controller.reset
-                          : _controller.retry,
-                      onStartOver: _controller.reset,
-                    ),
-                  ],
-                },
-                const SizedBox(height: 24),
-                const _ScreeningDisclaimer(),
+                  selected: {_mode},
+                  onSelectionChanged: (selection) =>
+                      setState(() => _mode = selection.first),
+                ),
+                const SizedBox(height: 16),
               ],
-            ),
+              if (_mode == _CheckMode.photo)
+                _buildPhotoContent()
+              else
+                VideoCheckSection(
+                  controller: _videoController!,
+                  resultActionsBuilder: widget.videoResultActionsBuilder,
+                ),
+              const SizedBox(height: 24),
+              const _ScreeningDisclaimer(),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoContent() {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ...switch (_controller.stage) {
+            DiseaseCheckStage.start => [
+              const _PhotoTips(),
+              const SizedBox(height: 20),
+              _PhotoButtons(controller: _controller),
+            ],
+            DiseaseCheckStage.checking => [
+              _PhotoPreview(photo: _controller.photo),
+              const SizedBox(height: 24),
+              const _CheckingIndicator(),
+            ],
+            DiseaseCheckStage.result => [
+              _PhotoPreview(photo: _controller.photo),
+              const SizedBox(height: 16),
+              _ResultCard(prediction: _controller.prediction!),
+              if (_controller.prediction!.isUncertain) ...[
+                const SizedBox(height: 16),
+                const _PhotoTips(compact: true),
+              ],
+              if (widget.resultActionsBuilder != null) ...[
+                const SizedBox(height: 16),
+                widget.resultActionsBuilder!(context, _controller.prediction!),
+              ],
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                key: const Key('disease-check-another'),
+                onPressed: _controller.reset,
+                icon: const Icon(Icons.add_a_photo_outlined),
+                label: const Text('Check another fish'),
+              ),
+            ],
+            DiseaseCheckStage.error => [
+              if (_controller.photo != null) ...[
+                _PhotoPreview(photo: _controller.photo),
+                const SizedBox(height: 16),
+              ],
+              _ErrorCard(
+                message: _controller.errorMessage!,
+                onRetry: _controller.photo == null
+                    ? _controller.reset
+                    : _controller.retry,
+                onStartOver: _controller.reset,
+              ),
+            ],
+          },
+        ],
       ),
     );
   }

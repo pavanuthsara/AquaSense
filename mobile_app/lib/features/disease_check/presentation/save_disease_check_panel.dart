@@ -15,12 +15,16 @@ class SaveDiseaseCheckPanel extends StatefulWidget {
     required this.facilityId,
     required this.prediction,
     required this.repository,
+    this.initialNote = '',
     super.key,
   });
 
   final String facilityId;
   final DiseasePrediction prediction;
   final DiseaseCheckRepository repository;
+
+  /// Pre-filled note text (used by the video check to summarise the result).
+  final String initialNote;
 
   @override
   State<SaveDiseaseCheckPanel> createState() => _SaveDiseaseCheckPanelState();
@@ -35,12 +39,19 @@ class _SaveDiseaseCheckPanelState extends State<SaveDiseaseCheckPanel> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _noteController.text = widget.initialNote;
+  }
+
+  @override
   void didUpdateWidget(SaveDiseaseCheckPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.prediction, widget.prediction)) {
       _requestKey = _newRequestKey();
       _saved = false;
       _error = null;
+      _noteController.text = widget.initialNote;
     }
   }
 

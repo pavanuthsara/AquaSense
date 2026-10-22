@@ -63,7 +63,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-014 | Fish crop classifier in Dart | DIS-012 | Done |
 | DIS-015 | Tracker, per-fish vote, video answer | DIS-013, DIS-014 | Done |
 | DIS-016 | Video source and frame extraction | DIS-011 | Done |
-| DIS-017 | Video check UI | DIS-015, DIS-016 | Not started |
+| DIS-017 | Video check UI | DIS-015, DIS-016 | Done |
 | DIS-018 | On-device parity check, performance, docs | DIS-017 | Not started |
 
 Give your agent one task at a time, in this order. After each task: run the
@@ -291,6 +291,36 @@ the phone means the check works offline at a farm, and the same model file can
 run on a Raspberry Pi later.
 
 ## Work log
+
+### 2026-10-22 — DIS-017: Video check UI — Done
+
+- Orchestration `data/video_check_runner.dart`: ties the fish detector, crop
+  classifier and tracker over the frame stream (MIN_FISH_PX too-small rule,
+  not_fish drop, close-up whole-frame mode), reports progress, keeps a best
+  crop thumbnail per fish, supports a cancel token.
+- `presentation/video_check_controller.dart`: start / checking(progress) /
+  result / error states, record + pick, cancel, retry, close-up toggle.
+- `domain/video_save_mapping.dart`: `videoResultToPrediction` (predictedLabel =
+  white_spot if any sick else healthy; confidence = top sick mean, or
+  1 - top mean for healthy; uncertain when NOT SURE) and `videoResultNote`.
+  Reuses the existing save panel and backend API, no backend change.
+- UI: `DiseaseCheckScreen` gains a Photo | Video segmented toggle (photo mode
+  unchanged). `presentation/video_check_section.dart`: record/choose buttons,
+  tips, "One fish fills the frame" switch, "Checking frame X of Y" with Cancel,
+  a coloured result card (red/green/amber), per-fish rows (thumbnail + border +
+  answer + average over N frames), the experimental honesty note, save, and
+  "Check another video". History shows a "Video" chip when the modelVersion
+  starts with `guppy-video`. Save panel gained an optional pre-filled note.
+- Scope + `AquaSenseApp` gained the detector, crop classifier, video source and
+  frame extractor (optional, defaulting to the real impls, so existing tests
+  keep working).
+- Fakes: `FakeFishDetector`, `FakeFishCropClassifier` (with an optional gate).
+- Tests: `video_save_mapping_test` (4 answer mappings + note) and
+  `video_check_screen_test` (mode toggle, white-spot/healthy/not-sure results,
+  cancel returns to start, classifier error shows try again).
+- Photo mode untouched. `dart format`/`analyze` clean, `flutter test` 129
+  passed. APK build in progress (DIS-018). Next: DIS-018.
+
 
 ### 2026-10-22 — DIS-016: Video source and frame extraction — Done
 

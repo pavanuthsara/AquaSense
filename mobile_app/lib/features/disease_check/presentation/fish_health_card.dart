@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../facility/presentation/selected_facility_scope.dart';
+import '../data/video_check_runner.dart';
+import '../domain/video_save_mapping.dart';
 import 'disease_check_scope.dart';
 import 'disease_check_screen.dart';
 import 'disease_history_screen.dart';
@@ -25,6 +27,18 @@ class FishHealthCard extends StatelessWidget {
             facilityId: facility.id,
             prediction: prediction,
             repository: scope.repository,
+          ),
+          videoRunner: VideoCheckRunner(
+            detector: scope.fishDetector,
+            classifier: scope.fishCropClassifier,
+            extractor: scope.frameExtractor,
+          ),
+          videoSource: scope.videoSource,
+          videoResultActionsBuilder: (context, result) => SaveDiseaseCheckPanel(
+            facilityId: facility.id,
+            prediction: videoResultToPrediction(result),
+            repository: scope.repository,
+            initialNote: videoResultNote(result),
           ),
         ),
       ),
