@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from transit_sim import available_species  # noqa: E402
-from transit_sim.advisor import AdvisoryRequest, advise  # noqa: E402
+from transit_sim.advisor import ADDONS, AdvisoryRequest, advise  # noqa: E402
 
 st.set_page_config(page_title="Export transit advisor", page_icon="🐟", layout="wide")
 
@@ -133,6 +133,15 @@ MODE_CAPTIONS = [
     "We test your fish per bag and add-ons",
 ]
 ANAES_LABELS = {None: "None", "ms222_40mgL": "MS-222 40 mg/L", "benzocaine_20mgL": "Benzocaine 20 mg/L"}
+# Water & advanced inputs: most exporters never change these, so they can be put back in one click.
+ADVANCED_DEFAULTS = {"ph0": 7.4, "alk": 65.0, "kla": 0.0, "samples": 10}
+for k, v in ADVANCED_DEFAULTS.items():
+    st.session_state.setdefault(k, v)
+
+
+def reset_advanced() -> None:
+    st.session_state.update(ADVANCED_DEFAULTS)
+
 
 with st.sidebar:
     st.html('<div class="brand">🐟 AquaSense <span>· Export planning</span></div>')
@@ -168,15 +177,26 @@ with st.sidebar:
             check_anaes = st.selectbox("Anaesthetic", list(ANAES_LABELS), format_func=ANAES_LABELS.get)
             check_zeo = st.checkbox("Zeolite 20 g/L", False)
         side_heading("Allowed add-ons" if mode != "check" else "Add-ons allowed for the recommendation")
-        allow_anaes = st.checkbox("Anaesthetics (MS-222 / benzocaine)", True)
-        allow_zeo = st.checkbox("Zeolite", True)
+        allow_anaes = st.checkbox("Anaesthetics (MS-222 / benzocaine)", True,
+                                  help=f"{ADDONS['ms222_40mgL']['why']} Used at "
+                                       f"{ADDONS['ms222_40mgL']['dose_mg_per_l']:g} mg of MS-222 or "
+                                       f"{ADDONS['benzocaine_20mgL']['dose_mg_per_l']:g} mg of benzocaine per litre "
+                                       "of bag water. Untick if the importing country does not allow anaesthetics.")
+        allow_zeo = st.checkbox("Zeolite", True,
+                                help=f"{ADDONS['zeolite']['why']} Used at {ADDONS['zeolite']['dose_g_per_l']:g} g "
+                                     "per litre of bag water. Untick if you do not have zeolite.")
         max_fast = st.select_slider("Longest fasting allowed (h)", [24, 48], 48)
-        with st.expander("Water & advanced"):
-            ph0 = st.number_input("Packing water pH", 5.5, 9.0, 7.4, step=0.1)
-            alk = st.number_input("Alkalinity (mg/L CaCO₃)", 5.0, 400.0, 65.0, step=5.0)
-            kla = st.number_input("Bag gas transfer kLa (1/h)", 0.0, 5.0, 0.0, step=0.05,
+        changed = any(st.session_state[k] != v for k, v in ADVANCED_DEFAULTS.items())
+        with st.expander("Water & advanced" + (" · changed" if changed else ""), key="advanced",
+                         icon=":material/warning:" if changed else None):
+            ph0 = st.number_input("Packing water pH", 5.5, 9.0, step=0.1, key="ph0")
+            alk = st.number_input("Alkalinity (mg/L CaCO₃)", 5.0, 400.0, step=5.0, key="alk")
+            kla = st.number_input("Bag gas transfer kLa (1/h)", 0.0, 5.0, step=0.05, key="kla",
                                   help="0 = the calibrated static bag. Higher = more bag motion.")
-            samples = st.slider("Random temperature profiles", 0, 30, 10)
+            samples = st.slider("Random temperature profiles", 0, 30, key="samples")
+            st.form_submit_button("Reset to defaults", icon=":material/restart_alt:", width="stretch",
+                                  on_click=reset_advanced, key="reset_advanced",
+                                  help="pH 7.4, alkalinity 65 mg/L, kLa 0 (still bag), 10 profiles")
         st.form_submit_button("Plan shipment", type="primary", icon=":material/play_arrow:", width="stretch",
                               key="plan_shipment")
 
