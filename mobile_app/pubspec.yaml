@@ -68,6 +68,9 @@ flutter:
   assets:
     - assets/models/guppy_disease.tflite
     - assets/models/guppy_disease_labels.txt
+    - assets/models/fish_detector.tflite
+    - assets/models/guppy_video_model.tflite
+    - assets/models/guppy_video_labels.txt
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

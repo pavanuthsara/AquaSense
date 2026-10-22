@@ -7,6 +7,13 @@ const double uncertainBelow = 0.6;
 /// told apart after the model is retrained.
 const String bundledModelVersion = 'guppy-white-spot-2026-10-16';
 
+/// Version of the bundled 3-class video white-spot model (healthy / not_fish /
+/// white_spot). Saved with every video-check result. See [[video_check_settings]].
+const String videoModelVersion = 'guppy-video-v5-2026-10-19';
+
+/// Version of the bundled YOLO11n fish-finder model used by the video check.
+const String fishFinderVersion = 'fish-finder-yolo11n-2026-10-19';
+
 /// The model's score for one class, between 0 and 1.
 class LabelScore {
   const LabelScore({required this.label, required this.score});

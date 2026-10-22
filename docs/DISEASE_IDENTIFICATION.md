@@ -57,6 +57,14 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-008 | Save results and history screen | DIS-002, DIS-007 | Done |
 | DIS-009 | Home screen entry and app wiring | DIS-007, DIS-008 | Done |
 | DIS-010 | Real-phone test with own fish | DIS-009 | Not started |
+| DIS-011 | Video check: models and setup | DIS-009 | Done |
+| DIS-012 | Python reference fixtures | DIS-011 | Not started |
+| DIS-013 | Fish finder in Dart | DIS-012 | Not started |
+| DIS-014 | Fish crop classifier in Dart | DIS-012 | Not started |
+| DIS-015 | Tracker, per-fish vote, video answer | DIS-013, DIS-014 | Not started |
+| DIS-016 | Video source and frame extraction | DIS-011 | Not started |
+| DIS-017 | Video check UI | DIS-015, DIS-016 | Not started |
+| DIS-018 | On-device parity check, performance, docs | DIS-017 | Not started |
 
 Give your agent one task at a time, in this order. After each task: run the
 checks under "Verify every task", update the status and add a work-log entry at
@@ -283,6 +291,36 @@ the phone means the check works offline at a farm, and the same model file can
 run on a Raspberry Pi later.
 
 ## Work log
+
+### 2026-10-22 — DIS-011: Video check models and setup — Done
+
+- Branch `feature/video-disease-check` off `feature/disease-identification`.
+- Copied the two video-pipeline models into `mobile_app/assets/models/` and
+  verified md5s against the source `1_models` folders:
+  - `fish_detector.tflite` (YOLO11n fish finder) `a915e2bbac39c4cc911df2da90b06dad`
+  - `guppy_video_model.tflite` (v5 3-class) `bf01e88db3b0843dbfc178e033463c08`
+  - `guppy_video_labels.txt` = healthy / not_fish / white_spot
+  All three registered under `flutter: assets:` and confirmed not git-ignored.
+- Added version constants `videoModelVersion = 'guppy-video-v5-2026-10-19'` and
+  `fishFinderVersion = 'fish-finder-yolo11n-2026-10-19'` next to
+  `bundledModelVersion`.
+- New `domain/video_check_settings.dart` holds every pipeline constant
+  (PAD 0.12, SURE 0.6, MIN_FISH_PX 48, MIN_FRAMES 3, finder conf 0.4, NMS IoU
+  0.5, 2 fps, track gap 3, input sizes 512/224), each pointing to its
+  counterpart in `check_video.py`.
+- `assets/models/README.md` documents each model, its source and md5.
+- Photo mode untouched. Checks: `dart format` clean, `flutter analyze` clean,
+  `flutter test` 82 passed.
+- Read `video_check/check_video.py` fully first; it is the reference. One note
+  to flag (below). Next: DIS-012 (Python fixtures).
+
+**Note on check_video.py vs the task spec:** they agree. The default white-spot
+model in the script is already `guppy_video_model.tflite` with
+`labels_video.txt`, and the finder's box-scaling is conditional
+(`multiply by 512 only when values <= 2.0`), both matching the spec. The crop
+classifier reads the model's own input dtype and does not divide by 255, as the
+spec states for the v5 float model. No disagreements found so far.
+
 
 ### 2026-10-19 — DIS-002: Disease-check history API (backend) — Done
 
