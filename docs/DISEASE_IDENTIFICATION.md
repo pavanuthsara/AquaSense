@@ -59,7 +59,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-010 | Real-phone test with own fish | DIS-009 | Not started |
 | DIS-011 | Video check: models and setup | DIS-009 | Done |
 | DIS-012 | Python reference fixtures | DIS-011 | Done |
-| DIS-013 | Fish finder in Dart | DIS-012 | Not started |
+| DIS-013 | Fish finder in Dart | DIS-012 | Done |
 | DIS-014 | Fish crop classifier in Dart | DIS-012 | Not started |
 | DIS-015 | Tracker, per-fish vote, video answer | DIS-013, DIS-014 | Not started |
 | DIS-016 | Video source and frame extraction | DIS-011 | Not started |
@@ -291,6 +291,28 @@ the phone means the check works offline at a farm, and the same model file can
 run on a Raspberry Pi later.
 
 ## Work log
+
+### 2026-10-22 — DIS-013: Fish finder in Dart — Done
+
+- `domain/`: `DecodedFrame` (RGB bytes + size + timeMs, isolate-safe),
+  `FishBox` (x0,y0,x1,y1,score with IoU), `FishDetector` interface.
+- `data/detector_preprocessor.dart`: `prepareDetectorInput` — letterbox to 512,
+  grey-114 pad, floor centring, linear resize, RGB /255, **NCHW**. Top-level for
+  `compute`.
+- `data/detection_decoder.dart`: `decodeDetections` (conf filter, conditional
+  *512 scaling, letterbox-inverse mapping, truncate+clamp) and a public
+  `nonMaxSuppression` / `rectIou` matching `cv2.dnn.NMSBoxes`.
+- `data/tflite_fish_detector.dart`: lazy load, checks NCHW 512 input and a
+  size-5 output axis (transposes `[N,5]` to `[5,N]`), preprocess in an isolate.
+- Tests `test/video/fish_detector_parity_test.dart` (pure Dart, fixtures):
+  - `prepareDetectorInput` vs `det_input_k.png` mean abs pixel diff **1.55 /
+    0.49 / 0.46** (budget 2.0); padding placement checked.
+  - `decodeDetections(det_output_k.bin)` == `boxes_k.json` within 1 px, exact
+    count and order, all 3 frames.
+  - NMS unit tests (overlap drop, disjoint keep, below-threshold keep).
+- Photo mode untouched. `dart format`/`analyze` clean, `flutter test` 93 passed
+  (11 new). Next: DIS-014 (fish crop classifier).
+
 
 ### 2026-10-22 — DIS-012: Python reference fixtures — Done
 
