@@ -62,7 +62,7 @@ history on the backend, so everyone in that aquarium can see past checks.
 | DIS-013 | Fish finder in Dart | DIS-012 | Done |
 | DIS-014 | Fish crop classifier in Dart | DIS-012 | Done |
 | DIS-015 | Tracker, per-fish vote, video answer | DIS-013, DIS-014 | Done |
-| DIS-016 | Video source and frame extraction | DIS-011 | Not started |
+| DIS-016 | Video source and frame extraction | DIS-011 | Done |
 | DIS-017 | Video check UI | DIS-015, DIS-016 | Not started |
 | DIS-018 | On-device parity check, performance, docs | DIS-017 | Not started |
 
@@ -291,6 +291,32 @@ the phone means the check works offline at a farm, and the same model file can
 run on a Raspberry Pi later.
 
 ## Work log
+
+### 2026-10-22 — DIS-016: Video source and frame extraction — Done
+
+- `domain/`: `PickedVideo`, `FishVideoSource` (recordVideo / pickVideo),
+  `VideoFrameExtractor` (`Stream<DecodedFrame> frames(video, {fps})`).
+- `data/image_picker_fish_video_source.dart`: image_picker camera + gallery,
+  `maxDuration` 30 s.
+- `data/video_frame_grabber.dart`: `FrameGrabber` interface + `PluginFrameGrabber`
+  (`video_player` for the length, `video_thumbnail` for full-size PNG frames at a
+  given ms). The plugins sit behind this one interface so the extractor is
+  testable with a fake and the plugin can be swapped.
+- `data/thumbnail_video_frame_extractor.dart`: pulls frames at 2 fps from 0 ms,
+  decodes each to RGB, stops at 30 s (60 frames). `decodeFrameBytes` helper.
+- Packages added: `video_thumbnail 0.5.6`, `video_player`. No Android manifest
+  change: recording launches the system camera app, which handles its own
+  permission (same as photo mode).
+- Fakes: `FakeFishVideoSource`, `FakeVideoFrameExtractor`, `FakeFrameGrabber`.
+- Tests `test/video/video_frame_extractor_test.dart`: timestamps every 0.5 s,
+  full-size decode, 30 s cap (60 frames), unreadable frames skipped, custom fps.
+- **Frame size note:** full resolution is requested (`maxWidth: 0`). On-device
+  (DIS-018) confirms the extracted frames are the real video size so
+  `MIN_FISH_PX = 48` applies in the same pixel space as Python; if a device
+  returns smaller frames, the orchestrator must scale 48 by the same factor.
+- Photo mode untouched. `dart format`/`analyze` clean, `flutter test` 118
+  passed. Next: DIS-017 (video check UI).
+
 
 ### 2026-10-22 — DIS-015: Tracker, per-fish vote and video answer — Done
 
