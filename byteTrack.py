@@ -13,10 +13,13 @@ For an iPhone, start its webcam bridge and Windows client before running this.
 
 import argparse
 import csv
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from time import perf_counter
+from urllib.parse import urlparse
+from uuid import UUID
 
 
 def parse_args():
@@ -48,6 +51,9 @@ def parse_args():
     parser.add_argument("--feature-output", type=Path, help="New CSV file for completed behavior windows")
     parser.add_argument("--crop", type=int, nargs=4, metavar=("LEFT", "TOP", "RIGHT", "BOTTOM"), help="Tank ROI in camera pixels; match your training setup")
     parser.add_argument("--feed-zone", type=float, nargs=4, metavar=("X_MIN", "Y_MIN", "X_MAX", "Y_MAX"), help="Optional feeding zone normalized within the cropped tank")
+    parser.add_argument("--serve-appetite-checks", action="store_true", help="Handle fresh 10-second checks requested by the mobile app")
+    parser.add_argument("--api-base-url", default="http://localhost:8080", help="Local Spring Boot API address")
+    parser.add_argument("--edge-device-id", default=os.environ.get("AQUASENSE_EDGE_DEVICE_ID"), help="Provisioned EDGE_PROCESSOR ID; defaults to AQUASENSE_EDGE_DEVICE_ID")
     args = parser.parse_args()
     args.behavior_enabled = args.extract_behavior or args.rf_model is not None
     if args.conf is None:
@@ -64,6 +70,17 @@ def parse_args():
         parser.error(f"RF model not found: {args.rf_model}. Run train_live_rf.py first.")
     if args.preview_only and args.behavior_enabled:
         parser.error("Raw preview cannot extract behavior. Remove --preview-only.")
+    if args.serve_appetite_checks:
+        if args.rf_model is None:
+            parser.error("--serve-appetite-checks requires --rf-model")
+        try:
+            UUID(args.edge_device_id or "")
+        except ValueError:
+            parser.error("Set AQUASENSE_EDGE_DEVICE_ID to the tank's provisioned edge processor ID")
+        if not os.environ.get("AQUASENSE_EDGE_DEVICE_TOKEN"):
+            parser.error("Set AQUASENSE_EDGE_DEVICE_TOKEN to the provisioned edge processor token")
+        if urlparse(args.api_base_url).scheme not in ("http", "https") or not urlparse(args.api_base_url).netloc:
+            parser.error("--api-base-url must be an HTTP(S) API address")
     if args.feature_output is not None and not args.behavior_enabled:
         parser.error("--feature-output requires --extract-behavior or --rf-model")
     if args.crop is not None:
@@ -94,6 +111,8 @@ def main():
     feature_log = None
     feature_writer = None
     behavior = None
+    check_client = None
+    active_check_id = None
     next_sample = 0.0
     if args.behavior_enabled:
         from live_behavior import (
@@ -127,12 +146,27 @@ def main():
             feature_log = args.feature_output.open("x", newline="", encoding="utf-8")
             print(f"Logging behavior to: {args.feature_output}")
             print("PRE mode: observe before adding food; stop this run when feeding starts.")
+        if args.serve_appetite_checks:
+            from appetite_check_client import AppetiteCheckClient
+
+            check_client = AppetiteCheckClient(
+                args.api_base_url, args.edge_device_id, os.environ["AQUASENSE_EDGE_DEVICE_TOKEN"]
+            )
+            check_client.start()
+            print("Ready for 'Check current appetite level' requests from the app.")
 
         cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
         print(f"Camera connected using {cap.getBackendName()}.")
         print("Press Q or Esc, or close the preview, to stop.")
 
         while True:
+            if check_client is not None:
+                request = check_client.take_request()
+                if request is not None:
+                    # Capture the first frame only after receiving this request.
+                    active_check_id = request["id"]
+                    behavior = LiveBehaviorMonitor(f"{session_id}_{active_check_id}", predictor, args.feed_zone)
+                    behavior.status = "Checking current appetite - collecting 10s of PRE behavior..."
             started = perf_counter()
             success, frame = cap.read()
             if not success or frame is None:
@@ -170,6 +204,9 @@ def main():
                     )
                     if completed is not None:
                         completed["observed_at_utc"] = datetime.now(timezone.utc).isoformat()
+                        if active_check_id is not None:
+                            check_client.complete(active_check_id, completed)
+                            active_check_id = None
                         if feature_writer is None:
                             feature_writer = csv.DictWriter(feature_log, fieldnames=list(completed))
                             feature_writer.writeheader()
@@ -215,6 +252,10 @@ def main():
             if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
                 break
     finally:
+        if check_client is not None:
+            if active_check_id is not None:
+                check_client.fail(active_check_id)
+            check_client.close()
         if feature_log is not None:
             feature_log.close()
         if cap is not None:

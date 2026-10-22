@@ -1,4 +1,5 @@
 import 'package:mobile_app/features/facility/domain/facility.dart';
+import 'package:mobile_app/features/facility/domain/appetite_check.dart';
 import 'package:mobile_app/features/facility/domain/facility_repository.dart';
 import 'package:mobile_app/features/facility/domain/facility_team.dart';
 import 'package:mobile_app/features/facility/domain/feeder_calibration.dart';
@@ -7,6 +8,23 @@ import 'package:mobile_app/features/facility/domain/tank_group.dart';
 import 'package:mobile_app/features/facility/domain/tank.dart';
 
 class FakeFacilityRepository implements FacilityRepository {
+  @override
+  Future<AppetiteCheck> requestAppetiteCheck({
+    required String facilityId,
+    required String tankId,
+  }) async {
+    throw const FacilityException('No camera process is connected.');
+  }
+
+  @override
+  Future<AppetiteCheck> getAppetiteCheck({
+    required String facilityId,
+    required String tankId,
+    required String checkId,
+  }) async {
+    throw const FacilityException('No appetite check is available.');
+  }
+
   FakeFacilityRepository({
     List<Facility>? facilities,
     List<FacilityInvitation>? invitations,
