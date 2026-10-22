@@ -88,8 +88,13 @@ for each, the largest fish count whose survival **after unpacking** stays above 
 streamlit run app/streamlit_app.py
 ```
 
-Opens in the browser: shipment inputs on the left; packing plan, what to add, oxygen, survival,
-water chemistry, temperature, unpacking and all options as tabs with interactive charts.
+Opens in the browser. Pick a planning mode and species on the left, fill in the shipment and press
+**Plan shipment** (each run simulates every add-on combination, so inputs are applied together).
+The answer comes first: a green or red verdict card with fish per bag, bags, survival and losses, a
+packing checklist and the AI second opinion. Details follow as tabs with interactive charts: before you
+pack, survival, inside the bag (oxygen + water chemistry), temperature, unpacking, compare options, and
+method & AI. Run it from `export_simulator/` so `.streamlit/config.toml` applies the AquaSense theme
+(light and dark).
 
 ### HTTP API (for the AquaSense backend)
 
