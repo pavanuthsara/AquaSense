@@ -154,6 +154,10 @@ def _method_section(req: "AdvisoryRequest", sp, n_runs: int, margin: float = 0.0
         steps.append("We try every combination of fasting, zeolite and anaesthetic and find the most fish per "
                      "bag that stays above your target on the warmest trip. An add-on is only suggested if it "
                      "lets you pack at least 5% more fish.")
+    steps.append("We also split the same bag between water and oxygen in different ways (oxygen 1 to 4 times the "
+                 "water) and find the most fish for each split. We suggest using as much of the bag for water as "
+                 "possible, as long as each litre of water still carries nearly as many fish (at least 95% of the "
+                 "best); with less oxygen than that, the oxygen starts to run short.")
     steps.append("Finally we simulate opening the bag: the CO2 escapes, the pH rises and ammonia becomes "
                  "toxic. That is why the plan checks survival after unpacking, not only on arrival.")
     if margin:
@@ -178,6 +182,7 @@ def _method_section(req: "AdvisoryRequest", sp, n_runs: int, margin: float = 0.0
 
 
 MIN_GAIN_SHARE = 0.95  # add-ons that gain < 5 % more fish per bag are not recommended
+GAS_RATIOS = (4.0, 3.0, 2.0, 1.5, 1.0)  # oxygen gas : water splits of the exporter's bag that are compared
 
 # How the exporter wants to plan:
 #   suggest     the simulator chooses fish per bag (and so the number of bags) and the add-ons
@@ -486,6 +491,50 @@ def _temperature_section(sp: Species, req: AdvisoryRequest, plan: Plan, n: int) 
             "advice": advice}
 
 
+def _bag_setup_section(sp: Species, req: AdvisoryRequest, plan: Plan, n_now: int) -> dict:
+    """Same bag size, different split between water and oxygen gas: how many fish each split carries.
+
+    Rule (like the add-on rule): use as much of the bag for water as possible while each litre of water
+    still carries at least MIN_GAIN_SHARE of the most fish per litre seen, i.e. before oxygen runs short.
+    """
+    bag = req.water_l + req.gas_l
+    now_ratio = round(req.gas_l / req.water_l, 2)
+    rows = []
+    for r in sorted({*GAS_RATIOS, now_ratio}, reverse=True):
+        current = r == now_ratio
+        water = req.water_l if current else round(bag / (1 + r), 3)
+        n = plan.max_fish if current else _max_fish(sp, replace(req, water_l=water, gas_l=bag - water), plan)[0]
+        bags = math.ceil(req.total_fish / n) if req.total_fish and n else None
+        rows.append({"water_l": water, "gas_l": round(bag - water, 3), "gas_to_water": r, "max_fish_per_bag": n,
+                     "fish_per_litre_water": round(n / water, 1), "bags_needed": bags,
+                     "total_water_l": round(bags * water, 1) if bags else None, "current": current,
+                     "recommended": False})
+    best_per_litre = max(x["fish_per_litre_water"] for x in rows)
+    ok = [x for x in rows if x["fish_per_litre_water"] >= MIN_GAIN_SHARE * best_per_litre > 0]
+    rec = max(ok, key=lambda x: (x["max_fish_per_bag"], x["current"])) if ok else None
+    now = next(x for x in rows if x["current"])
+    if rec is None:
+        explanation = "No split of this bag between water and oxygen keeps enough fish alive for this trip."
+    else:
+        rec["recommended"] = True
+        min_ratio = min(x["gas_to_water"] for x in ok)
+        explanation = (f"With this plan each litre of water safely carries about {rec['fish_per_litre_water']:.0f} "
+                       "fish, so the water volume sets how many fish fit. "
+                       + (f"Keep at least {min_ratio:g} times as much oxygen as water: with less, each litre of "
+                          "water carries fewer fish. " if min_ratio > min(GAS_RATIOS) else "")
+                       + ("Your split is already the best for this bag." if rec["current"] else
+                          f"In your {bag:g} L bag, {rec['water_l']:.2f} L water + {rec['gas_l']:.2f} L oxygen "
+                          f"carries {rec['max_fish_per_bag']} fish instead of {n_now}"
+                          + (f": {rec['bags_needed']} bags instead of {now['bags_needed']}, with "
+                             + (f"the same total water ({rec['total_water_l']:g} L)."
+                                if rec["total_water_l"] == now["total_water_l"] else
+                                f"about the same total water ({rec['total_water_l']:g} L vs "
+                                f"{now['total_water_l']:g} L).")
+                             if rec["bags_needed"] and now["bags_needed"] else ".")))
+    return {"bag_volume_l": round(bag, 3), "options": rows, "recommended": rec, "explanation": explanation,
+            "still_bag": req.kla_per_h is None}
+
+
 # ----------------------------------------------------------------------------- public API
 def _cautious(sp: Species, factor: float) -> Species:
     return sp.with_overrides(o2_rate=sp.o2_rate * factor, tan_rate=sp.tan_rate * factor)
@@ -677,6 +726,7 @@ def advise(req: AdvisoryRequest, history: ShipmentHistory | None = None,
     result["chemistry"] = _chemistry_section(med)
     result["unpacking"] = _unpacking_section(med, worst)
     result["temperature"] = _temperature_section(sp, req, chosen, n)
+    result["bag_setup"] = _bag_setup_section(sp, req, chosen, chosen.max_fish)
     result["timeline"] = {"median": _series(med), "worst": _series(worst), "worst_label": rr.worst_label}
     result["method"] = _method_section(req, sp, len(rr.runs), margin)
     # The AI has only learned from what it has seen: no numbers for a shipment unlike any of them.
@@ -719,6 +769,11 @@ def advise_text(adv: dict) -> str:
         lines.append(f"  hour {c['hour']:>4g}: {c['median']:6.2f}% alive (worst {c['worst']:.2f}%)")
     lines += ["\nWATER CHEMISTRY", "  " + adv["chemistry"]["explanation"]]
     lines += ["\nTEMPERATURE", "  " + adv["temperature"]["advice"]]
+    if bs := adv.get("bag_setup"):
+        lines += [f"\nWATER AND OXYGEN ({bs['bag_volume_l']:g} L bag)", "  " + bs["explanation"]]
+        for o in bs["options"]:
+            lines.append(f"  {o['water_l']:5.2f} L water + {o['gas_l']:4.2f} L O2  {o['max_fish_per_bag']:>4d} fish/bag"
+                         + ("  <- yours" if o["current"] else "") + ("  <- suggested" if o["recommended"] else ""))
     lines += ["\nUNPACKING", "  " + adv["unpacking"]["explanation"]] + [f"  {i + 1}. {s}" for i, s in
                                                                          enumerate(adv["unpacking"]["steps"])]
     lines += ["\nALL OPTIONS (max fish per bag at the hot end)"]

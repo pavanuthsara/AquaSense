@@ -63,6 +63,15 @@ st.html("""<style>
 .legend i.box {height: 12px; width: 14px; border: none; background: rgba(237,161,0,.28);}
 .step {font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .55;}
 .dose {font-size: 1.35rem; font-weight: 750; margin: .1rem 0 .3rem;}
+.params {display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: .6rem; margin: .2rem 0 .4rem;}
+.param {border: 1px solid rgba(128,128,128,.25); border-radius: .7rem; padding: .6rem .75rem;}
+.param .l {display: flex; justify-content: space-between; gap: .3rem; font-size: .78rem; opacity: .75;}
+.param .v {font-size: 1.15rem; font-weight: 700; margin: .15rem 0 .05rem; line-height: 1.3;}
+.param .n {font-size: .78rem; opacity: .6; line-height: 1.35;}
+.param .s {flex: none; width: 1.05rem; height: 1.05rem; border-radius: 50%; display: grid; place-items: center;
+           font-size: .7rem; font-weight: 800; color: #fff;}
+.param .s.ok {background: #0ca30c;}
+.param .s.warn {background: #fab219; color: #1a1c1c;}
 </style>""".replace("SIDEBAR_BG", SIDEBAR_BG))
 
 ICONS = {"ok": '<span class="icon">✓</span>', "danger": '<span class="icon">✕</span>'}
@@ -115,6 +124,14 @@ def line_chart(title: str, unit: str, tl: dict, key: str, ref: float | None = No
 
 def chart(fig: go.Figure, where=st) -> None:
     where.plotly_chart(fig, width="stretch", config={"displayModeBar": False})
+
+
+def param_tiles(tiles: list[tuple]) -> None:
+    """(label, value, note, status) tiles; status "ok" / "warn" adds a ✓ / ! mark next to the label."""
+    mark = {"ok": '<span class="s ok">✓</span>', "warn": '<span class="s warn">!</span>'}
+    st.html('<div class="params">' + "".join(
+        f'<div class="param"><div class="l"><span>{escape(lab)}</span>{mark.get(s, "")}</div>'
+        f'<div class="v">{escape(v)}</div><div class="n">{escape(n)}</div></div>' for lab, v, n, s in tiles) + "</div>")
 
 
 def side_heading(text: str) -> None:
@@ -239,6 +256,9 @@ if not adv["feasible"]:
 
 # ----------------------------------------------------------------------------- verdict
 mo, un, tl = adv["mortality"], adv["unpacking"], adv["timeline"]
+ox, ch, te = adv["oxygen"], adv["chemistry"], adv["temperature"]
+bs = adv.get("bag_setup") or {}
+bs_rec = bs.get("recommended")
 ai, experience = adv.get("ai_correction"), adv.get("experience") or {}
 ok = verdict.get("meets_target", True)
 status = (f"Meets the {adv['target_survival_pct']:g}% survival target, even on the hottest journey."
@@ -283,6 +303,12 @@ with right.container(border=True):
         st.caption(f"Without chemicals: {rec['fish_per_bag_without_chemicals']} fish per bag"
                    + (f" → {rec['bags_needed_without_chemicals']:,} bags." if rec["bags_needed_without_chemicals"]
                       else "."))
+    st.markdown(f"{len(rec['doses']) + 1}. **Fill each bag** — {r['water_l']:g} L water + {r['gas_l']:g} L oxygen")
+    if bs_rec and not bs_rec["current"]:
+        st.caption(f"Tip: the same bag with {bs_rec['water_l']:.2f} L water + {bs_rec['gas_l']:.2f} L oxygen safely "
+                   f"holds {bs_rec['max_fish_per_bag']} fish"
+                   + (f" → {bs_rec['bags_needed']:,} bags." if bs_rec["bags_needed"] else ".")
+                   + " See *Compare options*.")
     st.divider()
     if ai:
         st.markdown(f"**AI second opinion** · {ai['corrected_survival_pct']:.1f}% alive after unpacking")
@@ -294,6 +320,33 @@ with right.container(border=True):
         st.markdown("**AI second opinion** · not shown")
         st.caption("No recorded shipments like this one yet, so the plan uses the physics only. Details in "
                    "*Method & AI*." if experience.get("ai_display") == "hidden" else "No trained AI model yet.")
+
+st.markdown("**Key parameters for this shipment**")
+fasting = next(d["amount"].split(" before")[0] for d in rec["doses"] if d["addon"] == "fasting")
+chems = [f"{d['per_bag'].split(' per bag')[0]} {d['name'].split(' (')[0]}" for d in rec["doses"] if d["per_bag"]]
+t_max, first_loss = te["max_safe_constant_temp_c"], mo["hours_to_first_1pct_loss"]
+param_tiles([
+    ("Packing density", f"{rec['density_g_per_l']:.0f} g/L",
+     f"{rec['fish_per_bag']} fish × {r['fish_mass_g']:g} g in {r['water_l']:g} L", None),
+    ("Water + oxygen per bag", f"{r['water_l']:g} L + {r['gas_l']:g} L",
+     f"better: {bs_rec['water_l']:.2f} + {bs_rec['gas_l']:.2f} L ({bs_rec['max_fish_per_bag']} fish)"
+     if bs_rec and not bs_rec["current"] else f"oxygen {r['gas_l'] / r['water_l']:.1f}× the water", None),
+    ("Fasting", fasting, "before packing", None),
+    ("Chemicals per bag", " + ".join(chems) or "none", "see Before you pack" if chems else "fasting only", None),
+    ("Lowest oxygen in water", f"{ox['min_water_do_mgL']:.1f} mg/L", f"critical below {ox['do_critical_mgL']:g} mg/L",
+     "ok" if ox["hours_to_critical_do"] is None else "warn"),
+    ("Highest CO₂", f"{ch['max_co2_mgL']:.0f} mg/L", "harmful above about 20 mg/L",
+     "warn" if ch["max_co2_mgL"] > 20 else "ok"),
+    ("pH during the trip", f"{r['initial_ph']:g} → {ch['final_ph']:.1f}",
+     f"jumps to {un['ph_after_opening']:.1f} when opened", None),
+    ("Ammonia at unpacking", f"{un['peak_nh3_mgL']:.3f} mg/L", "toxic form, safe below 0.02 mg/L",
+     "warn" if un["danger"] else "ok"),
+    ("Temperature", f"safe up to {t_max:g} °C" if t_max is not None else "not safe",
+     f"forecast {r['temp_low_c']:g}–{r['temp_high_c']:g} °C",
+     "ok" if t_max is not None and t_max >= r["temp_high_c"] else "warn"),
+    ("First deaths", f"hour {first_loss:.0f}" if first_loss is not None else "none expected",
+     f"of a {r['duration_h']:g} h trip, typical journey", None),
+])
 
 if un["danger"]:
     st.warning(f"**Take care when opening the bags.** {un['explanation']} See *Unpacking* below.",
@@ -349,7 +402,6 @@ with tabs[1]:
                                                                         min_value=0, max_value=100)})
 
 with tabs[2]:
-    ox, ch = adv["oxygen"], adv["chemistry"]
     legend(tl)
     st.subheader("Oxygen")
     lead(ox["explanation"])
@@ -381,8 +433,6 @@ with tabs[2]:
     chart(line_chart("Total ammonia", "mg/L", tl, "tan_mgL"), b)
 
 with tabs[3]:
-    te = adv["temperature"]
-    t_max = te["max_safe_constant_temp_c"]
     (st.warning if t_max is None or r["temp_high_c"] > t_max else st.success)(te["advice"], icon=":material/thermostat:")
     m = st.columns(3)
     m[0].metric("Safe up to", f"{t_max:g} °C" if t_max is not None else "—", border=True,
@@ -463,6 +513,43 @@ with tabs[5]:
                                                                                     max_value=top),
                                     "g/L": st.column_config.NumberColumn("Fish density", format="%.1f g/L"),
                                     "vs basic": st.column_config.NumberColumn("vs fasting only", format="%+.0f%%")})
+
+    if bs:
+        st.subheader("Water and oxygen in the bag")
+        lead(bs["explanation"])
+        splits = bs["options"]  # least water first = bottom bar, so the most water is at the top
+
+        def split_label(o):
+            return f"{o['water_l']:.2f} L water + {o['gas_l']:.2f} L O₂ (1 : {o['gas_to_water']:g})"
+
+        def split_tag(o):
+            return " · ".join(t for t, on in (("suggested", o["recommended"]), ("yours", o["current"])) if on)
+
+        fig = go.Figure(go.Bar(
+            y=[split_label(o) for o in splits], x=[o["max_fish_per_bag"] for o in splits], orientation="h",
+            marker=dict(color=[MEDIAN if o["recommended"] else WORST if o["current"] else OTHER for o in splits],
+                        cornerradius=4),
+            text=[f"{o['max_fish_per_bag']}" + (f"  ·  {split_tag(o)}" if split_tag(o) else "") for o in splits],
+            textposition="outside", cliponaxis=False,
+            customdata=[o["fish_per_litre_water"] for o in splits],
+            hovertemplate="%{y}: %{x} fish per bag (%{customdata:.0f} per litre of water)<extra></extra>"))
+        top_split = max(o["max_fish_per_bag"] for o in splits) or 1
+        fig.update_layout(title=dict(text=f"Same {bs['bag_volume_l']:g} L bag, different water : oxygen split, "
+                                          f"with {rec['plan_label']}", font=dict(size=14), x=0, xanchor="left"),
+                          height=90 + 34 * len(splits), margin=dict(l=0, r=10, t=40, b=0), bargap=0.35,
+                          showlegend=False, xaxis=dict(gridcolor=GRID, range=[0, top_split * 1.35]))
+        chart(fig)
+        if bs["still_bag"]:
+            st.caption("Worked out for a still bag (the calibrated default). Same safety rule as above: survival "
+                       "after unpacking stays above the target on the hottest journey.")
+        with st.expander("Show as a table"):
+            st.dataframe([{"Water (L)": o["water_l"], "Oxygen (L)": o["gas_l"], "Fish per bag": o["max_fish_per_bag"],
+                           "Per litre of water": o["fish_per_litre_water"], "Bags": o["bags_needed"],
+                           "Total water (L)": o["total_water_l"], "": split_tag(o).capitalize()} for o in splits[::-1]],
+                         hide_index=True, width="stretch",
+                         column_config={"Fish per bag": st.column_config.ProgressColumn(format="%d", min_value=0,
+                                                                                        max_value=top_split),
+                                        "Per litre of water": st.column_config.NumberColumn(format="%.0f fish")})
 
 with tabs[6]:
     method = adv.get("method", {})

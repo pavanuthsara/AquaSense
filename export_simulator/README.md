@@ -56,6 +56,7 @@ OXYGEN            use rate first 6 h / average, gas left, when water O2 hits cri
 HOW FAST FISH DIE first deaths ~hour 29; alive at 6/12/24/36 h (median + worst); main cause
 WATER CHEMISTRY   CO2, pH, total and toxic ammonia
 TEMPERATURE       max safe constant temperature for this load
+WATER AND OXYGEN  same bag split 1:1 ... 1:4 water:O2 -> fish per bag for each, suggested split
 UNPACKING         pH rebound + NH3 spike, step-by-step unpacking
 ALL OPTIONS       max fish/bag for every add-on combination
 ```
@@ -82,6 +83,14 @@ for each, the largest fish count whose survival **after unpacking** stays above 
 **hot end** of the temperature range is found. An add-on is only recommended if it gains at least
 5 % more fish per bag. The chosen plan is then re-run across the whole temperature range.
 
+Water and oxygen (`advisory["bag_setup"]`): the exporter's bag size is kept and split between water
+and oxygen gas in different ways (oxygen 1, 1.5, 2, 3 and 4 times the water, plus their own split).
+For each split the same hot-end rule gives the most fish per bag. The suggested split uses as much of
+the bag for water as possible while each litre of water still carries at least 95 % of the best fish
+per litre, i.e. before the oxygen starts to run short. In a still bag the water volume, not the gas,
+sets how many fish fit (guppy, 36 h, 24-28 C: about 90 fish per litre of water); in a 1.6 L bag,
+0.53 L water + 1.07 L O2 holds 48 fish instead of 37 with 0.4 + 1.2, for the same total water.
+
 ### Demo UI (Streamlit)
 
 ```bash
@@ -91,9 +100,12 @@ streamlit run app/streamlit_app.py
 Opens in the browser. Pick a planning mode and species on the left, fill in the shipment and press
 **Plan shipment** (each run simulates every add-on combination, so inputs are applied together).
 The answer comes first: a green or red verdict card with fish per bag, bags, survival and losses, a
-packing checklist and the AI second opinion. Details follow as tabs with interactive charts: before you
-pack, survival, inside the bag (oxygen + water chemistry), temperature, unpacking, compare options, and
-method & AI. Run it from `export_simulator/` so `.streamlit/config.toml` applies the AquaSense theme
+packing checklist (including how to fill the bag) and the AI second opinion. Below it, **Key parameters
+for this shipment** shows the conditions that decide survival, not just the fish count: packing
+density, water + oxygen per bag, fasting, chemicals per bag, lowest oxygen, highest CO2, pH, ammonia at
+unpacking, safe temperature and when deaths start, each marked against its safe limit. Details follow
+as tabs with interactive charts: before you pack, survival, inside the bag (oxygen + water chemistry),
+temperature, unpacking, compare options (add-ons and water : oxygen splits), and method & AI. Run it from `export_simulator/` so `.streamlit/config.toml` applies the AquaSense theme
 (light and dark).
 
 ### HTTP API (for the AquaSense backend)

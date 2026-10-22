@@ -12,7 +12,7 @@ def adv():
 def test_advisory_has_every_section(adv):
     assert adv["feasible"]
     for key in ("recommendation", "oxygen", "mortality", "chemistry", "unpacking", "temperature", "timeline",
-                "options", "warnings", "survival_band_pct"):
+                "options", "warnings", "survival_band_pct", "bag_setup"):
         assert key in adv, key
 
 
@@ -41,6 +41,21 @@ def test_chemicals_only_recommended_when_they_pay(adv):
 def test_more_fish_than_chemical_free(adv):
     rec = adv["recommendation"]
     assert rec["fish_per_bag"] >= rec["fish_per_bag_without_chemicals"]
+
+
+def test_bag_setup_keeps_the_bag_size_and_suggests_a_split(adv):
+    bs = adv["bag_setup"]
+    assert bs["bag_volume_l"] == pytest.approx(1.6)
+    for o in bs["options"]:
+        assert o["water_l"] + o["gas_l"] == pytest.approx(1.6, abs=1e-3)
+    now = next(o for o in bs["options"] if o["current"])
+    assert now["max_fish_per_bag"] == adv["recommendation"]["fish_per_bag"]  # suggest mode: the safe maximum
+    rec = bs["recommended"]
+    assert rec["recommended"] and rec["max_fish_per_bag"] >= now["max_fish_per_bag"]
+    best = max(o["fish_per_litre_water"] for o in bs["options"])
+    assert rec["fish_per_litre_water"] >= 0.95 * best
+    # more water in the same bag never carries fewer fish while oxygen is still enough
+    assert rec["water_l"] >= now["water_l"]
 
 
 def test_timeline_is_hourly_and_includes_unpacking(adv):
@@ -124,7 +139,7 @@ def test_advice_has_no_citations_outside_the_method_section(adv):
         texts += [d["why"], d["caution"], d["evidence"]]
     for key in ("oxygen", "mortality", "chemistry", "unpacking"):
         texts.append(adv[key]["explanation"])
-    texts += [adv["temperature"]["advice"], adv["recommendation"]["summary"]]
+    texts += [adv["temperature"]["advice"], adv["recommendation"]["summary"], adv["bag_setup"]["explanation"]]
     for t in texts:
         assert not citation.search(t), t
     assert adv["method"]["steps"] and adv["method"]["sources"]
