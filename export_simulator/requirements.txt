@@ -10,3 +10,6 @@ httpx>=0.27
 # demo UI
 streamlit>=1.50
 plotly>=5.20
+# AI correction layer
+scikit-learn>=1.3
+joblib>=1.3

@@ -147,9 +147,15 @@ c[3].metric("Survival (worst case)", f"{adv['mortality']['worst_survival_after_u
 c[4].metric("Expected losses / bag", f"{adv['mortality']['expected_dead_per_bag']:.1f}",
             help=f"worst case {adv['mortality']['expected_dead_per_bag_worst']:.1f}")
 
+ai = adv.get("ai_correction")
+if ai:
+    st.caption(f"🤖 AI second opinion: {ai['corrected_survival_pct']:.1f}% alive after unpacking "
+               f"(physics {ai['physics_survival_pct']:.1f}%, AI adjusts {ai['adjustment_pp']:+.1f} points). "
+               f"{ai['note']}")
+
 tl = adv["timeline"]
 tabs = st.tabs(["What to add", "Oxygen", "How fast fish die", "Water chemistry", "Temperature", "Unpacking",
-                "How we calculate", "All options"])
+                "How we calculate", "All options", "AI correction"])
 
 with tabs[0]:
     st.subheader("Chemicals and preparation — how much" if mode != "check" else "What is in your bag")
@@ -256,6 +262,32 @@ with tabs[7]:
     st.dataframe([{"Plan": o["label"], "Fish/bag": o["max_fish_per_bag"], "g/L": o["density_g_per_l"],
                    "vs basic %": o["gain_vs_basic_pct"], "Recommended": "✓" if o["recommended"] else ""}
                   for o in opts[::-1]], hide_index=True, width="stretch")
+
+with tabs[8]:
+    ROOT = Path(__file__).resolve().parent.parent
+    ml_dir = ROOT / "reports" / "ml"
+    st.subheader("AI correction layer")
+    st.markdown(
+        "The physics simulator predicts survival from how the bag works. The AI layer learns, from completed "
+        "shipments, **where the physics is usually wrong** and corrects it. It predicts only the difference, so it "
+        "needs little data and leaves the physics unchanged when it has seen nothing.")
+    if ai:
+        a1, a2, a3 = st.columns(3)
+        a1.metric("Physics estimate", f"{ai['physics_survival_pct']:.1f}%")
+        a2.metric("AI-corrected", f"{ai['corrected_survival_pct']:.1f}%", f"{ai['adjustment_pp']:+.1f} pts")
+        a3.metric(f"Training shipments ({ai['trained_on']})", f"{ai['n_shipments']}")
+    if (ml_dir / "ml_result.json").exists():
+        if '"trained_on": "simulated"' in (ml_dir / "ml_result.json").read_text(encoding="utf-8"):
+            st.error("Trained on SIMULATED shipments: this shows the method works and how much data it needs. "
+                     "It is not real-world accuracy. Real shipment records will replace the simulated data.",
+                     icon="🧪")
+        for img, cap in (("learning_curve.png", "Error vs number of completed shipments"),
+                         ("predicted_vs_observed.png", "Predicted vs observed on unseen shipments"),
+                         ("feature_importance.png", "What the AI pays attention to")):
+            if (ml_dir / img).exists():
+                st.image(str(ml_dir / img), caption=cap)
+    else:
+        st.info("No AI model trained yet. Run: python -m transit_sim ml train")
 
 st.caption("Estimates from a simulation. See 'How we calculate' for how they are worked out. "
            "Not a substitute for species-specific veterinary advice.")

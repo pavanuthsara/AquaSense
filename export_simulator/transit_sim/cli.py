@@ -102,6 +102,26 @@ def cmd_advise(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ml(a: argparse.Namespace) -> int:
+    from .ml.synthetic import generate, write_csv
+    from .ml.train import DATA_DIR, train
+
+    if a.ml_cmd == "generate":
+        out = Path(a.out) if a.out else DATA_DIR / "simulated_shipments.csv"
+        write_csv(generate(a.n, seed=a.seed), out)
+        print(f"{a.n} simulated shipments -> {out}")
+        return 0
+    res = train(Path(a.data) if a.data else None, Path(a.test) if a.test else None)
+    t = res["test"]
+    print(f"Trained on {res['n_train']} {res['trained_on']} shipments, tested on {res['n_test']}.")
+    for name, key in (("Physics only", "physics_only"), ("Physics + AI", "physics_plus_ai"),
+                      ("AI only", "ai_only")):
+        print(f"  {name:14s} mean error {t[key]['mae_pp']:.2f} pp, safe/not-safe correct "
+              f"{100 * t[key]['safe_call_accuracy']:.0f}%")
+    print("Report: reports/ml/ml_summary.md; model: models/correction_model.joblib")
+    return 0
+
+
 def cmd_calibrate(a: argparse.Namespace) -> int:
     from .calibration import calibrate, write_config, write_report
 
@@ -178,6 +198,17 @@ def build_parser() -> argparse.ArgumentParser:
                     help="check: anaesthetic in your bags")
     ad.add_argument("--json", action="store_true")
     ad.set_defaults(func=cmd_advise)
+
+    ml = sub.add_parser("ml", help="AI correction layer: generate simulated shipments / train")
+    mls = ml.add_subparsers(dest="ml_cmd", required=True)
+    g = mls.add_parser("generate", help="write simulated shipment records (pretend reality)")
+    g.add_argument("--n", type=int, default=600)
+    g.add_argument("--seed", type=int, default=0)
+    g.add_argument("--out", default=None)
+    t = mls.add_parser("train", help="train + evaluate; default data = simulated shipments")
+    t.add_argument("--data", default=None, help="shipment records CSV (e.g. real records)")
+    t.add_argument("--test", default=None, help="separate test CSV (optional)")
+    ml.set_defaults(func=cmd_ml)
 
     c = sub.add_parser("calibrate", help="re-fit to Pramod et al. 2010 and write report")
     c.add_argument("--write", action="store_true", help="write fitted values into config/")

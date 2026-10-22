@@ -229,6 +229,47 @@ control + MS-222 + benzocaine. Full details: [`reports/calibration_summary.md`](
 | `kLa_open` = 4 /h | Assumed | Unpacking measurements |
 | Tris buffer, salt, 2-phenoxyethanol | Not modelled yet | — |
 
+## AI correction layer (`transit_sim/ml/`)
+
+The physics model gets most of the answer right but will be systematically off in real shipments
+(bag motion, species differences, sedation, hotter-than-forecast days). The AI layer learns that
+error from completed shipments and corrects it:
+
+`corrected survival = expit( logit(physics survival) + AI correction )`
+
+- **Model:** scikit-learn `GradientBoostingRegressor` (300 shallow trees, depth 2, learning rate 0.03,
+  80 % subsampling) predicting the **residual** on the logit scale. Inputs: the shipment details
+  (species, fish weight, fish/bag, density, water, oxygen ratio, trip length, temperature range,
+  fasting, zeolite, anaesthetic) plus physics outputs (survival, lowest oxygen, highest CO2,
+  ammonia at unpacking). Shipments are weighted by √(fish counted).
+- **Data now: SIMULATED.** `ml/synthetic.py` builds a "pretend reality" — the simulator with hidden
+  differences (guppies breathe 20 % faster, bags move so oxygen enters faster, sedated fish tolerate
+  CO2 better, trips run up to 1 °C hotter than forecast, random handling stress, fish-by-fish counting
+  noise) — and records shipments from it in the same CSV format real records will use
+  (`data/shipments/README.md`).
+- **Evaluation:** 600 training / 300 unseen test shipments; learning curve at 10–600 shipments,
+  5 repeats each; compared with physics only and with AI alone (no physics).
+
+| On unseen simulated shipments | Mean error | Safe/not-safe call correct |
+|---|---|---|
+| Physics only | 3.5 points | 95 % |
+| Physics + AI correction | **1.6 points** | 96 % |
+| AI alone (no physics) | 3.0 points | 92 % |
+
+With only 10 shipments the hybrid already improves on physics (2.5 points) while AI alone is far worse
+(16.8 points): the physics core is what makes the AI usable with little data. The AI's attention
+(permutation importance) falls on low oxygen, MS-222/benzocaine and fish weight — the hidden
+differences it was meant to discover.
+
+```bash
+python -m transit_sim ml train                     # simulated data (generated on first run)
+python -m transit_sim ml train --data data/shipments/real_shipments.csv   # once real records exist
+```
+
+Reports: `reports/ml/` (summary, learning curve, predicted vs observed, feature importance).
+The advisory shows the AI estimate as a labelled **second opinion**; packing decisions stay
+physics-based until the AI is trained on real records.
+
 ## Running the whole export feature locally
 
 1. Python service: `uvicorn transit_sim.api:app --port 8001` (from `export_simulator/`).
@@ -250,7 +291,7 @@ Backend endpoints (any member of the aquarium):
 
 1. ✅ Mechanistic bag simulator + calibration/validation (this package)
 2. ✅ Packing optimiser + transit advisory, demo UI, API, backend module and app screens
-3. ML correction layer: learn the residual between predicted and actual survival
+3. ✅ ML correction layer (trained on simulated shipments; waiting for real records)
 4. Arrival confirmation: logged temperature profile + alive/dead counts → compare, attribute, retrain
 5. ✅ API for the Spring Boot backend / Flutter app (`transit_sim/api.py`)
 

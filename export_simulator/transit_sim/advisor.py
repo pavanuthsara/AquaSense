@@ -109,6 +109,28 @@ SOURCES = [
 ]
 
 
+def _ai_correction(req: "AdvisoryRequest", plan: "Plan", n: int) -> dict | None:
+    """Second opinion from the AI correction layer (if a trained model exists). Decisions above stay
+    physics-based; this is shown next to them, clearly labelled with what the AI was trained on."""
+    try:
+        from .ml.correction import correct_one
+    except ImportError:  # scikit-learn not installed
+        return None
+    sed = next((a for a in plan.addons if a in ANAESTHETICS), "none")
+    row = {"species": req.species, "fish_mass_g": req.fish_mass_g, "fish_per_bag": n, "water_l": req.water_l,
+           "gas_l": req.gas_l, "duration_h": req.duration_h, "temp_low_c": req.temp_low_c,
+           "temp_high_c": req.temp_high_c, "fasting_h": plan.fasting_h,
+           "zeolite_g_per_l": ADDONS["zeolite"]["dose_g_per_l"] if "zeolite" in plan.addons else 0.0,
+           "anaesthetic": sed}
+    out = correct_one(row)
+    if out is None:
+        return None
+    simulated = out["trained_on"] == "simulated"
+    out["note"] = ("Demonstration only: the AI was trained on simulated shipments, not real records yet."
+                   if simulated else f"Learned from {out['n_shipments']} completed shipments.")
+    return out
+
+
 def _method_section(req: "AdvisoryRequest", sp, n_runs: int) -> dict:
     steps = [
         "We follow the sealed bag hour by hour. The fish use oxygen and give off carbon dioxide (CO2) and "
@@ -593,6 +615,7 @@ def advise(req: AdvisoryRequest) -> dict:
     result["temperature"] = _temperature_section(sp, req, chosen, n)
     result["timeline"] = {"median": _series(med), "worst": _series(worst), "worst_label": rr.worst_label}
     result["method"] = _method_section(req, sp, len(rr.runs))
+    result["ai_correction"] = _ai_correction(req, chosen, n)
     return result
 
 
