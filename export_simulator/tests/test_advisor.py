@@ -122,9 +122,25 @@ def test_check_uses_the_exporters_addons():
     assert adv["verdict"]["safe_max_with_selected_addons"] >= 35
 
 
+def test_check_with_bags_instead_of_fish_per_bag():
+    adv = advise(AdvisoryRequest(**BASE, mode="check", bags=30))
+    assert adv["recommendation"]["fish_per_bag"] == 34          # ceil(1000 / 30)
+    assert adv["recommendation"]["bags_needed"] == 30
+    assert adv["recommendation"]["summary"].startswith("30 bags for 1000 fish")
+
+
+def test_check_too_few_bags_says_what_would_make_it_safe():
+    adv = advise(AdvisoryRequest(**BASE, mode="check", bags=10))
+    v = adv["verdict"]
+    assert v["meets_target"] is False
+    assert "would be safe" in v["message"] or f"at least {v['recommended_bags']} bags" in v["message"]
+
+
 def test_check_and_fixed_bags_validation():
     with pytest.raises(ValueError):
         advise(AdvisoryRequest(**BASE, mode="check"))
+    with pytest.raises(ValueError):
+        advise(AdvisoryRequest(**{**BASE, "total_fish": None}, mode="check", bags=5))
     with pytest.raises(ValueError):
         advise(AdvisoryRequest(**{**BASE, "total_fish": None}, mode="fixed_bags", bags=5))
     with pytest.raises(ValueError):

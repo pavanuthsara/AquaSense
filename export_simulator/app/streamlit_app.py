@@ -141,13 +141,11 @@ def side_heading(text: str) -> None:
 # ----------------------------------------------------------------------------- inputs
 MODE_LABELS = {
     "suggest": "Suggest the number of bags",
-    "fixed_bags": "I'll set the number of bags",
     "check": "Check my own packing",
 }
 MODE_CAPTIONS = [
     "We choose fish per bag, bags and add-ons",
-    "We check whether your bags are enough",
-    "We test your fish per bag and add-ons",
+    "We test your bags or fish per bag and add-ons",
 ]
 ANAES_LABELS = {None: "None", "ms222_40mgL": "MS-222 40 mg/L", "benzocaine_20mgL": "Benzocaine 20 mg/L"}
 # Water & advanced inputs: most exporters never change these, so they can be put back in one click.
@@ -165,18 +163,19 @@ with st.sidebar:
     side_heading("How do you want to plan?")
     mode = st.radio("Planning mode", list(MODE_LABELS), format_func=MODE_LABELS.get, captions=MODE_CAPTIONS,
                     label_visibility="collapsed")
+    by_bags = mode == "check" and st.radio("Your packing is set by", ["Number of bags", "Fish per bag"],
+                                           horizontal=True) == "Number of bags"
     side_heading("Shipment")
     species_list = available_species()
     species = st.selectbox("Species", species_list, index=species_list.index("guppy"), format_func=nice)
     with st.form("plan", border=False, enter_to_submit=True):
         mass = st.number_input("Average fish weight (g)", 0.05, 200.0, 0.3 if species == "guppy" else 12.0, step=0.05)
         total = st.number_input("Total fish to ship", 0, 1_000_000, 1000, step=100,
-                                help="Used to work out the number of bags. 0 = not set."
-                                     if mode != "fixed_bags" else None)
+                                help="Used to work out the number of bags. 0 = not set." if not by_bags else None)
         bags = fish_per_bag = None
-        if mode == "fixed_bags":
+        if by_bags:
             bags = st.number_input("Number of bags you have", 1, 100_000, 20, step=1)
-        if mode == "check":
+        elif mode == "check":
             fish_per_bag = st.number_input("Fish per bag (your packing)", 1, 100_000, 60, step=5)
         side_heading("Journey")
         hours = st.slider("Door-to-door time (h)", 6, 96, 36, step=2)
@@ -281,7 +280,7 @@ if mode != "suggest" and verdict.get("recommended_fish_per_bag"):
                f"{verdict['recommended_plan_label']}"
                + (f" → {verdict['recommended_bags']:,} bags." if verdict.get("recommended_bags") else "."))
 
-lead_word = {"suggest": "Pack", "fixed_bags": "Your bags hold", "check": "You pack"}[mode]
+lead_word = "Pack" if mode == "suggest" else "Your bags hold" if by_bags else "You pack"
 left, right = st.columns([5, 3], gap="medium")
 left.html(
     f'<div class="verdict {"ok" if ok else "danger"}">'

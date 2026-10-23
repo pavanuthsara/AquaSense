@@ -188,7 +188,8 @@ GAS_RATIOS = (4.0, 3.0, 2.0, 1.5, 1.0)  # oxygen gas : water splits of the expor
 #   suggest     the simulator chooses fish per bag (and so the number of bags) and the add-ons
 #   fixed_bags  the exporter fixes the number of bags; the simulator says if that is safe and which
 #               add-ons are needed, or how many bags are really needed
-#   check       the exporter enters their own fish per bag and add-ons; the simulator shows what happens
+#   check       the exporter enters their own fish per bag (or number of bags) and add-ons; the simulator
+#               shows what happens and, if it is not safe, which add-ons or how many bags would make it safe
 MODES = ("suggest", "fixed_bags", "check")
 ANAESTHETICS = ("ms222_40mgL", "benzocaine_20mgL")
 
@@ -214,7 +215,7 @@ class AdvisoryRequest:
     samples: int = 10                      # random temperature profiles for the final check
     seed: int = 0
     mode: str = "suggest"
-    bags: int | None = None                # fixed_bags mode: bags available
+    bags: int | None = None                # fixed_bags mode: bags available (check mode: instead of fish_per_bag)
     fish_per_bag: int | None = None        # check mode: exporter's own packing
     check_fasting_h: float = 24.0          # check mode add-ons
     check_zeolite: bool = False
@@ -240,9 +241,14 @@ class AdvisoryRequest:
                  "there are more bags than fish"),
             ]
         if self.mode == "check":
+            by_bags = self.fish_per_bag is None and self.bags is not None
             checks += [
-                (self.fish_per_bag is not None and 0 < self.fish_per_bag <= 1_000_000,
-                 "check mode needs fish_per_bag > 0"),
+                (by_bags or (self.fish_per_bag is not None and 0 < self.fish_per_bag <= 1_000_000),
+                 "check mode needs fish_per_bag > 0, or bags with total_fish"),
+                (not by_bags or (self.total_fish is not None and self.bags > 0),
+                 "check mode with bags needs total_fish and bags > 0"),
+                (not by_bags or self.total_fish is None or self.bags <= self.total_fish,
+                 "there are more bags than fish"),
                 (self.check_anaesthetic in (None, *ANAESTHETICS),
                  f"check_anaesthetic must be one of {', '.join(ANAESTHETICS)} or empty"),
                 (0 <= self.check_fasting_h <= 96, "check_fasting_h must be 0-96"),
@@ -613,12 +619,14 @@ def advise(req: AdvisoryRequest, history: ShipmentHistory | None = None,
             chosen = min(safe, key=lambda p: (len(p.addons), p.fasting_h))
         else:  # not safe with any add-on: show the strongest plan and how many bags are really needed
             chosen = max(plans, key=lambda p: (p.max_fish, -len(p.addons)))
-    else:  # check
+    else:  # check: the exporter's add-ons, with their fish per bag or their number of bags
         chosen = _make_plan(req.check_fasting_h, req.check_zeolite, req.check_anaesthetic)
         chosen.doses = _doses(chosen, req)
         known = next((p for p in plans if p.key == chosen.key), None)
         chosen.max_fish = known.max_fish if known else _max_fish(sp, req, chosen)[0]
-        n = int(req.fish_per_bag)
+        n = int(req.fish_per_bag) if req.fish_per_bag else math.ceil(total / req.bags)
+    # simplest allowed add-ons that make this fish per bag safe (check mode: shown if the exporter's are not)
+    fix = min((p for p in plans if p.max_fish >= n), key=lambda p: (len(p.addons), p.fasting_h), default=None)
 
     result["feasible"] = True
     for o in result["options"]:
@@ -639,7 +647,8 @@ def advise(req: AdvisoryRequest, history: ShipmentHistory | None = None,
     surv_worst = 100 * worst.summary["survival_after_unpacking"]
     # Same rule as the optimiser: safe if this count is within the hot-end maximum for these add-ons.
     meets = 0 < n <= chosen.max_fish
-    bags = (req.bags if req.mode == "fixed_bags" else math.ceil(total / n) if total else None)
+    own_bags = req.mode == "fixed_bags" or (req.mode == "check" and not req.fish_per_bag)
+    bags = req.bags if own_bags else math.ceil(total / n) if total else None
     dead_total = round((total or n * (bags or 1)) * (1 - surv_med / 100))
     target_txt = f"{100 * req.target_survival:.0f}%"
     survival_txt = (f"Expected survival after unpacking: {surv_med:.1f}% (worst case {surv_worst:.1f}%) over "
@@ -668,10 +677,13 @@ def advise(req: AdvisoryRequest, history: ShipmentHistory | None = None,
                        + (f" across {bags} bags." if bags else " per bag.")
                        + (f" With your add-ons the safe maximum is {chosen.max_fish} fish per bag"
                           if chosen.max_fish else " Your add-ons cannot make this trip safe")
-                       + (f"; the best plan allows {best.max_fish} ({best.label})."
+                       + (f"; with {fix.label} your {n} fish per bag would be safe." if fix else
+                          f"; the best plan allows {best.max_fish} ({best.label})"
+                          + (f", so you need at least {rec_bags} bags." if rec_bags else ".")
                           if best.max_fish else "; no packing is safe for this trip."))
-        summary = (f"Your packing: {n} fish per bag ({n * req.fish_mass_g / req.water_l:.0f} g/L) with: "
-                   f"{chosen.label}. " + (f"{bags} bags for {total} fish. " if bags else "") + survival_txt)
+        summary = ((f"{bags} bags for {total} fish = " if own_bags else "Your packing: ")
+                   + f"{n} fish per bag ({n * req.fish_mass_g / req.water_l:.0f} g/L) with: {chosen.label}. "
+                   + (f"{bags} bags for {total} fish. " if bags and not own_bags else "") + survival_txt)
 
     result["verdict"] = {**verdict, "meets_target": bool(meets), "survival_median_pct": round(surv_med, 2),
                          "survival_worst_pct": round(surv_worst, 2), "expected_dead_total": dead_total,

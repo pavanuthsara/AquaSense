@@ -67,7 +67,10 @@ Three planning modes (CLI flags / API `mode` / the radio buttons in the demo / t
 |---|---|---|
 | `suggest` (default) | shipment + bag size | fish per bag, number of bags, add-ons and doses |
 | `fixed_bags` (`--bags 20`) | total fish + number of bags | is that safe? which add-ons make it safe? if not, how many bags are needed |
-| `check` (`--fish-per-bag 60 [--fasting 24] [--zeolite] [--anaesthetic ms222_40mgL]`) | their own packing | what happens to their fish (survival really drops when overpacked), compared with the safe plan |
+| `check` (`--fish-per-bag 60` or `--mode check --bags 20`, `[--fasting 24] [--zeolite] [--anaesthetic ms222_40mgL]`) | their own packing: fish per bag or number of bags, and their add-ons | what happens to their fish (survival really drops when overpacked), compared with the safe plan; if not safe, which allowed add-ons or how many bags would make it safe |
+
+The demo app shows only `suggest` and `check` ("Check my own packing", by number of bags or fish per
+bag); `fixed_bags` stays available in the CLI and API.
 
 ```bash
 python -m transit_sim advise --mass 0.3 --total 1000 --water 0.4 --gas 1.2 --hours 36 --temp-range 24 28 --fish-per-bag 60
