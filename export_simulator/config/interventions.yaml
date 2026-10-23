@@ -1,0 +1,12 @@
+ms222_40mgL:
+  metabolic_factor: 0.8804
+  excretion_factor: 0.4615
+  stress_factor: 0.3559
+  species: tiger_barb
+  source: Calibrated to Pramod et al. 2010 MS-222 bag (DO/TAN/CO2)
+benzocaine_20mgL:
+  metabolic_factor: 0.9128
+  excretion_factor: 0.5049
+  stress_factor: 0.7742
+  species: tiger_barb
+  source: Calibrated to Pramod et al. 2010 benzocaine bag (DO/TAN/CO2)

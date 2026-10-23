@@ -1,0 +1,177 @@
+{
+  "trained_on": "simulated",
+  "n_train": 600,
+  "n_test": 300,
+  "test": {
+    "physics_only": {
+      "mae_pp": 3.5170026731082644,
+      "rmse_pp": 6.314938006280234,
+      "bias_pp": -3.223545890280895,
+      "safe_call_accuracy": 0.9466666666666667
+    },
+    "physics_plus_ai": {
+      "mae_pp": 1.5708497877698329,
+      "rmse_pp": 2.4274284706270457,
+      "bias_pp": 0.031416017065362366,
+      "safe_call_accuracy": 0.9633333333333334
+    },
+    "ai_only": {
+      "mae_pp": 2.926296161754576,
+      "rmse_pp": 4.929188463915796,
+      "bias_pp": 0.7640097040053538,
+      "safe_call_accuracy": 0.9233333333333333
+    }
+  },
+  "learning_curve": [
+    {
+      "n": 10,
+      "physics_mae_pp": 3.5170026731082644,
+      "hybrid_mae_pp": 2.539026608672314,
+      "pure_ml_mae_pp": 16.836328118961013,
+      "physics_safe_acc": 0.9466666666666667,
+      "hybrid_safe_acc": 0.9460000000000001,
+      "pure_ml_safe_acc": 0.44333333333333336
+    },
+    {
+      "n": 20,
+      "physics_mae_pp": 3.5170026731082644,
+      "hybrid_mae_pp": 2.4501134582406996,
+      "pure_ml_mae_pp": 8.19264485736755,
+      "physics_safe_acc": 0.9466666666666667,
+      "hybrid_safe_acc": 0.9486666666666668,
+      "pure_ml_safe_acc": 0.8273333333333334
+    },
+    {
+      "n": 40,
+      "physics_mae_pp": 3.5170026731082644,
+      "hybrid_mae_pp": 2.4338193976477527,
+      "pure_ml_mae_pp": 7.198155057558646,
+      "physics_safe_acc": 0.9466666666666667,
+      "hybrid_safe_acc": 0.9559999999999998,
+      "pure_ml_safe_acc": 0.8666666666666668
+    },
+    {
+      "n": 80,
+      "physics_mae_pp": 3.5170026731082644,
+      "hybrid_mae_pp": 2.0259495539379997,
+      "pure_ml_mae_pp": 4.8295422544856335,
+      "physics_safe_acc": 0.9466666666666667,
+      "hybrid_safe_acc": 0.9546666666666667,
+      "pure_ml_safe_acc": 0.9039999999999999
+    },
+    {
+      "n": 160,
+      "physics_mae_pp": 3.5170026731082644,
+      "hybrid_mae_pp": 1.840191086966298,
+      "pure_ml_mae_pp": 3.512117240135556,
+      "physics_safe_acc": 0.9466666666666667,
+      "hybrid_safe_acc": 0.9613333333333334,
+      "pure_ml_safe_acc": 0.9166666666666667
+    },
+    {
+      "n": 320,
+      "physics_mae_pp": 3.5170026731082644,
+      "hybrid_mae_pp": 1.6845371858294822,
+      "pure_ml_mae_pp": 3.2249049154347795,
+      "physics_safe_acc": 0.9466666666666667,
+      "hybrid_safe_acc": 0.9606666666666666,
+      "pure_ml_safe_acc": 0.9193333333333333
+    },
+    {
+      "n": 600,
+      "physics_mae_pp": 3.5170026731082644,
+      "hybrid_mae_pp": 1.5770532741317767,
+      "pure_ml_mae_pp": 2.9947485965032987,
+      "physics_safe_acc": 0.9466666666666667,
+      "hybrid_safe_acc": 0.9640000000000001,
+      "pure_ml_safe_acc": 0.9326666666666668
+    }
+  ],
+  "importance": [
+    {
+      "feature": "phys_logit",
+      "label": "Physics survival estimate",
+      "importance_pp": 0.7551480957396796
+    },
+    {
+      "feature": "phys_min_do",
+      "label": "Physics: lowest oxygen",
+      "importance_pp": 0.43387200217134486
+    },
+    {
+      "feature": "sed_ms222",
+      "label": "MS-222",
+      "importance_pp": 0.3463592096483943
+    },
+    {
+      "feature": "fish_mass_g",
+      "label": "Fish weight",
+      "importance_pp": 0.21761530910523041
+    },
+    {
+      "feature": "sed_benzocaine",
+      "label": "Benzocaine",
+      "importance_pp": 0.13052827369948924
+    },
+    {
+      "feature": "duration_h",
+      "label": "Trip length",
+      "importance_pp": 0.07778751546608481
+    },
+    {
+      "feature": "gas_ratio",
+      "label": "Oxygen : water ratio",
+      "importance_pp": 0.05890350132200216
+    },
+    {
+      "feature": "phys_peak_nh3_unpack",
+      "label": "Physics: ammonia at unpacking",
+      "importance_pp": 0.041083019428320745
+    },
+    {
+      "feature": "phys_max_co2",
+      "label": "Physics: highest CO2",
+      "importance_pp": 0.02496232658447308
+    },
+    {
+      "feature": "is_guppy",
+      "label": "Species (guppy)",
+      "importance_pp": 0.021483701156860928
+    },
+    {
+      "feature": "temp_low_c",
+      "label": "Coolest temperature",
+      "importance_pp": 0.011879675499786545
+    },
+    {
+      "feature": "density_g_per_l",
+      "label": "Packing density",
+      "importance_pp": 0.011195963123896147
+    },
+    {
+      "feature": "fish_per_bag",
+      "label": "Fish per bag",
+      "importance_pp": 0.005328733876850018
+    },
+    {
+      "feature": "water_l",
+      "label": "Water per bag",
+      "importance_pp": 0.004360411337122963
+    },
+    {
+      "feature": "temp_high_c",
+      "label": "Warmest temperature",
+      "importance_pp": 0.0014648857950305336
+    },
+    {
+      "feature": "zeolite",
+      "label": "Zeolite",
+      "importance_pp": 0.0
+    },
+    {
+      "feature": "fasting_h",
+      "label": "Fasting",
+      "importance_pp": -0.0038688557080859137
+    }
+  ]
+}
