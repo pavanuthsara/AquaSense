@@ -1,0 +1,3 @@
+# Additional evaluation packages for the existing research virtual environment.
+motmetrics==1.4.0
+matplotlib>=3.8

@@ -36,3 +36,6 @@ pip install ultralytics opencv-python numpy pandas
 For live tracking, behavior extraction, and a local PRE-only appetite model,
 see the [live appetite guide](docs/LIVE_APPETITE.md). Training and inference
 also require `scikit-learn` and `joblib` in the research environment.
+
+For reproducible ByteTrack ID and Random Forest evaluation, saved metrics, and
+presentation plots, see the [model evaluation guide](docs/MODEL_EVALUATION.md).

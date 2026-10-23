@@ -1,6 +1,7 @@
 """Evaluate and export a PRE-only, 10-second appetite classifier for live use."""
 
 import argparse
+import hashlib
 from pathlib import Path
 
 import joblib
@@ -19,45 +20,72 @@ from live_behavior import (
 )
 
 
-def main():
-    root = Path(__file__).resolve().parent
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--features", type=Path, default=root / "output/poc_features.csv")
-    parser.add_argument("--output", type=Path, default=root / "models/random_forest_live_pre.joblib")
-    args = parser.parse_args()
-
-    df = pd.read_csv(args.features)
+def prepare_training_data(df):
+    """The same PRE window selection is used by training and evaluation."""
     required = FEATURE_COLUMNS + [
         "session_id", "phase", "appetite_label", "start_sec", "end_sec",
         "tracking_coverage_pct", "valid_speed_steps",
     ]
     missing = set(required) - set(df.columns)
     if missing:
-        parser.error(f"Feature CSV is missing columns: {sorted(missing)}")
-    df = df[df["phase"].str.strip().str.upper() == "PRE"].copy()
+        raise ValueError(f"Feature CSV is missing columns: {sorted(missing)}")
+    df = df.copy()
+    for column in FEATURE_COLUMNS + ["start_sec", "end_sec", "tracking_coverage_pct", "valid_speed_steps"]:
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+    df = df[df["phase"].astype("string").str.strip().str.upper() == "PRE"].copy()
     df["appetite_label"] = df["appetite_label"].astype("string").str.strip().str.upper()
     df = df[df["appetite_label"].isin(["HIGH", "LOW"])].dropna(subset=["session_id"])
     df = df[(df["end_sec"] - df["start_sec"]) == SEGMENT_SECONDS]
     if df.empty:
-        parser.error("No labeled PRE windows with the expected 10-second length were found.")
+        raise ValueError("No labeled PRE windows with the expected 10-second length were found.")
+    df["session_id"] = df["session_id"].astype(str).str.strip()
+    df = df[df["session_id"] != ""]
+    if df.empty:
+        raise ValueError("No nonempty session IDs were found.")
     df = df[df.apply(lambda row: has_track_data(row.to_dict()), axis=1)].reset_index(drop=True)
+    if df.empty:
+        raise ValueError("No PRE windows passed the tracking quality checks.")
     session_labels = df.groupby("session_id")["appetite_label"].agg(["first", "nunique"])
     if (session_labels["nunique"] != 1).any():
-        parser.error("Each session must have exactly one appetite label.")
-    counts = session_labels["first"].value_counts()
-    if set(counts.index) != {"HIGH", "LOW"} or counts.min() < 2:
-        parser.error("Need at least two independent PRE sessions for each of HIGH and LOW.")
+        raise ValueError("Each session must have exactly one appetite label.")
+    return df
 
-    X = feature_frame(df.to_dict("records"))
-    y = df["appetite_label"]
-    groups = df["session_id"]
-    pipeline = make_pipeline(
+
+def validate_cv_sessions(df):
+    session_labels = df.groupby("session_id")["appetite_label"].first()
+    counts = session_labels.value_counts()
+    if set(counts.index) != {"HIGH", "LOW"} or counts.min() < 2:
+        raise ValueError("Need at least two independent PRE sessions for each of HIGH and LOW.")
+    return counts
+
+
+def build_pipeline():
+    return make_pipeline(
         SimpleImputer(strategy="median", keep_empty_features=True),
         RandomForestClassifier(
             n_estimators=100, max_depth=3, min_samples_leaf=5,
             class_weight="balanced", random_state=42,
         ),
     )
+
+
+def main():
+    root = Path(__file__).resolve().parent
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--features", type=Path, default=root / "output/poc_features.csv")
+    parser.add_argument("--output", type=Path, default=root / "models/random_forest_live_pre.joblib")
+    args = parser.parse_args()
+    try:
+        df = prepare_training_data(pd.read_csv(args.features))
+        counts = validate_cv_sessions(df)
+    except ValueError as error:
+        parser.error(str(error))
+    session_labels = df.groupby("session_id")["appetite_label"].first()
+
+    X = feature_frame(df.to_dict("records"))
+    y = df["appetite_label"]
+    groups = df["session_id"]
+    pipeline = build_pipeline()
     # Fit imputation inside each fold; never split segments of one session.
     predictions = pd.Series(index=df.index, dtype="object")
     session_predictions = []
@@ -90,6 +118,8 @@ def main():
         "phase": "PRE",
         "sklearn_version": sklearn.__version__,
         "training_sessions": len(session_labels),
+        "training_session_ids": sorted(session_labels.index.tolist()),
+        "training_data_sha256": hashlib.sha256(args.features.read_bytes()).hexdigest(),
     }, args.output)
     print(f"Saved live model: {args.output}")
 
