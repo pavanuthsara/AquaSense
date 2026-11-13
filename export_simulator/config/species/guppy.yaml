@@ -1,0 +1,10 @@
+# Guppy: PROVISIONAL. Inherits the tiger barb calibration (Pramod 2010) and relies on
+# allometric mass scaling (mass_exponent) to convert the 12 g barb rates to guppy size.
+# Validate against Teo, Chen & Lee 1989 and Teo & Chen 1993 before using numbers in the thesis.
+name: guppy
+scientific_name: Poecilia reticulata
+base: tiger_barb
+parameters:
+  nh3_lc50:
+    value: 1.17
+    source: Silva et al. 2023, guppy 96 h LC50 un-ionized NH3

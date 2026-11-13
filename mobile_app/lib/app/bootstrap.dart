@@ -8,6 +8,9 @@ import '../features/auth/data/development_authentication_repository.dart';
 import '../features/auth/data/google_backend_authentication_repository.dart';
 import '../features/auth/data/secure_auth_session_storage.dart';
 import '../features/auth/domain/authentication_repository.dart';
+import '../features/export/data/development_export_repository.dart';
+import '../features/export/data/http_export_repository.dart';
+import '../features/export/domain/export_repository.dart';
 import '../features/facility/data/development_facility_repository.dart';
 import '../features/facility/data/http_facility_repository.dart';
 import '../features/facility/data/shared_preferences_facility_selection_store.dart';
@@ -24,6 +27,7 @@ Future<void> bootstrap({
   AuthenticationRepository? authenticationRepository,
   FacilityRepository? facilityRepository,
   FacilitySelectionStore? facilitySelectionStore,
+  ExportRepository? exportRepository,
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -52,6 +56,14 @@ Future<void> bootstrap({
           : DevelopmentFacilityRepository());
   final resolvedFacilitySelectionStore =
       facilitySelectionStore ?? SharedPreferencesFacilitySelectionStore();
+  final resolvedExportRepository =
+      exportRepository ??
+      (resolvedEnvironment.usesRealAuthentication
+          ? HttpExportRepository(
+              apiBaseUrl: resolvedEnvironment.apiBaseUrl,
+              sessionStorage: sessionStorage,
+            )
+          : DevelopmentExportRepository());
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
@@ -79,6 +91,7 @@ Future<void> bootstrap({
         authenticationRepository: resolvedAuthenticationRepository,
         facilityRepository: resolvedFacilityRepository,
         facilitySelectionStore: resolvedFacilitySelectionStore,
+        exportRepository: resolvedExportRepository,
       ),
     ),
     (error, stack) {

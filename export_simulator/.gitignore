@@ -1,0 +1,5 @@
+# local simulation outputs (reports/ is committed on purpose)
+*.csv
+!data/**/*.csv
+/*.png
+/out/

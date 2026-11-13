@@ -1,0 +1,65 @@
+name: tiger_barb
+scientific_name: Puntius filamentosus
+parameters:
+  ref_mass_g:
+    value: 12.0
+    source: Pramod 2010 (12 +/- 1 g)
+  ref_temp_c:
+    value: 22.0
+    source: Pramod 2010
+  o2_rate:
+    value: 26.42581
+    source: Calibrated to Pramod et al. 2010 control bag (python -m transit_sim calibrate);
+      fitted to DO+TAN+CO2
+  tan_rate:
+    value: 4.5855
+    source: Calibrated to Pramod et al. 2010 control bag (python -m transit_sim calibrate);
+      fitted to DO+TAN+CO2
+  mass_exponent:
+    value: -0.2
+    source: General fish allometry (mass-specific exponent ~ -0.2); ASSUMED
+  q10:
+    value: 2.0
+    source: Typical 2-3; ASSUMED
+  rq:
+    value: 0.9
+    source: Typical fish RQ 0.8-1.0; ASSUMED
+  stress_amp:
+    value: 0.5733
+    source: Calibrated to Pramod et al. 2010 control bag (python -m transit_sim calibrate);
+      fitted to DO+TAN+CO2
+  stress_tau_h:
+    value: 4.0
+    source: ASSUMED
+  do_half_uptake:
+    value: 1.5
+    source: ASSUMED
+  hypoxia_hill:
+    value: 4.0
+    source: ASSUMED
+  do_crit:
+    value: 3.0
+    source: Kramer & Mehegan; critical DO ~2-3 mg/L
+  nh3_lc50:
+    value: 1.0
+    source: Warmwater fish 1-3 mg/L (Boyd); species value unknown; ASSUMED
+  alk_from_tan:
+    value: 0.0
+    source: Selected by cross-treatment validation on Pramod 2010 (0 beats 0.5 and
+      1.0 on anaesthetic-bag CO2, DO and mortality); consistent with Na+/NH4+ exchange
+      at the gill
+  co2_ref:
+    value: 100.0
+    source: ASSUMED normaliser
+  guts_kd:
+    value: 0.0001
+    source: Calibrated to Pramod et al. 2010 control bag (python -m transit_sim calibrate);
+      fitted to mortality
+  guts_b:
+    value: 6.19816
+    source: Calibrated to Pramod et al. 2010 control bag (python -m transit_sim calibrate);
+      fitted to mortality
+  guts_z:
+    value: 0.00049
+    source: Calibrated to Pramod et al. 2010 control bag (python -m transit_sim calibrate);
+      fitted to mortality

@@ -1,0 +1,39 @@
+{
+  "trained_on": "simulated",
+  "n_shipments": 600,
+  "created": "2026-10-22T09:03:06+00:00",
+  "model": "GradientBoostingRegressor on logit residual (physics + AI correction)",
+  "sklearn_version": "1.9.1",
+  "features": [
+    "fish_mass_g",
+    "fish_per_bag",
+    "density_g_per_l",
+    "water_l",
+    "gas_ratio",
+    "duration_h",
+    "temp_low_c",
+    "temp_high_c",
+    "fasting_h",
+    "zeolite",
+    "is_guppy",
+    "sed_ms222",
+    "sed_benzocaine",
+    "phys_logit",
+    "phys_min_do",
+    "phys_max_co2",
+    "phys_peak_nh3_unpack"
+  ],
+  "test_metrics": {
+    "mae_pp": 1.5708497877698329,
+    "rmse_pp": 2.4274284706270457,
+    "bias_pp": 0.031416017065362366,
+    "safe_call_accuracy": 0.9633333333333334
+  },
+  "physics_only_test_metrics": {
+    "mae_pp": 3.5170026731082644,
+    "rmse_pp": 6.314938006280234,
+    "bias_pp": -3.223545890280895,
+    "safe_call_accuracy": 0.9466666666666667
+  },
+  "data_file": "simulated_shipments.csv"
+}

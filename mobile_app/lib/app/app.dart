@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../features/auth/domain/authentication_repository.dart';
 import '../features/auth/presentation/authentication_controller.dart';
 import '../features/auth/presentation/authentication_scope.dart';
+import '../features/export/data/development_export_repository.dart';
+import '../features/export/domain/export_repository.dart';
+import '../features/export/presentation/export_repository_scope.dart';
 import '../features/facility/domain/facility_repository.dart';
 import '../features/facility/domain/facility_selection_store.dart';
 import '../features/facility/presentation/facility_repository_scope.dart';
@@ -20,6 +23,7 @@ class AquaSenseApp extends StatefulWidget {
     required this.authenticationRepository,
     required this.facilityRepository,
     required this.facilitySelectionStore,
+    this.exportRepository,
     super.key,
   });
 
@@ -29,12 +33,17 @@ class AquaSenseApp extends StatefulWidget {
   final FacilityRepository facilityRepository;
   final FacilitySelectionStore facilitySelectionStore;
 
+  /// Export planning backend; defaults to the offline sample repository.
+  final ExportRepository? exportRepository;
+
   @override
   State<AquaSenseApp> createState() => _AquaSenseAppState();
 }
 
 class _AquaSenseAppState extends State<AquaSenseApp> {
   late final AuthenticationController _authenticationController;
+  late final ExportRepository _exportRepository =
+      widget.exportRepository ?? DevelopmentExportRepository();
 
   @override
   void initState() {
@@ -61,16 +70,19 @@ class _AquaSenseAppState extends State<AquaSenseApp> {
           store: widget.facilitySelectionStore,
           child: FacilityRepositoryScope(
             repository: widget.facilityRepository,
-            child: MaterialApp(
-              title: 'AquaSense',
-              debugShowCheckedModeBanner: !widget.environment.isProduction,
-              theme: AquaSenseTheme.light,
-              home: StartupGate(
-                onboardingRepository: widget.onboardingRepository,
+            child: ExportRepositoryScope(
+              repository: _exportRepository,
+              child: MaterialApp(
+                title: 'AquaSense',
+                debugShowCheckedModeBanner: !widget.environment.isProduction,
+                theme: AquaSenseTheme.light,
+                home: StartupGate(
+                  onboardingRepository: widget.onboardingRepository,
+                ),
+                onGenerateRoute: AppRouter(
+                  onboardingRepository: widget.onboardingRepository,
+                ).onGenerateRoute,
               ),
-              onGenerateRoute: AppRouter(
-                onboardingRepository: widget.onboardingRepository,
-              ).onGenerateRoute,
             ),
           ),
         ),

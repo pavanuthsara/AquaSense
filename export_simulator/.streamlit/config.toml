@@ -1,0 +1,38 @@
+# Demo UI (app/streamlit_app.py). Streamlit reads this when started from export_simulator/.
+# Colours follow the AquaSense app theme (primary #087F8C, surface #F4FAFA).
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+baseRadius = "0.6rem"
+buttonRadius = "0.6rem"
+metricValueFontSize = "1.75rem"
+showWidgetBorder = true
+showSidebarBorder = true
+chartCategoricalColors = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
+
+[theme.light]
+primaryColor = "#087F8C"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#eef5f6"
+textColor = "#1a1c1c"
+borderColor = "#d5e2e4"
+
+[theme.light.sidebar]
+backgroundColor = "#f4fafa"
+secondaryBackgroundColor = "#ffffff"
+
+[theme.dark]
+primaryColor = "#178895"
+backgroundColor = "#0f1416"
+secondaryBackgroundColor = "#1a2124"
+textColor = "#eef2f2"
+borderColor = "#2c373a"
+
+[theme.dark.sidebar]
+backgroundColor = "#141b1d"
+secondaryBackgroundColor = "#1f282b"
