@@ -1,0 +1,112 @@
+name: Build APK
+
+# Builds an installable Android APK and publishes it as a GitHub Release so it
+# can be shared with a single download link.
+#
+# Run it from the Actions tab ("Run workflow"), or it runs automatically on
+# pushes to the integrated branches below.
+#
+# Optional repository variables (Settings > Secrets and variables > Actions >
+# Variables) used for the real build:
+#   AQUASENSE_API_BASE_URL              backend URL, e.g. https://api.example.com
+#   AQUASENSE_GOOGLE_SERVER_CLIENT_ID   Google OAuth web client ID
+# Without them the APK is built with placeholder values: the UI works, but
+# sign-in and backend calls will not.
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: "Backend API base URL (overrides the repository variable)"
+        required: false
+        type: string
+      google_client_id:
+        description: "Google server client ID (overrides the repository variable)"
+        required: false
+        type: string
+  push:
+    branches:
+      - "integrated-*"
+    paths:
+      - "mobile_app/**"
+      - ".github/workflows/build-apk.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build and publish APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mobile_app
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            mobile_app/android/*.gradle*
+            mobile_app/android/**/*.gradle*
+            mobile_app/android/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.4"
+          channel: stable
+          cache: true
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      - name: Build release APK
+        env:
+          API_BASE_URL: ${{ inputs.api_base_url || vars.AQUASENSE_API_BASE_URL || 'https://api.example.com' }}
+          GOOGLE_CLIENT_ID: ${{ inputs.google_client_id || vars.AQUASENSE_GOOGLE_SERVER_CLIENT_ID || 'ci-placeholder.apps.googleusercontent.com' }}
+        run: >-
+          flutter build apk --release
+          --dart-define=AQUASENSE_ENV=production
+          --dart-define=AQUASENSE_API_BASE_URL="$API_BASE_URL"
+          --dart-define=AQUASENSE_GOOGLE_SERVER_CLIENT_ID="$GOOGLE_CLIENT_ID"
+
+      - name: Name the APK
+        id: apk
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          name="aquasense-${short_sha}.apk"
+          cp build/app/outputs/flutter-apk/app-release.apk "$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "tag=apk-${GITHUB_RUN_NUMBER}-${short_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: aquasense-android-release
+          path: mobile_app/${{ steps.apk.outputs.name }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.apk.outputs.tag }}" \
+            "${{ steps.apk.outputs.name }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "AquaSense APK (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7})" \
+            --notes "Android APK built from \`${GITHUB_REF_NAME}\` at \`${GITHUB_SHA::7}\`. On your phone: download the .apk, open it, and allow installs from this source when asked. Note: signed with the debug key, intended for testing."
