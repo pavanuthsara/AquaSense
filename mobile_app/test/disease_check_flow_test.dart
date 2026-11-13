@@ -42,6 +42,8 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(find.byKey(const Key('open-disease-check')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('open-disease-check')));
     await tester.pumpAndSettle();
     expect(find.text('Check a guppy for white spot'), findsOneWidget);

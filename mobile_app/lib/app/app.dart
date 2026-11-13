@@ -57,6 +57,7 @@ class AquaSenseApp extends StatefulWidget {
 
   /// Export planning backend; defaults to the offline sample repository.
   final ExportRepository? exportRepository;
+
   /// Optional so existing tests keep working; defaults are created below.
   final DiseaseClassifier? diseaseClassifier;
   final DiseaseCheckRepository? diseaseCheckRepository;
@@ -130,25 +131,25 @@ class _AquaSenseAppState extends State<AquaSenseApp> {
             child: ExportRepositoryScope(
               repository: _exportRepository,
               child: DiseaseCheckScope(
-              classifier: _diseaseClassifier,
-              repository: _diseaseCheckRepository,
-              photoSource: _fishPhotoSource,
-              fishDetector: _fishDetector,
-              fishCropClassifier: _fishCropClassifier,
-              videoSource: _fishVideoSource,
-              frameExtractor: _videoFrameExtractor,
-              child: MaterialApp(
-                title: 'AquaSense',
-                debugShowCheckedModeBanner: !widget.environment.isProduction,
-                theme: AquaSenseTheme.light,
-                home: StartupGate(
-                  onboardingRepository: widget.onboardingRepository,
+                classifier: _diseaseClassifier,
+                repository: _diseaseCheckRepository,
+                photoSource: _fishPhotoSource,
+                fishDetector: _fishDetector,
+                fishCropClassifier: _fishCropClassifier,
+                videoSource: _fishVideoSource,
+                frameExtractor: _videoFrameExtractor,
+                child: MaterialApp(
+                  title: 'AquaSense',
+                  debugShowCheckedModeBanner: !widget.environment.isProduction,
+                  theme: AquaSenseTheme.light,
+                  home: StartupGate(
+                    onboardingRepository: widget.onboardingRepository,
+                  ),
+                  onGenerateRoute: AppRouter(
+                    onboardingRepository: widget.onboardingRepository,
+                  ).onGenerateRoute,
                 ),
-                onGenerateRoute: AppRouter(
-                  onboardingRepository: widget.onboardingRepository,
-                ).onGenerateRoute,
               ),
-            ),
             ),
           ),
         ),
