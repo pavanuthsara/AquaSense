@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AquaSense Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a7fa0'/%3E%3Cellipse cx='28' cy='32' rx='18' ry='11' fill='white'/%3E%3Cpolygon points='44,32 58,22 58,42' fill='white'/%3E%3Ccircle cx='20' cy='29' r='2.5' fill='%230a5a82'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #f3f7fa; --panel: #ffffff; --ink: #0f2a3a; --muted: #5b7384; --line: #dbe5ec;
+  --brand: #0a7fa0; --brand-ink: #ffffff;
+  --ok: #138a55; --ok-bg: #e0f4ea; --warn: #a86400; --warn-bg: #fdf0d5;
+  --bad: #c0392b; --bad-bg: #fbe3df; --off: #6b7c88; --off-bg: #e7edf1;
+  --shadow: 0 1px 2px rgba(15,42,58,.06), 0 4px 14px rgba(15,42,58,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1820; --panel: #12242f; --ink: #e5f0f6; --muted: #8fa8b8; --line: #234050;
+    --brand: #35b6d8; --brand-ink: #062631;
+    --ok: #4fd18f; --ok-bg: #123a2b; --warn: #f0b84a; --warn-bg: #3b2d10;
+    --bad: #ff8577; --bad-bg: #432019; --off: #9bb0bd; --off-bg: #1c3340;
+    --shadow: none;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1820; --panel: #12242f; --ink: #e5f0f6; --muted: #8fa8b8; --line: #234050;
+  --brand: #35b6d8; --brand-ink: #062631;
+  --ok: #4fd18f; --ok-bg: #123a2b; --warn: #f0b84a; --warn-bg: #3b2d10;
+  --bad: #ff8577; --bad-bg: #432019; --off: #9bb0bd; --off-bg: #1c3340; --shadow: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
+.bar { max-width: 1200px; margin: 0 auto; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; }
+.brand { font-weight: 700; font-size: 18px; display: flex; align-items: center; gap: 8px; margin-right: auto; }
+.brand svg { width: 26px; height: 26px; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 99px; background: var(--off-bg); color: var(--off); white-space: nowrap; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); } .pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.bad { background: var(--bad-bg); color: var(--bad); } .pill.brand { background: var(--brand); color: var(--brand-ink); }
+select, input, button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 10px; }
+button { cursor: pointer; } button:hover { border-color: var(--brand); }
+button.primary { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); font-weight: 600; }
+nav { max-width: 1200px; margin: 0 auto; padding: 0 16px; display: flex; gap: 4px; overflow-x: auto; }
+nav button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 10px 14px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+nav button[aria-selected="true"] { color: var(--brand); border-bottom-color: var(--brand); }
+main { max-width: 1200px; margin: 0 auto; padding: 18px 16px 48px; }
+.banner { padding: 10px 14px; border-radius: 10px; margin-bottom: 16px; background: var(--warn-bg); color: var(--warn); font-size: 14px; }
+.banner.bad { background: var(--bad-bg); color: var(--bad); }
+.grid { display: grid; gap: 14px; }
+.kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 18px; }
+.cards { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.two { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); min-width: 0; }
+.card h3 { margin: 0 0 6px; font-size: 14px; color: var(--muted); font-weight: 600; letter-spacing: .02em; }
+.kpi .v { font-size: 28px; font-weight: 700; line-height: 1.15; }
+.kpi .s { color: var(--muted); font-size: 13px; }
+h2 { font-size: 17px; margin: 22px 0 10px; }
+.comp .t { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 700; margin-bottom: 4px; }
+.comp p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tw { overflow-x: auto; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+tr:last-child td { border-bottom: 0; }
+.empty { color: var(--muted); padding: 18px 4px; text-align: center; }
+.params { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
+.param { cursor: pointer; border-width: 2px; } .param.sel { border-color: var(--brand); }
+.param .v { font-size: 26px; font-weight: 700; } .param .u { font-size: 14px; color: var(--muted); font-weight: 500; }
+.range { position: relative; height: 8px; border-radius: 6px; background: var(--off-bg); margin-top: 10px; }
+.range .ok { position: absolute; top: 0; bottom: 0; background: var(--ok-bg); border: 1px solid var(--ok); border-radius: 6px; }
+.range .dot { position: absolute; top: -3px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink); transform: translateX(-50%); border: 2px solid var(--panel); }
+.chart { width: 100%; height: auto; aspect-ratio: 640 / 220; display: block; }
+.chart text { fill: var(--muted); font-size: 11px; }
+.act { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.act:last-child { border-bottom: 0; }
+.muted { color: var(--muted); } .sm { font-size: 13px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+label.f input, label.f select { width: 100%; }
+.form { display: grid; gap: 12px; max-width: 560px; }
+.bars { display: grid; gap: 6px; }
+.bar-row { display: grid; grid-template-columns: 150px 1fr 34px; gap: 8px; align-items: center; font-size: 13px; }
+.bar-row .b { height: 10px; border-radius: 6px; background: var(--brand); }
+@media (max-width: 560px) { .kpi .v { font-size: 24px; } .bar-row { grid-template-columns: 110px 1fr 28px; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">
+      <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#0a7fa0"/><ellipse cx="28" cy="32" rx="18" ry="11" fill="#fff"/><polygon points="44,32 58,22 58,42" fill="#fff"/><circle cx="20" cy="29" r="2.5" fill="#0a5a82"/></svg>
+      AquaSense
+    </div>
+    <span id="modePill" class="pill">…</span>
+    <select id="facilitySel" aria-label="Facility" hidden></select>
+    <span id="updated" class="muted sm"></span>
+    <button id="refreshBtn" class="primary">Refresh</button>
+  </div>
+  <nav role="tablist" id="tabs">
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="feeding" aria-selected="false">Feeding</button>
+    <button role="tab" data-tab="water" aria-selected="false">Water quality</button>
+    <button role="tab" data-tab="disease" aria-selected="false">Disease checks</button>
+    <button role="tab" data-tab="export" aria-selected="false">Export planning</button>
+    <button role="tab" data-tab="settings" aria-selected="false">Settings</button>
+  </nav>
+</header>
+<main id="main"></main>
+
+<script>
+"use strict";
+/* ============================ helpers ============================ */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = (n, d = 1) => (n == null || Number.isNaN(+n)) ? "–" : (+n).toFixed(d);
+const pct = n => (n == null) ? "–" : `${Math.round(+n * (+n <= 1 ? 100 : 1))}%`;
+const ago = t => {
+  if (!t) return "–";
+  const ms = typeof t === "number" ? (t > 1e12 ? t : t * 1000) : Date.parse(t);
+  const s = Math.round((Date.now() - ms) / 1000);
+  const a = Math.abs(s), u = a < 60 ? `${a}s` : a < 3600 ? `${Math.round(a/60)}m` : a < 86400 ? `${Math.round(a/3600)}h` : `${Math.round(a/86400)}d`;
+  return s >= 0 ? `${u} ago` : `in ${u}`;
+};
+const pill = (text, kind = "") => `<span class="pill ${kind}">${esc(text)}</span>`;
+const nice = s => esc(String(s ?? "–").toLowerCase().replace(/_/g, " ").replace(/^./, c => c.toUpperCase()));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+/* ============================ settings / state ============================ */
+const cfg = Object.assign({ mode: "demo", backend: "", water: "", token: "", facilityId: "" }, store.get("aq.cfg", {}));
+const S = {
+  tab: store.get("aq.tab", "overview"), loading: false, updated: null,
+  facilities: [], facilityId: cfg.facilityId || "",
+  tanks: [], disease: [], exports: [],
+  water: { tanks: [], tankId: "", state: null, alerts: [], metrics: null, param: "", history: [] },
+  status: { backend: "idle", water: "idle" }, errors: { backend: "", water: "" }, demo: false,
+};
+const saveCfg = () => store.set("aq.cfg", cfg);
+
+/* ============================ API ============================ */
+function bases() {
+  if (cfg.mode === "proxy") return { b: "/proxy/backend", w: "/proxy/water" };
+  return { b: cfg.backend.replace(/\/$/, ""), w: cfg.water.replace(/\/$/, "") };
+}
+async function http(url, { token } = {}) {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 9000);
+  try {
+    const res = await fetch(url, { signal: ctl.signal, headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!res.ok) {
+      let msg = `${res.status} ${res.statusText}`;
+      try { const j = await res.json(); if (j.error || j.message) msg += ` – ${j.error || j.message}`; } catch {}
+      const e = new Error(msg); e.status = res.status; throw e;
+    }
+    return await res.json();
+  } finally { clearTimeout(t); }
+}
+const bk = path => http(`${bases().b}${path}`, { token: cfg.token });
+const wq = path => http(`${bases().w}${path}`);
+
+/* ============================ demo data ============================ */
+function demoData() {
+  const now = Date.now(), iso = m => new Date(now - m * 60000).toISOString();
+  const names = ["Breeders A1", "Breeders A2", "Fry B1", "Fry B2", "Grow-out C1", "Quarantine Q1"];
+  const states = ["ONLINE", "ONLINE", "ONLINE", "STALE", "ONLINE", "OFFLINE"];
+  const tanks = names.map((name, i) => {
+    const exp = [60, 60, 120, 120, 80, 20][i], det = exp - [1, 3, 2, 14, 0, 0][i];
+    const low = i === 3, outcome = ["DELIVERED","DELIVERED","SKIPPED_LOW_APPETITE","SKIPPED_STALE_OBSERVATION","DELIVERED","BLOCKED_UNHEALTHY_DEVICE"][i];
+    return {
+      id: `t${i}`, name, code: `T-${i + 1}`, expectedGuppyCount: exp, detectedGuppyCount: det,
+      groupName: i < 2 ? "Breeders" : i < 4 ? "Fry" : "Other", status: i === 5 ? "PAUSED" : "ACTIVE",
+      detail: {
+        deviceHealth: { overallState: states[i], feedingAllowed: states[i] === "ONLINE" },
+        appetiteObservation: { appetiteResult: low || i === 2 ? "LOW" : "HIGH", confidence: [0.93, 0.9, 0.86, 0.62, 0.95, 0.88][i],
+          detectedGuppyCount: det, modelVersion: "yolov8-guppy-rf-0.3", observedAt: iso(i === 3 ? 22 : 2 + i),
+          stale: i === 3, lowConfidence: i === 3 },
+        lastFeedingAt: iso(120 + i * 7), nextFeedingAt: new Date(now + (180 - i * 11) * 60000).toISOString(),
+      },
+      session: { outcome, portionUnits: outcome === "DELIVERED" ? [2.5, 2.5, 0, 0, 3.0, 0][i] : null, scheduledFor: iso(95 + i * 3), reason: null },
+    };
+  });
+  const pdef = [["temperature","Temperature","°C",24,28,26.3],["do","Dissolved oxygen","mg/L",5,9,6.1],["ph","pH","",6.8,7.8,7.2],
+                ["ammonia","Ammonia","mg/L",0,0.05,0.07],["nitrate","Nitrate","mg/L",0,40,18.4]];
+  const state = { tank_id: "pond1", mode: "AUTO", engine: "threshold", now: now / 1000,
+    parameters: pdef.map(([name, label, unit, min, max, value]) => ({ name, label, unit, min, max, value,
+      status: (value < min || value > max) ? "CRITICAL" : "OK", source: "simulated", ts: now / 1000 })),
+    actuators: [{ name: "aerator", label: "Aerator", is_on: false, runtime_s: 5400, switch_ons: 6, power_w: 40, energy_wh: 60 },
+                { name: "heater", label: "Heater", is_on: true, runtime_s: 2300, switch_ons: 3, power_w: 150, energy_wh: 95.8 },
+                { name: "ph_pump", label: "pH dosing pump", is_on: false, runtime_s: 120, switch_ons: 2, power_w: 10, energy_wh: .3 }],
+    active_alerts: [{ id: 1, parameter: "ammonia", side: "high", severity: "CRITICAL", value: 0.07, threshold: 0.05, raised_at: now / 1000 - 1500 }] };
+  const history = {};
+  pdef.forEach(([name, , , min, max, value]) => {
+    const mid = (min + max) / 2, amp = (max - min) / 5;
+    history[name] = Array.from({ length: 120 }, (_, k) => ({ ts: now / 1000 - (119 - k) * 120,
+      value: +(mid + amp * Math.sin(k / 9 + name.length) + (k > 100 ? (value - mid) * (k - 100) / 19 : 0)).toFixed(3) }));
+  });
+  return {
+    facilities: [{ id: "demo", name: "Blue Reef Hatchery (demo data)", role: "OWNER" }], tanks,
+    disease: [
+      { id: 1, tankLabel: "Fry B1", predictedLabel: "white_spot", confidence: 0.91, uncertain: false, checkedByName: "A. Perera", checkedAt: iso(55), modelVersion: "wspot-0.2" },
+      { id: 2, tankLabel: "Breeders A1", predictedLabel: "healthy", confidence: 0.97, uncertain: false, checkedByName: "A. Perera", checkedAt: iso(300), modelVersion: "wspot-0.2" },
+      { id: 3, tankLabel: "Grow-out C1", predictedLabel: "healthy", confidence: 0.88, uncertain: false, checkedByName: "N. Silva", checkedAt: iso(1500), modelVersion: "wspot-0.2" },
+      { id: 4, tankLabel: "Quarantine Q1", predictedLabel: "white_spot", confidence: 0.58, uncertain: true, checkedByName: "N. Silva", checkedAt: iso(2900), modelVersion: "wspot-0.2" },
+    ],
+    exports: [
+      { id: 1, label: "Dubai order", species: "guppy", durationHours: 36, mode: "suggest", feasible: true, meetsTarget: true, fishPerBag: 60, bagsNeeded: 17, survivalPct: 96.4, worstSurvivalPct: 93.1, createdAt: iso(4000) },
+      { id: 2, label: "Singapore trial", species: "guppy", durationHours: 48, mode: "check", feasible: true, meetsTarget: false, fishPerBag: 90, bagsNeeded: 12, survivalPct: 71.2, worstSurvivalPct: 56.0, createdAt: iso(9000) },
+    ],
+    water: { tanks: ["pond1"], tankId: "pond1", state, alerts: state.active_alerts, metrics: null, history },
+  };
+}
+
+/* ============================ loading ============================ */
+async function loadWater() {
+  S.errors.water = "";
+  try {
+    const tanks = await wq("/api/tanks");
+    S.water.tanks = tanks;
+    if (!S.water.tankId || !tanks.includes(S.water.tankId)) S.water.tankId = tanks[0] || "";
+    if (!S.water.tankId) { S.status.water = "ok"; S.water.state = null; return; }
+    const t = encodeURIComponent(S.water.tankId);
+    const [state, alerts, metrics] = await Promise.all([
+      wq(`/api/state?tank_id=${t}`), wq(`/api/alerts?tank_id=${t}&limit=20`), wq(`/api/metrics?tank_id=${t}`).catch(() => null)]);
+    S.water.state = state; S.water.alerts = alerts; S.water.metrics = metrics;
+    if (!S.water.param) S.water.param = state.parameters[0]?.name || "";
+    await loadHistory();
+    S.status.water = "ok";
+  } catch (e) { S.status.water = "down"; S.errors.water = e.message || String(e); }
+}
+async function loadHistory() {
+  if (S.demo) { S.water.history = DEMO.water.history[S.water.param] || []; return; }
+  if (!S.water.param) return;
+  const t = encodeURIComponent(S.water.tankId);
+  S.water.history = await wq(`/api/history?parameter=${encodeURIComponent(S.water.param)}&tank_id=${t}&limit=300`);
+}
+async function loadBackend() {
+  S.errors.backend = "";
+  try {
+    if (!cfg.token) throw Object.assign(new Error("No access token set (Settings → Access token)"), { status: 401 });
+    S.facilities = await bk("/api/v1/facilities");
+    if (!S.facilities.some(f => f.id === S.facilityId)) S.facilityId = S.facilities[0]?.id || "";
+    if (!S.facilityId) { S.tanks = []; S.disease = []; S.exports = []; S.status.backend = "ok"; return; }
+    const f = `/api/v1/facilities/${S.facilityId}`;
+    const [page, disease, exports] = await Promise.all([
+      bk(`${f}/tanks?size=100`), bk(`${f}/disease-checks?limit=50`).catch(() => []), bk(`${f}/export-advisories`).catch(() => [])]);
+    S.disease = disease; S.exports = exports;
+    S.tanks = await Promise.all((page.items || []).slice(0, 40).map(async t => {
+      const [detail, session] = await Promise.all([
+        bk(`${f}/tanks/${t.id}`).catch(() => null), bk(`${f}/tanks/${t.id}/feeding-session/latest`).catch(() => null)]);
+      return { ...t, detail, session: session?.available ? session.session : null };
+    }));
+    S.status.backend = "ok";
+  } catch (e) { S.status.backend = e.status === 401 || e.status === 403 ? "auth" : "down"; S.errors.backend = e.message || String(e); }
+}
+let DEMO = null;
+async function loadAll() {
+  if (S.loading) return; S.loading = true; render();
+  S.demo = cfg.mode === "demo";
+  if (S.demo) {
+    DEMO = DEMO || demoData();
+    S.facilities = DEMO.facilities; S.facilityId = "demo"; S.tanks = DEMO.tanks; S.disease = DEMO.disease; S.exports = DEMO.exports;
+    Object.assign(S.water, { tanks: DEMO.water.tanks, tankId: "pond1", state: DEMO.water.state, alerts: DEMO.water.alerts });
+    S.water.param = S.water.param || "temperature"; await loadHistory();
+    S.status = { backend: "demo", water: "demo" }; S.errors = { backend: "", water: "" };
+  } else {
+    await Promise.all([loadBackend(), loadWater()]);
+    cfg.facilityId = S.facilityId; saveCfg();
+  }
+  S.updated = new Date(); S.loading = false; render();
+}
+
+/* ============================ derived ============================ */
+const devOk = t => t.detail?.deviceHealth?.overallState === "ONLINE";
+const isFlagged = d => /white|spot|ich|disease|fungus|rot|fin/i.test(d.predictedLabel || "") && !/healthy|normal/i.test(d.predictedLabel || "");
+const kindOfState = s => ({ ONLINE: "ok", STALE: "warn", UNHEALTHY: "bad", OFFLINE: "bad", NOT_CONFIGURED: "" }[s] || "");
+const outcomeKind = o => /^DELIVERED$|COMMAND_SENT/.test(o || "") ? "ok" : /^SKIPPED/.test(o || "") ? "warn" : /BLOCKED|FAILED/.test(o || "") ? "bad" : "";
+const statusKind = s => ({ OK: "ok", WARNING: "warn", CRITICAL: "bad", FAULT: "bad", MISSING: "" }[s] || "");
+
+/* ============================ views ============================ */
+function banner() {
+  if (S.demo) return `<div class="banner">Showing <b>demo data</b> so you can explore the layout. Open <b>Settings</b> to connect the real backend and water-quality controller.</div>`;
+  let out = "";
+  if (S.errors.backend) out += `<div class="banner bad"><b>Backend:</b> ${esc(S.errors.backend)}</div>`;
+  if (S.errors.water) out += `<div class="banner bad"><b>Water quality:</b> ${esc(S.errors.water)}</div>`;
+  return out;
+}
+function compStatus(key) {
+  const s = S.status[key];
+  return s === "ok" ? pill("Connected", "ok") : s === "demo" ? pill("Demo data", "brand") : s === "auth" ? pill("Needs token", "warn") : s === "down" ? pill("Unreachable", "bad") : pill("Not loaded");
+}
+function vOverview() {
+  const active = S.tanks.filter(t => t.status === "ACTIVE").length;
+  const online = S.tanks.filter(devOk).length;
+  const sessions = S.tanks.map(t => t.session).filter(Boolean);
+  const delivered = sessions.filter(x => x.outcome === "DELIVERED").length;
+  const skipped = sessions.filter(x => /SKIPPED|BLOCKED|FAILED/.test(x.outcome)).length;
+  const alerts = S.water.state?.active_alerts?.length ?? 0;
+  const flagged = S.disease.filter(isFlagged).length;
+  const meets = S.exports.filter(e => e.meetsTarget).length;
+  const k = (t, v, s) => `<div class="card kpi"><h3>${t}</h3><div class="v">${v}</div><div class="s">${s}</div></div>`;
+  const lowApp = S.tanks.filter(t => t.detail?.appetiteObservation?.appetiteResult === "LOW").length;
+  return `${banner()}
+  <div class="grid kpis">
+    ${k("Tanks", S.tanks.length, `${active} active · ${S.tanks.length - active} paused/archived`)}
+    ${k("Devices online", S.tanks.length ? `${online}/${S.tanks.length}` : "–", "feeder + camera health")}
+    ${k("Latest feedings", delivered, `${skipped} skipped or blocked`)}
+    ${k("Low appetite", lowApp, "tanks flagged by the model")}
+    ${k("Water alerts", alerts, alerts ? "active right now" : "all parameters in range")}
+    ${k("Disease flags", flagged, `of ${S.disease.length} recent checks`)}
+    ${k("Export plans", S.exports.length ? `${meets}/${S.exports.length}` : "–", "meet the survival target")}
+  </div>
+  <h2>Components</h2>
+  <div class="grid cards">
+    <div class="card comp"><div class="t">Appetite &amp; feeding ${compStatus("backend")}</div>
+      <p>Spring Boot backend: facilities, tanks, feeding schedules, calibration, device health, appetite observations and scheduled feeding sessions.</p></div>
+    <div class="card comp"><div class="t">Vision (edge) ${compStatus("backend")}</div>
+      <p>YOLOv8 + ByteTrack count guppies and extract behaviour; a Random Forest turns it into HIGH/LOW appetite. Seen here as observations: ${
+        S.tanks.filter(t => t.detail?.appetiteObservation).length} tank(s) reporting.</p></div>
+    <div class="card comp"><div class="t">Water quality ${compStatus("water")}</div>
+      <p>Controller with threshold baseline and forecasting: ${S.water.state ? `${esc(S.water.tankId)} · ${esc(S.water.state.mode)} mode · ${S.water.state.parameters.length} parameters` : "no tank data yet"}.</p></div>
+    <div class="card comp"><div class="t">Disease detection ${compStatus("backend")}</div>
+      <p>On-phone model (photo and video) checks fish for white spot; results are saved here per aquarium. ${S.disease.length} recent check(s).</p></div>
+    <div class="card comp"><div class="t">Export planning ${compStatus("backend")}</div>
+      <p>Transit simulator and advisory: packing plan, oxygen, survival and chemicals. ${S.exports.length} saved plan(s).</p></div>
+  </div>
+  ${S.tanks.some(t => t.session && /BLOCKED|SKIPPED|FAILED/.test(t.session.outcome)) ? `<h2>Needs attention</h2><div class="card">${
+    S.tanks.filter(t => t.session && /BLOCKED|SKIPPED|FAILED/.test(t.session.outcome)).map(t =>
+      `<div class="act"><span><b>${esc(t.name)}</b> <span class="muted">${esc(t.code)}</span></span>${pill(nice(t.session.outcome), outcomeKind(t.session.outcome))}</div>`).join("")}</div>` : ""}`;
+}
+function vFeeding() {
+  if (!S.tanks.length) return `${banner()}<div class="card empty">No tanks to show yet.</div>`;
+  const rows = S.tanks.map(t => {
+    const o = t.detail?.appetiteObservation, h = t.detail?.deviceHealth, s = t.session;
+    return `<tr><td><b>${esc(t.name)}</b> <span class="muted">${esc(t.code || "")}</span></td>
+      <td>${pill(nice(t.status), t.status === "ACTIVE" ? "ok" : "")}</td>
+      <td>${t.detectedGuppyCount ?? "–"} / ${t.expectedGuppyCount ?? "–"}</td>
+      <td>${o ? `${pill(o.appetiteResult, o.appetiteResult === "HIGH" ? "ok" : "warn")} <span class="muted sm">${pct(o.confidence)} · ${ago(o.observedAt)}</span>${o.stale ? " " + pill("stale", "warn") : ""}` : '<span class="muted">no data</span>'}</td>
+      <td>${h ? pill(nice(h.overallState), kindOfState(h.overallState)) : "–"}</td>
+      <td>${s ? `${pill(nice(s.outcome), outcomeKind(s.outcome))}${s.portionUnits ? ` <span class="muted sm">${fmt(s.portionUnits)} units</span>` : ""}` : '<span class="muted">none yet</span>'}</td>
+      <td class="muted">${ago(t.detail?.lastFeedingAt)}</td><td class="muted">${ago(t.detail?.nextFeedingAt)}</td></tr>`;
+  }).join("");
+  return `${banner()}<div class="card"><div class="tw"><table><thead><tr><th>Tank</th><th>Status</th><th>Fish (seen/expected)</th><th>Appetite</th><th>Devices</th><th>Latest session</th><th>Last fed</th><th>Next feed</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+function chart(data, p) {
+  if (!data || data.length < 2) return `<div class="empty">No history yet.</div>`;
+  const W = 640, H = 220, L = 44, R = 10, T = 10, B = 22;
+  const ts = data.map(d => d.ts), vs = data.map(d => d.value).filter(v => v != null);
+  let lo = Math.min(...vs, p?.min ?? Infinity), hi = Math.max(...vs, p?.max ?? -Infinity);
+  const pad = (hi - lo) * .08 || 1; lo -= pad; hi += pad;
+  const x = t => L + (t - ts[0]) / ((ts[ts.length - 1] - ts[0]) || 1) * (W - L - R);
+  const y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+  const pts = data.filter(d => d.value != null).map(d => `${x(d.ts).toFixed(1)},${y(d.value).toFixed(1)}`).join(" ");
+  const band = p && p.min != null && p.max != null ? `<rect x="${L}" y="${y(p.max)}" width="${W - L - R}" height="${Math.max(0, y(p.min) - y(p.max))}" fill="var(--ok-bg)" opacity=".9"/>` : "";
+  const grid = [0, .25, .5, .75, 1].map(f => { const v = lo + f * (hi - lo); return `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${fmt(v, hi - lo < 5 ? 2 : 1)}</text>`; }).join("");
+  const t0 = new Date(ts[0] * 1000), t1 = new Date(ts[ts.length - 1] * 1000), tf = d => d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(p?.label || "")} history">${band}${grid}
+    <polyline points="${pts}" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linejoin="round"/>
+    <text x="${L}" y="${H - 5}">${tf(t0)}</text><text x="${W - R}" y="${H - 5}" text-anchor="end">${tf(t1)}</text></svg>`;
+}
+function vWater() {
+  const st = S.water.state;
+  if (!st) return `${banner()}<div class="card empty">${S.errors.water ? "Water-quality controller not reachable." : "No readings yet. Start the controller and a simulator (see README)."}</div>`;
+  const sel = S.water.param, selP = st.parameters.find(p => p.name === sel);
+  const cards = st.parameters.map(p => {
+    const span = (p.max - p.min) || 1, lo = p.min - span * .5, hi = p.max + span * .5;
+    const pos = p.value == null ? null : Math.min(100, Math.max(0, (p.value - lo) / (hi - lo) * 100));
+    return `<div class="card param ${p.name === sel ? "sel" : ""}" data-param="${esc(p.name)}"><h3>${esc(p.label)} ${p.status !== "OK" ? pill(nice(p.status), statusKind(p.status)) : ""}</h3>
+      <div class="v">${fmt(p.value, 2)} <span class="u">${esc(p.unit)}</span></div>
+      <div class="range"><div class="ok" style="left:${(p.min - lo) / (hi - lo) * 100}%;width:${span / (hi - lo) * 100}%"></div>${pos == null ? "" : `<div class="dot" style="left:${pos}%"></div>`}</div>
+      <div class="muted sm" style="margin-top:6px">Safe ${p.min}–${p.max} ${esc(p.unit)} · ${esc(p.source || "no data")}</div></div>`;
+  }).join("");
+  const acts = st.actuators.map(a => `<div class="act"><span>${esc(a.label)}</span><span>${pill(a.is_on ? "ON" : "OFF", a.is_on ? "ok" : "")} <span class="muted sm">${fmt(a.runtime_s / 60, 0)} min · ${a.switch_ons}× · ${fmt(a.energy_wh, 1)} Wh</span></span></div>`).join("");
+  const alerts = (S.water.alerts || []).slice(0, 8).map(a => `<div class="act"><span>${pill(a.severity, statusKind(a.severity))} <b>${esc(a.parameter)}</b> ${esc(a.side || "")}</span><span class="muted sm">${a.cleared_at ? "cleared" : "active"} · ${ago(a.raised_at)}</span></div>`).join("");
+  return `${banner()}
+  <div class="row"><label class="muted sm">Tank <select id="waterTank">${S.water.tanks.map(t => `<option ${t === S.water.tankId ? "selected" : ""}>${esc(t)}</option>`).join("")}</select></label>
+    ${pill(`${st.mode} mode`, st.mode === "AUTO" ? "ok" : "warn")} ${pill(`engine: ${st.engine}`)}</div>
+  <div class="grid params">${cards}</div>
+  <h2>${esc(selP?.label || "History")} history</h2><div class="card">${chart(S.water.history, selP)}</div>
+  <div class="grid two"><div><h2>Actuators</h2><div class="card">${acts || '<div class="empty">None configured.</div>'}</div></div>
+  <div><h2>Alerts</h2><div class="card">${alerts || '<div class="empty">No alerts.</div>'}</div></div></div>`;
+}
+function vDisease() {
+  const counts = {}; S.disease.forEach(d => counts[d.predictedLabel] = (counts[d.predictedLabel] || 0) + 1);
+  const max = Math.max(1, ...Object.values(counts));
+  const bars = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([l, n]) =>
+    `<div class="bar-row"><span>${nice(l)}</span><div><div class="b" style="width:${n / max * 100}%"></div></div><span>${n}</span></div>`).join("");
+  const rows = S.disease.map(d => `<tr><td>${esc(d.tankLabel || "–")}</td><td>${pill(String(d.predictedLabel).replace(/_/g, " "), isFlagged(d) ? "bad" : "ok")}${d.uncertain ? " " + pill("uncertain", "warn") : ""}</td>
+    <td>${pct(d.confidence)}</td><td>${esc(d.checkedByName || "–")}</td><td class="muted">${ago(d.checkedAt)}</td><td class="muted">${esc(d.modelVersion || "")}</td></tr>`).join("");
+  return `${banner()}${S.disease.length ? `<div class="grid two"><div class="card"><h3>Results by label</h3><div class="bars">${bars}</div></div>
+    <div class="card kpi"><h3>Flagged</h3><div class="v">${S.disease.filter(isFlagged).length}</div><div class="s">of ${S.disease.length} recent checks · ${S.disease.filter(d => d.uncertain).length} uncertain</div></div></div>
+    <h2>Check history</h2><div class="card"><div class="tw"><table><thead><tr><th>Tank</th><th>Result</th><th>Confidence</th><th>Checked by</th><th>When</th><th>Model</th></tr></thead><tbody>${rows}</tbody></table></div></div>` : '<div class="card empty">No disease checks saved yet.</div>'}`;
+}
+function vExport() {
+  const rows = S.exports.map(e => `<tr><td><b>${esc(e.label || "Untitled")}</b></td><td>${esc(e.species)}</td><td>${fmt(e.durationHours, 0)} h</td><td>${nice(e.mode)}</td>
+    <td>${e.feasible ? pill(e.meetsTarget ? "Meets target" : "Below target", e.meetsTarget ? "ok" : "bad") : pill("Not feasible", "bad")}</td>
+    <td>${e.fishPerBag ?? "–"}</td><td>${e.bagsNeeded ?? "–"}</td><td>${e.survivalPct == null ? "–" : fmt(e.survivalPct, 1) + "%"}</td><td>${e.worstSurvivalPct == null ? "–" : fmt(e.worstSurvivalPct, 1) + "%"}</td><td class="muted">${ago(e.createdAt)}</td></tr>`).join("");
+  return `${banner()}${S.exports.length ? `<div class="card"><div class="tw"><table><thead><tr><th>Plan</th><th>Species</th><th>Transit</th><th>Mode</th><th>Verdict</th><th>Fish/bag</th><th>Bags</th><th>Survival</th><th>Worst case</th><th>Saved</th></tr></thead><tbody>${rows}</tbody></table></div></div>` : '<div class="card empty">No export plans saved yet.</div>'}`;
+}
+function vSettings() {
+  return `${banner()}<div class="card"><div class="form">
+    <label class="f">Data source<select id="cMode">
+      <option value="demo" ${cfg.mode === "demo" ? "selected" : ""}>Demo data (no servers needed)</option>
+      <option value="proxy" ${cfg.mode === "proxy" ? "selected" : ""}>Live via serve.py proxy (recommended)</option>
+      <option value="direct" ${cfg.mode === "direct" ? "selected" : ""}>Live, direct URLs (needs CORS on the servers)</option></select></label>
+    <label class="f">Backend URL (direct mode)<input id="cBackend" placeholder="http://localhost:8080" value="${esc(cfg.backend)}"></label>
+    <label class="f">Water-quality controller URL (direct mode)<input id="cWater" placeholder="http://localhost:8000" value="${esc(cfg.water)}"></label>
+    <label class="f">Access token (backend JWT from sign-in)<input id="cToken" type="password" autocomplete="off" placeholder="paste access token" value="${esc(cfg.token)}"></label>
+    <div class="muted sm">The token is kept only in this browser (localStorage) and sent to the backend as a Bearer token. Run <code>python3 dashboard/serve.py</code> to start the proxy.</div>
+    <div class="row"><button class="primary" id="cSave">Save and reload</button><button id="cTheme">Toggle dark mode</button></div>
+  </div></div>`;
+}
+const VIEWS = { overview: vOverview, feeding: vFeeding, water: vWater, disease: vDisease, export: vExport, settings: vSettings };
+
+function render() {
+  const mp = $("#modePill");
+  mp.textContent = S.demo ? "Demo data" : S.loading ? "Loading…" : cfg.mode === "proxy" ? "Live (proxy)" : "Live (direct)";
+  mp.className = "pill " + (S.demo ? "brand" : (S.status.backend === "ok" || S.status.water === "ok") ? "ok" : "warn");
+  const sel = $("#facilitySel");
+  sel.hidden = S.facilities.length < 2;
+  sel.innerHTML = S.facilities.map(f => `<option value="${esc(f.id)}" ${f.id === S.facilityId ? "selected" : ""}>${esc(f.name)}</option>`).join("");
+  $("#updated").textContent = S.updated ? `Updated ${S.updated.toLocaleTimeString()}` : "";
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === S.tab));
+  $("#main").innerHTML = (VIEWS[S.tab] || vOverview)();
+}
+
+/* ============================ events ============================ */
+document.addEventListener("click", async e => {
+  const tab = e.target.closest("[data-tab]");
+  if (tab) { S.tab = tab.dataset.tab; store.set("aq.tab", S.tab); return render(); }
+  const prm = e.target.closest("[data-param]");
+  if (prm) { S.water.param = prm.dataset.param; try { await loadHistory(); } catch {} return render(); }
+  if (e.target.id === "refreshBtn") return loadAll();
+  if (e.target.id === "cTheme") {
+    const dark = document.documentElement.dataset.theme !== "dark";
+    document.documentElement.dataset.theme = dark ? "dark" : "light"; store.set("aq.theme", dark ? "dark" : "light"); return;
+  }
+  if (e.target.id === "cSave") {
+    cfg.mode = $("#cMode").value; cfg.backend = $("#cBackend").value.trim(); cfg.water = $("#cWater").value.trim(); cfg.token = $("#cToken").value.trim();
+    saveCfg(); S.tab = "overview"; return loadAll();
+  }
+});
+document.addEventListener("change", async e => {
+  if (e.target.id === "facilitySel") { S.facilityId = e.target.value; cfg.facilityId = S.facilityId; saveCfg(); return loadAll(); }
+  if (e.target.id === "waterTank") { S.water.tankId = e.target.value; return loadAll(); }
+});
+const savedTheme = store.get("aq.theme", null); if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+loadAll();
+setInterval(() => { if (!document.hidden && !S.demo && S.tab !== "settings") loadAll(); }, 15000);
+</script>
+</body>
+</html>
