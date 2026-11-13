@@ -33,8 +33,16 @@ class _ExportAdvisoryScreenState extends State<ExportAdvisoryScreen>
   static const _journeyTab = 1;
   static const _unpackingTab = 2;
 
-  late final _tabs = TabController(length: 4, vsync: this);
+  late final TabController _tabs;
   var _metric = _JourneyMetric.survival;
+
+  @override
+  void initState() {
+    super.initState();
+    // Created eagerly: an infeasible plan never builds the tabs, and a lazy
+    // controller would otherwise be created for the first time in dispose().
+    _tabs = TabController(length: 4, vsync: this);
+  }
 
   @override
   void dispose() {
@@ -224,10 +232,7 @@ class _MethodCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 11,
-                  child: Text(
-                    '${i + 1}',
-                    style: theme.textTheme.labelSmall,
-                  ),
+                  child: Text('${i + 1}', style: theme.textTheme.labelSmall),
                 ),
                 const SizedBox(width: 10),
                 Expanded(child: Text(method.steps[i], style: body)),
@@ -341,14 +346,11 @@ class _VerdictCard extends StatelessWidget {
               style: theme.textTheme.titleMedium?.copyWith(color: onCard),
             )
           else ...[
-            Text(
-              switch (mode) {
-                PlanningMode.suggest => 'Pack',
-                PlanningMode.fixedBags => 'Your bags hold',
-                PlanningMode.check => 'You pack',
-              },
-              style: theme.textTheme.titleMedium?.copyWith(color: onCard),
-            ),
+            Text(switch (mode) {
+              PlanningMode.suggest => 'Pack',
+              PlanningMode.fixedBags => 'Your bags hold',
+              PlanningMode.check => 'You pack',
+            }, style: theme.textTheme.titleMedium?.copyWith(color: onCard)),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,

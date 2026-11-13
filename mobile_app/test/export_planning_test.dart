@@ -269,7 +269,13 @@ void main() {
     });
 
     testWidgets('check mode shows the safety verdict', (tester) async {
+      // The overview is a lazily built list; use a tall window so the
+      // "What is in your bag" section is built.
+      tester.view.physicalSize = const Size(800, 4000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final json = jsonDecode(sampleAdvisoryJson) as Map<String, dynamic>
+        ..['mode'] = 'check'
         ..['verdict'] = {
           'mode': 'check',
           'meets_target': false,
