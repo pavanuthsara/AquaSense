@@ -3,6 +3,7 @@ package com.aquasense.backend.auth.web;
 import java.time.Instant;
 import java.util.Map;
 
+import com.aquasense.backend.disease.service.DiseaseCheckException;
 import com.aquasense.backend.facility.service.FacilityException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(FacilityException.class)
     ResponseEntity<Map<String, Object>> facilityFailure(FacilityException exception) {
+        return error(exception.getStatus(), exception.getCode(), exception.getMessage());
+    }
+
+    @ExceptionHandler(DiseaseCheckException.class)
+    ResponseEntity<Map<String, Object>> diseaseCheckFailure(DiseaseCheckException exception) {
         return error(exception.getStatus(), exception.getCode(), exception.getMessage());
     }
 

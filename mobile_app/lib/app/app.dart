@@ -6,6 +6,21 @@ import '../features/auth/presentation/authentication_scope.dart';
 import '../features/export/data/development_export_repository.dart';
 import '../features/export/domain/export_repository.dart';
 import '../features/export/presentation/export_repository_scope.dart';
+import '../features/disease_check/data/development_disease_check_repository.dart';
+import '../features/disease_check/data/image_picker_fish_video_source.dart';
+import '../features/disease_check/data/image_picker_photo_source.dart';
+import '../features/disease_check/data/tflite_disease_classifier.dart';
+import '../features/disease_check/data/tflite_fish_crop_classifier.dart';
+import '../features/disease_check/data/tflite_fish_detector.dart';
+import '../features/disease_check/data/thumbnail_video_frame_extractor.dart';
+import '../features/disease_check/domain/disease_check_repository.dart';
+import '../features/disease_check/domain/disease_classifier.dart';
+import '../features/disease_check/domain/fish_crop_classifier.dart';
+import '../features/disease_check/domain/fish_detector.dart';
+import '../features/disease_check/domain/fish_photo_source.dart';
+import '../features/disease_check/domain/fish_video_source.dart';
+import '../features/disease_check/domain/video_frame_extractor.dart';
+import '../features/disease_check/presentation/disease_check_scope.dart';
 import '../features/facility/domain/facility_repository.dart';
 import '../features/facility/domain/facility_selection_store.dart';
 import '../features/facility/presentation/facility_repository_scope.dart';
@@ -24,6 +39,13 @@ class AquaSenseApp extends StatefulWidget {
     required this.facilityRepository,
     required this.facilitySelectionStore,
     this.exportRepository,
+    this.diseaseClassifier,
+    this.diseaseCheckRepository,
+    this.fishPhotoSource,
+    this.fishDetector,
+    this.fishCropClassifier,
+    this.fishVideoSource,
+    this.videoFrameExtractor,
     super.key,
   });
 
@@ -35,6 +57,14 @@ class AquaSenseApp extends StatefulWidget {
 
   /// Export planning backend; defaults to the offline sample repository.
   final ExportRepository? exportRepository;
+  /// Optional so existing tests keep working; defaults are created below.
+  final DiseaseClassifier? diseaseClassifier;
+  final DiseaseCheckRepository? diseaseCheckRepository;
+  final FishPhotoSource? fishPhotoSource;
+  final FishDetector? fishDetector;
+  final FishCropClassifier? fishCropClassifier;
+  final FishVideoSource? fishVideoSource;
+  final VideoFrameExtractor? videoFrameExtractor;
 
   @override
   State<AquaSenseApp> createState() => _AquaSenseAppState();
@@ -44,10 +74,28 @@ class _AquaSenseAppState extends State<AquaSenseApp> {
   late final AuthenticationController _authenticationController;
   late final ExportRepository _exportRepository =
       widget.exportRepository ?? DevelopmentExportRepository();
+  late final DiseaseClassifier _diseaseClassifier;
+  late final DiseaseCheckRepository _diseaseCheckRepository;
+  late final FishPhotoSource _fishPhotoSource;
+  late final FishDetector _fishDetector;
+  late final FishCropClassifier _fishCropClassifier;
+  late final FishVideoSource _fishVideoSource;
+  late final VideoFrameExtractor _videoFrameExtractor;
 
   @override
   void initState() {
     super.initState();
+    // The model itself is only loaded the first time a fish is checked.
+    _diseaseClassifier = widget.diseaseClassifier ?? TfliteDiseaseClassifier();
+    _diseaseCheckRepository =
+        widget.diseaseCheckRepository ?? DevelopmentDiseaseCheckRepository();
+    _fishPhotoSource = widget.fishPhotoSource ?? ImagePickerPhotoSource();
+    _fishDetector = widget.fishDetector ?? TfliteFishDetector();
+    _fishCropClassifier =
+        widget.fishCropClassifier ?? TfliteFishCropClassifier();
+    _fishVideoSource = widget.fishVideoSource ?? ImagePickerFishVideoSource();
+    _videoFrameExtractor =
+        widget.videoFrameExtractor ?? const ThumbnailVideoFrameExtractor();
     _authenticationController = AuthenticationController(
       repository: widget.authenticationRepository,
     );
@@ -57,6 +105,15 @@ class _AquaSenseAppState extends State<AquaSenseApp> {
   @override
   void dispose() {
     _authenticationController.dispose();
+    if (widget.diseaseClassifier == null) {
+      _diseaseClassifier.dispose();
+    }
+    if (widget.fishDetector == null) {
+      _fishDetector.dispose();
+    }
+    if (widget.fishCropClassifier == null) {
+      _fishCropClassifier.dispose();
+    }
     super.dispose();
   }
 
@@ -72,6 +129,14 @@ class _AquaSenseAppState extends State<AquaSenseApp> {
             repository: widget.facilityRepository,
             child: ExportRepositoryScope(
               repository: _exportRepository,
+              child: DiseaseCheckScope(
+              classifier: _diseaseClassifier,
+              repository: _diseaseCheckRepository,
+              photoSource: _fishPhotoSource,
+              fishDetector: _fishDetector,
+              fishCropClassifier: _fishCropClassifier,
+              videoSource: _fishVideoSource,
+              frameExtractor: _videoFrameExtractor,
               child: MaterialApp(
                 title: 'AquaSense',
                 debugShowCheckedModeBanner: !widget.environment.isProduction,
@@ -83,6 +148,7 @@ class _AquaSenseAppState extends State<AquaSenseApp> {
                   onboardingRepository: widget.onboardingRepository,
                 ).onGenerateRoute,
               ),
+            ),
             ),
           ),
         ),

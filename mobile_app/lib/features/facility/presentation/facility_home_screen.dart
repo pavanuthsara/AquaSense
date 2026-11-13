@@ -6,6 +6,7 @@ import '../../auth/presentation/authentication_scope.dart';
 import '../../export/data/development_export_repository.dart';
 import '../../export/presentation/export_plans_screen.dart';
 import '../../export/presentation/export_repository_scope.dart';
+import '../../disease_check/presentation/fish_health_card.dart';
 import '../domain/facility.dart';
 import 'selected_facility_scope.dart';
 
@@ -254,6 +255,8 @@ class FacilityHomeScreen extends StatelessWidget {
                 onTap: () => _openExportPlanning(context, facility),
               ),
             ),
+            const SizedBox(height: 20),
+            const FishHealthCard(),
           ],
         ),
       ),

@@ -1,0 +1,3 @@
+healthy
+not_fish
+white_spot

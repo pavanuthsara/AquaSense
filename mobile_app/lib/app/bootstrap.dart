@@ -11,6 +11,9 @@ import '../features/auth/domain/authentication_repository.dart';
 import '../features/export/data/development_export_repository.dart';
 import '../features/export/data/http_export_repository.dart';
 import '../features/export/domain/export_repository.dart';
+import '../features/disease_check/data/development_disease_check_repository.dart';
+import '../features/disease_check/data/http_disease_check_repository.dart';
+import '../features/disease_check/domain/disease_check_repository.dart';
 import '../features/facility/data/development_facility_repository.dart';
 import '../features/facility/data/http_facility_repository.dart';
 import '../features/facility/data/shared_preferences_facility_selection_store.dart';
@@ -28,6 +31,7 @@ Future<void> bootstrap({
   FacilityRepository? facilityRepository,
   FacilitySelectionStore? facilitySelectionStore,
   ExportRepository? exportRepository,
+  DiseaseCheckRepository? diseaseCheckRepository,
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -54,6 +58,14 @@ Future<void> bootstrap({
               sessionStorage: sessionStorage,
             )
           : DevelopmentFacilityRepository());
+  final resolvedDiseaseCheckRepository =
+      diseaseCheckRepository ??
+      (resolvedEnvironment.usesRealAuthentication
+          ? HttpDiseaseCheckRepository(
+              apiBaseUrl: resolvedEnvironment.apiBaseUrl,
+              sessionStorage: sessionStorage,
+            )
+          : DevelopmentDiseaseCheckRepository());
   final resolvedFacilitySelectionStore =
       facilitySelectionStore ?? SharedPreferencesFacilitySelectionStore();
   final resolvedExportRepository =
@@ -90,6 +102,7 @@ Future<void> bootstrap({
         onboardingRepository: resolvedOnboardingRepository,
         authenticationRepository: resolvedAuthenticationRepository,
         facilityRepository: resolvedFacilityRepository,
+        diseaseCheckRepository: resolvedDiseaseCheckRepository,
         facilitySelectionStore: resolvedFacilitySelectionStore,
         exportRepository: resolvedExportRepository,
       ),

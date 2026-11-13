@@ -1,0 +1,25 @@
+[
+ {
+  "j": 0,
+  "box": [
+   5,
+   400,
+   720,
+   850
+  ],
+  "crop_box": [
+   0,
+   346,
+   720,
+   904
+  ],
+  "probs": [
+   0.0,
+   0.0,
+   1.0
+  ],
+  "white_spot_score": 1.0,
+  "not_fish": false,
+  "too_small": false
+ }
+]

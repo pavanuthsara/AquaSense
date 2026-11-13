@@ -1,0 +1,42 @@
+{
+ "clip": "WhatsApp Video 2026-10-16 at 11.34.27.mp4",
+ "labels": [
+  "healthy",
+  "not_fish",
+  "white_spot"
+ ],
+ "frame_times_s": [
+  1.0,
+  3.0,
+  5.0
+ ],
+ "frames": [
+  {
+   "k": 1,
+   "time_s": 1.0,
+   "width": 720,
+   "height": 1280,
+   "det_rows": 5,
+   "det_cols": 5376,
+   "box_count": 1
+  },
+  {
+   "k": 2,
+   "time_s": 3.0,
+   "width": 720,
+   "height": 1280,
+   "det_rows": 5,
+   "det_cols": 5376,
+   "box_count": 1
+  },
+  {
+   "k": 3,
+   "time_s": 5.0,
+   "width": 720,
+   "height": 1280,
+   "det_rows": 5,
+   "det_cols": 5376,
+   "box_count": 1
+  }
+ ]
+}
