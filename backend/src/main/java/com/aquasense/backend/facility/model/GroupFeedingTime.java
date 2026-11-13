@@ -59,6 +59,10 @@ public class GroupFeedingTime {
         nextExecutionAt = automationEnabled ? nextOccurrence(localTime, timeZone, now) : null;
     }
 
+    public void advance(ZoneId timeZone, Instant after) {
+        nextExecutionAt = nextOccurrence(localTime, timeZone, after);
+    }
+
     public static Instant nextOccurrence(LocalTime localTime, ZoneId timeZone, Instant now) {
         LocalDate localDate = now.atZone(timeZone).toLocalDate();
         ZonedDateTime candidate = localDate.atTime(localTime).atZone(timeZone);
@@ -69,6 +73,7 @@ public class GroupFeedingTime {
     }
 
     public UUID getId() { return id; }
+    public TankGroup getTankGroup() { return tankGroup; }
     public LocalTime getLocalTime() { return localTime; }
     public Instant getNextExecutionAt() { return nextExecutionAt; }
 }

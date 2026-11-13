@@ -54,6 +54,12 @@ public class TankFeedingTime {
         nextExecutionAt = null;
     }
 
+    public void advance(ZoneId timeZone, Instant after) {
+        nextExecutionAt = GroupFeedingTime.nextOccurrence(localTime, timeZone, after);
+    }
+
+    public UUID getId() { return id; }
+    public Tank getTank() { return tank; }
     public LocalTime getLocalTime() { return localTime; }
     public Instant getNextExecutionAt() { return nextExecutionAt; }
 }

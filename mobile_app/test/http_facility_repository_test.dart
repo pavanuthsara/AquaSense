@@ -274,6 +274,12 @@ void main() {
       expect(requests.first.url.queryParameters['tag'], 'breeding');
       expect(detail.observationState, TankObservationState.stale);
       expect(detail.deviceStatus, TankDeviceStatus.offline);
+      expect(detail.appetiteObservation?.appetiteResult, AppetiteResult.low);
+      expect(detail.appetiteObservation?.ownerReviewRequired, isTrue);
+      expect(detail.appetiteObservation?.reviewReasons, [
+        'LOW_CONFIDENCE',
+        'COUNT_INCONSISTENT',
+      ]);
       expect(detail.scheduleMode, TankScheduleMode.override);
       expect(scheduled.feedingTimes, ['08:00', '16:00']);
       expect(detail.recentActivity.single.title, 'Tank created');
@@ -483,6 +489,19 @@ const _tankDetailJson =
   "tank": $_tankJson,
   "observationState": "STALE",
   "deviceStatus": "OFFLINE",
+  "appetiteObservation": {
+    "id": "observation-1",
+    "tankId": "tank-1",
+    "detectedGuppyCount": 40,
+    "confidence": 0.61,
+    "appetiteResult": "LOW",
+    "modelVersion": "guppy-appetite-v1",
+    "observedAt": "2026-10-19T07:58:00Z",
+    "receivedAt": "2026-10-19T07:58:02Z",
+    "validForFeedingDecision": false,
+    "ownerReviewRequired": true,
+    "reviewReasons": ["LOW_CONFIDENCE", "COUNT_INCONSISTENT"]
+  },
   "scheduleMode": "OVERRIDE",
   "inheritedFeedingTimes": ["07:00", "17:00"],
   "feedingTimes": ["08:00", "16:00"],

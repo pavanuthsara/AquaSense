@@ -321,6 +321,11 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
             ],
           ),
           const SizedBox(height: 14),
+          _AppetiteObservationSection(
+            observation: detail.appetiteObservation,
+            dateLabel: _date,
+          ),
+          const SizedBox(height: 14),
           _Section(
             title: 'Feeding and hardware',
             children: [
@@ -437,6 +442,70 @@ class _TankDetailScreenState extends State<TankDetailScreen> {
     return '${local.year}-${two(local.month)}-${two(local.day)} '
         '${two(local.hour)}:${two(local.minute)}';
   }
+}
+
+class _AppetiteObservationSection extends StatelessWidget {
+  const _AppetiteObservationSection({
+    required this.observation,
+    required this.dateLabel,
+  });
+
+  final TankAppetiteObservation? observation;
+  final String Function(DateTime) dateLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = observation;
+    if (item == null) {
+      return const _Section(
+        title: 'Appetite observation',
+        children: [
+          _InfoRow(
+            label: 'Status',
+            value: 'No appetite observation received yet',
+          ),
+        ],
+      );
+    }
+    final reasons = item.reviewReasons.map(_reviewReason).join(', ');
+    return _Section(
+      title: 'Appetite observation',
+      children: [
+        _InfoRow(
+          label: 'Appetite',
+          value: item.appetiteResult == AppetiteResult.high ? 'High' : 'Low',
+        ),
+        _InfoRow(
+          label: 'Detected',
+          value: '${item.detectedGuppyCount} guppies',
+        ),
+        _InfoRow(
+          label: 'Confidence',
+          value: '${(item.confidence * 100).toStringAsFixed(0)}%',
+        ),
+        _InfoRow(label: 'Observed', value: dateLabel(item.observedAt)),
+        _InfoRow(label: 'Model', value: item.modelVersion),
+        _InfoRow(
+          label: 'Safety',
+          value: item.validForFeedingDecision
+              ? 'Valid for feeding decision'
+              : 'Not valid for feeding decision',
+        ),
+        if (item.ownerReviewRequired)
+          _InfoRow(
+            label: 'Review',
+            value: reasons.isEmpty ? 'Owner review required' : reasons,
+          ),
+      ],
+    );
+  }
+
+  String _reviewReason(String reason) => switch (reason) {
+    'STALE' => 'Observation is stale',
+    'LOW_CONFIDENCE' => 'Low confidence',
+    'COUNT_INCONSISTENT' => 'Count differs from expected',
+    _ => reason,
+  };
 }
 
 class _DeviceHealthRow extends StatelessWidget {

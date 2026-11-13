@@ -50,6 +50,34 @@ class ProvisionedTankDevice {
 
 enum TankScheduleMode { inherited, override }
 
+enum AppetiteResult { high, low }
+
+class TankAppetiteObservation {
+  const TankAppetiteObservation({
+    required this.id,
+    required this.detectedGuppyCount,
+    required this.confidence,
+    required this.appetiteResult,
+    required this.modelVersion,
+    required this.observedAt,
+    required this.receivedAt,
+    required this.validForFeedingDecision,
+    required this.ownerReviewRequired,
+    required this.reviewReasons,
+  });
+
+  final String id;
+  final int detectedGuppyCount;
+  final double confidence;
+  final AppetiteResult appetiteResult;
+  final String modelVersion;
+  final DateTime observedAt;
+  final DateTime receivedAt;
+  final bool validForFeedingDecision;
+  final bool ownerReviewRequired;
+  final List<String> reviewReasons;
+}
+
 class Tank {
   const Tank({
     required this.id,
@@ -191,6 +219,7 @@ class TankDetail {
     this.lastFeedingAt,
     this.nextFeedingAt,
     this.deviceHealth,
+    this.appetiteObservation,
   });
 
   final Tank tank;
@@ -202,5 +231,6 @@ class TankDetail {
   final DateTime? lastFeedingAt;
   final DateTime? nextFeedingAt;
   final TankHardwareHealth? deviceHealth;
+  final TankAppetiteObservation? appetiteObservation;
   final List<TankActivity> recentActivity;
 }

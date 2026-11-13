@@ -155,6 +155,13 @@ public class Tank {
         this.updatedAt = now;
     }
 
+    public void recordDetectedCount(int detectedGuppyCount, BigDecimal confidence, Instant observedAt, Instant now) {
+        this.detectedGuppyCount = detectedGuppyCount;
+        this.detectionConfidence = confidence;
+        this.countObservedAt = observedAt;
+        this.updatedAt = now;
+    }
+
     public UUID getId() { return id; }
     public Facility getFacility() { return facility; }
     public TankGroup getGroup() { return group; }

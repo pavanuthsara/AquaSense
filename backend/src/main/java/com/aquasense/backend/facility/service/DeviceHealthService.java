@@ -77,6 +77,13 @@ public class DeviceHealthService {
 
     @Transactional
     public TankDevice heartbeat(UUID deviceId, String token, boolean healthy, String message) {
+        TankDevice device = authenticate(deviceId, token);
+        device.recordHeartbeat(healthy, message, Instant.now());
+        return device;
+    }
+
+    @Transactional(readOnly = true)
+    public TankDevice authenticate(UUID deviceId, String token) {
         TankDevice device = devices.findById(deviceId)
                 .orElseThrow(this::invalidDeviceCredential);
         if (token == null || token.isBlank()
@@ -85,7 +92,6 @@ public class DeviceHealthService {
                         hash(token).getBytes(StandardCharsets.US_ASCII))) {
             throw invalidDeviceCredential();
         }
-        device.recordHeartbeat(healthy, message, Instant.now());
         return device;
     }
 

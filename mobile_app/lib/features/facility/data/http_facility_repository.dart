@@ -726,6 +726,11 @@ class HttpFacilityRepository implements FacilityRepository {
       deviceHealth: json['deviceHealth'] is Map<String, dynamic>
           ? _deviceHealthFromJson(json['deviceHealth'] as Map<String, dynamic>)
           : null,
+      appetiteObservation: json['appetiteObservation'] is Map<String, dynamic>
+          ? _appetiteObservationFromJson(
+              json['appetiteObservation'] as Map<String, dynamic>,
+            )
+          : null,
       scheduleMode: switch (json['scheduleMode']) {
         'OVERRIDE' => TankScheduleMode.override,
         'INHERITED' || null => TankScheduleMode.inherited,
@@ -752,6 +757,27 @@ class HttpFacilityRepository implements FacilityRepository {
             );
           })
           .toList(growable: false),
+    );
+  }
+
+  TankAppetiteObservation _appetiteObservationFromJson(
+    Map<String, dynamic> json,
+  ) {
+    return TankAppetiteObservation(
+      id: json['id'] as String,
+      detectedGuppyCount: json['detectedGuppyCount'] as int,
+      confidence: (json['confidence'] as num).toDouble(),
+      appetiteResult: json['appetiteResult'] == 'LOW'
+          ? AppetiteResult.low
+          : AppetiteResult.high,
+      modelVersion: json['modelVersion'] as String,
+      observedAt: DateTime.parse(json['observedAt'] as String).toUtc(),
+      receivedAt: DateTime.parse(json['receivedAt'] as String).toUtc(),
+      validForFeedingDecision:
+          json['validForFeedingDecision'] as bool? ?? false,
+      ownerReviewRequired: json['ownerReviewRequired'] as bool? ?? false,
+      reviewReasons: (json['reviewReasons'] as List<dynamic>? ?? const [])
+          .cast<String>(),
     );
   }
 

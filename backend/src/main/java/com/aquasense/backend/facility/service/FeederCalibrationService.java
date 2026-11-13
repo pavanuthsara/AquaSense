@@ -91,8 +91,12 @@ public class FeederCalibrationService {
                     "invalid_fish_count",
                     "Fish count must be between 0 and 1,000,000");
         }
-        Optional<FeederCalibration> active = calibrations
-                .findFirstByFacility_IdOrderByVersionDesc(facilityId);
+        return calculateForFeeding(facilityId, fishCount);
+    }
+
+    @Transactional(readOnly = true)
+    public PortionPreview calculateForFeeding(UUID facilityId, int fishCount) {
+        Optional<FeederCalibration> active = calibrations.findFirstByFacility_IdOrderByVersionDesc(facilityId);
         if (active.isEmpty()) {
             return new PortionPreview(fishCount, null, null, null, "NOT_CONFIGURED");
         }

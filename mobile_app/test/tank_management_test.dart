@@ -181,6 +181,18 @@ void main() {
           feedingTimes: const ['08:00', '16:00'],
           lastFeedingAt: DateTime.utc(2026, 10, 19, 8),
           nextFeedingAt: DateTime.utc(2026, 10, 19, 16),
+          appetiteObservation: TankAppetiteObservation(
+            id: 'observation-1',
+            detectedGuppyCount: 40,
+            confidence: 0.61,
+            appetiteResult: AppetiteResult.low,
+            modelVersion: 'guppy-appetite-v1',
+            observedAt: DateTime.utc(2026, 10, 19, 7, 58),
+            receivedAt: DateTime.utc(2026, 10, 19, 7, 58, 2),
+            validForFeedingDecision: false,
+            ownerReviewRequired: true,
+            reviewReasons: const ['LOW_CONFIDENCE', 'COUNT_INCONSISTENT'],
+          ),
           recentActivity: [
             TankActivity(
               type: 'COUNT_OBSERVED',
@@ -208,6 +220,18 @@ void main() {
     expect(find.byKey(const Key('edit-tank-button')), findsNothing);
     expect(find.byKey(const Key('archive-tank-button')), findsNothing);
     expect(find.byKey(const Key('edit-tank-schedule-button')), findsNothing);
+
+    await tester.scrollUntilVisible(
+      find.text('Not valid for feeding decision'),
+      180,
+      scrollable: _verticalScrollable(),
+    );
+    expect(find.text('Low'), findsOneWidget);
+    expect(find.text('guppy-appetite-v1'), findsOneWidget);
+    expect(
+      find.text('Low confidence, Count differs from expected'),
+      findsOneWidget,
+    );
 
     await tester.scrollUntilVisible(
       find.text('08:00, 16:00'),

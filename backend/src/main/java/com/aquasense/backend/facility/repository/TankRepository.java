@@ -31,10 +31,18 @@ public interface TankRepository extends JpaRepository<Tank, UUID>, JpaSpecificat
             @Param("id") UUID id,
             @Param("facilityId") UUID facilityId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = {"facility", "group"})
+    @Query("select tank from Tank tank where tank.id = :id")
+    Optional<Tank> findByIdForFeedingUpdate(@Param("id") UUID id);
+
     @Query("""
             select distinct tag from Tank tank join tank.tags tag
             where tank.facility.id = :facilityId and tank.archivedAt is null
             order by tag
             """)
     List<String> findActiveTags(@Param("facilityId") UUID facilityId);
+
+    @EntityGraph(attributePaths = {"facility", "group", "tags", "feedingTimes"})
+    List<Tank> findByGroup_IdAndArchivedAtIsNull(UUID groupId);
 }
