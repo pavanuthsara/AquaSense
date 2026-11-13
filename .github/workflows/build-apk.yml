@@ -77,25 +77,27 @@ jobs:
           API_BASE_URL: ${{ inputs.api_base_url || vars.AQUASENSE_API_BASE_URL || 'https://api.example.com' }}
           GOOGLE_CLIENT_ID: ${{ inputs.google_client_id || vars.AQUASENSE_GOOGLE_SERVER_CLIENT_ID || 'ci-placeholder.apps.googleusercontent.com' }}
         run: >-
-          flutter build apk --release
+          flutter build apk --release --split-per-abi
           --dart-define=AQUASENSE_ENV=production
           --dart-define=AQUASENSE_API_BASE_URL="$API_BASE_URL"
           --dart-define=AQUASENSE_GOOGLE_SERVER_CLIENT_ID="$GOOGLE_CLIENT_ID"
 
-      - name: Name the APK
+      - name: Name the APKs
         id: apk
         run: |
           short_sha="${GITHUB_SHA::7}"
-          name="aquasense-${short_sha}.apk"
-          cp build/app/outputs/flutter-apk/app-release.apk "$name"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
+          out=build/app/outputs/flutter-apk
+          for abi in arm64-v8a armeabi-v7a; do
+            cp "$out/app-$abi-release.apk" "aquasense-$abi-$short_sha.apk"
+          done
           echo "tag=apk-${GITHUB_RUN_NUMBER}-${short_sha}" >> "$GITHUB_OUTPUT"
+          echo "short=${short_sha}" >> "$GITHUB_OUTPUT"
 
-      - name: Upload APK artifact
+      - name: Upload APK artifacts
         uses: actions/upload-artifact@v7
         with:
           name: aquasense-android-release
-          path: mobile_app/${{ steps.apk.outputs.name }}
+          path: mobile_app/aquasense-*.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -104,9 +106,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "${{ steps.apk.outputs.tag }}" \
-            "${{ steps.apk.outputs.name }}" \
+            aquasense-arm64-v8a-${{ steps.apk.outputs.short }}.apk \
+            aquasense-armeabi-v7a-${{ steps.apk.outputs.short }}.apk \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --prerelease \
             --title "AquaSense APK (${GITHUB_REF_NAME} @ ${GITHUB_SHA::7})" \
-            --notes "Android APK built from \`${GITHUB_REF_NAME}\` at \`${GITHUB_SHA::7}\`. On your phone: download the .apk, open it, and allow installs from this source when asked. Note: signed with the debug key, intended for testing."
+            --notes "Android APKs built from \`${GITHUB_REF_NAME}\` at \`${GITHUB_SHA::7}\`. Most phones need the **arm64-v8a** file; use **armeabi-v7a** only on old 32-bit phones. Download, open it, and allow installs from this source when asked. Signed with the debug key, for testing."

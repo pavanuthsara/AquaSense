@@ -29,6 +29,15 @@ android {
         versionName = flutter.versionName
     }
 
+    packaging {
+        jniLibs {
+            // Store native libraries compressed and extract them at install time.
+            // Some Xiaomi/MIUI installers reject APKs with uncompressed libraries
+            // ("package appears to be invalid").
+            useLegacyPackaging = true
+        }
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
