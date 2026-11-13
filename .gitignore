@@ -16,6 +16,17 @@ __pycache__/
 # Original research videos and images
 data_collection/
 
+# Water-quality raw CSVs (~100 MB, Udanor IoTPond dataset)
+water_quality/data/
+
+# Trained forecasters (~30 MB); rebuild with `python -m prediction.train`
+water_quality/outputs/prediction/models/
+
+# Baseline controller SQLite databases (one per experiment run)
+*.db
+*.db-wal
+*.db-shm
+
 # YOLO training dataset
 dataset/
 
